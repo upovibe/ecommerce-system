@@ -28,6 +28,7 @@ class RootLayout extends App {
                     </div>
                 </nav>
                 <main id="page-content" class="flex-grow"></main>
+                <div id="toast-container" class="fixed top-6 right-6 z-[9999]"></div>
                 <footer class="bg-white border-t border-gray-200 py-12 px-6">
                     <div class="max-w-7xl mx-auto text-center text-gray-500 text-sm">
                         &copy; 2026 VastCommerce. Universal E-commerce Architecture.

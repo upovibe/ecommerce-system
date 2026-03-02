@@ -14,14 +14,17 @@ class Migration_20260302000007createsettingstable
         $this->pdo->exec("
             CREATE TABLE IF NOT EXISTS settings (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                `key` VARCHAR(100) UNIQUE NOT NULL,
-                `value` TEXT NULL,
-                `type` VARCHAR(50) DEFAULT 'text',
-                `group` VARCHAR(50) DEFAULT 'general',
+                setting_key VARCHAR(255) UNIQUE NOT NULL,
+                setting_value TEXT,
+                setting_type ENUM('text', 'number', 'boolean', 'color', 'file', 'textarea', 'select', 'image', 'array') DEFAULT 'text',
+                category VARCHAR(100) DEFAULT 'general',
+                description TEXT,
+                is_active BOOLEAN DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                INDEX idx_key (`key`),
-                INDEX idx_group (`group`)
+                INDEX idx_setting_key (setting_key),
+                INDEX idx_category (category),
+                INDEX idx_active (is_active)
             )
         ");
     }

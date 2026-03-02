@@ -4,11 +4,16 @@
 export default {
   login: {
     redirectIfAuth: true,
-    redirectTo: "/admin",
+    redirectTo: (user) =>
+      user?.user_type === "admin" ? "/dashboard/admin" : "/profile",
   },
-  admin: {
+  "dashboard/admin": {
     requireAuth: true,
     requireRole: "admin",
+    redirectTo: "/login",
+  },
+  profile: {
+    requireAuth: true,
     redirectTo: "/login",
   },
   "*": {
