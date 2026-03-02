@@ -2,7 +2,7 @@
  * Basic Middleware for E-commerce System
  */
 export default {
-  login: {
+  auth: {
     redirectIfAuth: true,
     redirectTo: (user) =>
       user?.user_type === "admin" ? "/dashboard/admin" : "/profile",
@@ -10,14 +10,19 @@ export default {
   "dashboard/admin": {
     requireAuth: true,
     requireRole: "admin",
-    redirectTo: "/login",
+    redirectTo: "/auth/login",
   },
   profile: {
     requireAuth: true,
-    redirectTo: "/login",
+    redirectTo: "/auth/login",
+  },
+  public: {
+    requireAuth: false,
+    logAccess: false,
   },
   "*": {
     requireAuth: false,
     logAccess: false,
+    redirectTo: (user) => (window.location.pathname === "/" ? "/public" : null),
   },
 };

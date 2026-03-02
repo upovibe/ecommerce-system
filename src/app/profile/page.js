@@ -16,7 +16,7 @@ class ProfilePage extends App {
   handleLogout() {
     localStorage.removeItem("token");
     localStorage.removeItem("userData");
-    window.location.href = "/login";
+    window.location.href = "/auth/login";
   }
 
   render() {

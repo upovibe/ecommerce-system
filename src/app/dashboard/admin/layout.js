@@ -5,7 +5,7 @@ class AdminLayout extends App {
     super.connectedCallback();
     // Check auth
     if (!localStorage.getItem("token")) {
-      window.location.href = "/login";
+      window.location.href = "/auth/login";
       return;
     }
   }
@@ -13,7 +13,7 @@ class AdminLayout extends App {
   handleLogout() {
     localStorage.removeItem("token");
     localStorage.removeItem("userData");
-    window.location.href = "/login";
+    window.location.href = "/auth/login";
   }
 
   render() {

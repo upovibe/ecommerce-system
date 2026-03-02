@@ -17,7 +17,7 @@ class AdminDashboard extends App {
     document.title = "Dashboard | VastCommerce Admin";
     // Check if logged in
     if (!localStorage.getItem("token")) {
-      window.location.href = "/login";
+      window.location.href = "/auth/login";
       return;
     }
   }
