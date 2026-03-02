@@ -1,7 +1,8 @@
 <?php
 // api/core/BaseModel.php - Base class for all database models
 
-class BaseModel {
+class BaseModel
+{
     protected $pdo;
     protected static $table = '';
     protected $attributes = [];
@@ -11,30 +12,41 @@ class BaseModel {
     protected static $timestamps = true;
     protected static $casts = [];
 
-    public function __construct($pdo) {
+    public function __construct($pdo)
+    {
         $this->pdo = $pdo;
         $this->table = static::$table;
     }
 
-    protected function getTableName() {
+    public function getPdo()
+    {
+        return $this->pdo;
+    }
+
+    protected function getTableName()
+    {
         return (string)(static::$table ?: $this->table);
     }
 
     // Dynamic property handling
-    public function __get($name) {
+    public function __get($name)
+    {
         return $this->attributes[$name] ?? null;
     }
 
-    public function __set($name, $value) {
+    public function __set($name, $value)
+    {
         $this->attributes[$name] = $value;
     }
 
-    public function __isset($name) {
+    public function __isset($name)
+    {
         return isset($this->attributes[$name]);
     }
 
     // Set multiple attributes
-    public function fill($data) {
+    public function fill($data)
+    {
         foreach ($data as $key => $value) {
             if (in_array($key, static::$fillable)) {
                 $this->attributes[$key] = $value;
@@ -44,7 +56,8 @@ class BaseModel {
     }
 
     // Get attributes (excluding hidden ones)
-    public function toArray() {
+    public function toArray()
+    {
         $data = $this->attributes;
         foreach (static::$hidden as $hidden) {
             unset($data[$hidden]);
@@ -53,14 +66,16 @@ class BaseModel {
     }
 
     // Where clause builder
-    public static function where($column, $value) {
-        $instance = new static(static::getPdo());
+    public static function where($column, $value)
+    {
+        $instance = new static(static::getStaticPdo());
         $instance->whereConditions[] = [$column, $value];
         return $instance;
     }
 
     // Get first result
-    public function first() {
+    public function first()
+    {
         if (!empty($this->whereConditions)) {
             $conditions = [];
             $values = [];
@@ -71,7 +86,7 @@ class BaseModel {
             $whereClause = implode(' AND ', $conditions);
             $tableName = $this->getTableName();
             $sql = "SELECT * FROM {$tableName} WHERE {$whereClause} LIMIT 1";
-            
+
             try {
                 $stmt = $this->pdo->prepare($sql);
                 $stmt->execute($values);
@@ -88,24 +103,26 @@ class BaseModel {
         return null;
     }
 
-    public function findAll() {
+    public function findAll()
+    {
         try {
             $tableName = $this->getTableName();
             $stmt = $this->pdo->query("SELECT * FROM {$tableName}");
             $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             // Apply casts to each result
             foreach ($results as &$result) {
                 $result = $this->applyCasts($result);
             }
-            
+
             return $results;
         } catch (PDOException $e) {
             throw new Exception('Error fetching all records: ' . $e->getMessage());
         }
     }
 
-    public function findById($id) {
+    public function findById($id)
+    {
         try {
             $tableName = $this->getTableName();
             $stmt = $this->pdo->prepare("SELECT * FROM {$tableName} WHERE id = ?");
@@ -121,7 +138,8 @@ class BaseModel {
         }
     }
 
-    public function create($data) {
+    public function create($data)
+    {
         try {
             // Add timestamps if enabled
             if (static::$timestamps) {
@@ -146,17 +164,18 @@ class BaseModel {
             }
             $stmt->execute();
             $id = $this->pdo->lastInsertId();
-            
+
             // Set the created record's attributes
             $this->attributes = array_merge($processedData, ['id' => $id]);
-            
+
             return $id;
         } catch (PDOException $e) {
             throw new Exception('Error creating record: ' . $e->getMessage());
         }
     }
 
-    public function update($id, $data) {
+    public function update($id, $data)
+    {
         try {
             // Add updated_at timestamp if enabled
             if (static::$timestamps) {
@@ -179,37 +198,38 @@ class BaseModel {
             // Build SET clause with placeholders
             $setParts = [];
             $params = [];
-            
+
             foreach ($filteredData as $key => $value) {
                 $setParts[] = "$key = ?";
                 $params[] = $value;
             }
-            
+
             if (empty($setParts)) {
                 // No valid fields to update
                 return true;
             }
-            
+
             $setClause = implode(', ', $setParts);
             $params[] = $id; // Add ID for WHERE clause
-            
+
             $tableName = $this->getTableName();
             $sql = "UPDATE {$tableName} SET $setClause WHERE id = ?";
-            
+
             $stmt = $this->pdo->prepare($sql);
             $result = $stmt->execute($params);
-            
+
             if ($result) {
                 $this->attributes = array_merge($this->attributes, $filteredData);
             }
-            
+
             return $result;
         } catch (PDOException $e) {
             throw new Exception('Error updating record: ' . $e->getMessage());
         }
     }
 
-    public function delete($id) {
+    public function delete($id)
+    {
         try {
             $tableName = $this->getTableName();
             $stmt = $this->pdo->prepare("DELETE FROM {$tableName} WHERE id = ?");
@@ -220,7 +240,8 @@ class BaseModel {
     }
 
     // Save method for creating or updating
-    public function save() {
+    public function save()
+    {
         if (isset($this->attributes['id'])) {
             $id = $this->attributes['id'];
             unset($this->attributes['id']);
@@ -233,7 +254,8 @@ class BaseModel {
     /**
      * Apply casts to data when retrieving from database
      */
-    protected function applyCasts($data) {
+    protected function applyCasts($data)
+    {
         foreach (static::$casts as $field => $cast) {
             if (isset($data[$field]) && $data[$field] !== null) {
                 switch ($cast) {
@@ -257,18 +279,18 @@ class BaseModel {
         return $data;
     }
 
-    // Get PDO instance (you'll need to implement this based on your connection setup)
-    protected static function getPdo() {
-        // This should return your PDO instance
-        // You might need to adjust this based on how you handle database connections
-        global $pdo; // Assuming you have a global PDO instance
+    // Get PDO instance static wrapper
+    public static function getStaticPdo()
+    {
+        global $pdo;
         return $pdo;
     }
-    
+
     /**
      * Get real IP address
      */
-    protected static function getRealIpAddress() {
+    protected static function getRealIpAddress()
+    {
         // Check for forwarded IP addresses
         $ipKeys = [
             'HTTP_CF_CONNECTING_IP', // Cloudflare
@@ -280,7 +302,7 @@ class BaseModel {
             'HTTP_FORWARDED',        // Forwarded
             'REMOTE_ADDR'            // Direct IP
         ];
-        
+
         foreach ($ipKeys as $key) {
             if (array_key_exists($key, $_SERVER) === true) {
                 foreach (explode(',', $_SERVER[$key]) as $ip) {
@@ -291,18 +313,20 @@ class BaseModel {
                 }
             }
         }
-        
+
         // Fallback to REMOTE_ADDR
         return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
     }
 
     // Override in child classes to define table schema
-    public static function schema() {
+    public static function schema()
+    {
         return [];
     }
 
     // Generate and execute migration SQL
-    public static function migrate($pdo) {
+    public static function migrate($pdo)
+    {
         $schema = static::schema();
         if (empty($schema)) {
             throw new Exception('No schema defined for ' . static::class);
@@ -324,4 +348,3 @@ class BaseModel {
         }
     }
 }
-?> 

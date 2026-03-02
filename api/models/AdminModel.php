@@ -1,18 +1,18 @@
 <?php
-// api/models/UserModel.php
+// api/models/AdminModel.php
 
 require_once __DIR__ . '/../core/BaseModel.php';
 
-class UserModel extends BaseModel
+class AdminModel extends BaseModel
 {
-    protected static $table = 'users';
+    protected static $table = 'admins';
 
     protected static $fillable = [
+        'role_id',
         'name',
         'email',
         'password',
         'phone',
-        'is_guest',
         'status'
     ];
 
@@ -21,7 +21,6 @@ class UserModel extends BaseModel
     ];
 
     protected static $casts = [
-        'is_guest' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];

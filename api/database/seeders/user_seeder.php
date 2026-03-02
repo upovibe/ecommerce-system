@@ -14,6 +14,7 @@ class UserSeeder
     {
         echo "🌱 Seeding default users...\n";
         $this->seedAdminUser();
+        $this->seedCustomerUser();
     }
 
     private function seedAdminUser()
@@ -29,16 +30,16 @@ class UserSeeder
             return;
         }
 
-        $stmt = $this->pdo->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt = $this->pdo->prepare('SELECT id FROM admins WHERE email = ?');
         $stmt->execute(['admin@vastcommerce.com']);
         if ($stmt->fetch()) {
-            echo "⚠️  Admin user already exists\n";
+            echo "⚠️  Admin user already exists in admins table\n";
             return;
         }
 
         $stmt = $this->pdo->prepare('
-            INSERT INTO users (role_id, name, email, password, is_guest, status, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+            INSERT INTO admins (role_id, name, email, password, status, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, NOW(), NOW())
         ');
 
         $stmt->execute([
@@ -46,10 +47,36 @@ class UserSeeder
             'Vast Admin',
             'admin@vastcommerce.com',
             password_hash('admin123', PASSWORD_DEFAULT),
+            'active'
+        ]);
+
+        echo "✅ Seeded admin user into admins table: admin@vastcommerce.com / admin123\n";
+    }
+
+    private function seedCustomerUser()
+    {
+        echo "📝 Seeding customer user into users table...\n";
+
+        $stmt = $this->pdo->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt->execute(['customer@vastcommerce.com']);
+        if ($stmt->fetch()) {
+            echo "⚠️  Customer user already exists in users table\n";
+            return;
+        }
+
+        $stmt = $this->pdo->prepare('
+            INSERT INTO users (name, email, password, is_guest, status, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+        ');
+
+        $stmt->execute([
+            'John Doe Customer',
+            'customer@vastcommerce.com',
+            password_hash('customer123', PASSWORD_DEFAULT),
             0,
             'active'
         ]);
 
-        echo "✅ Seeded admin user: admin@vastcommerce.com / admin123\n";
+        echo "✅ Seeded customer user into users table: customer@vastcommerce.com / customer123\n";
     }
 }

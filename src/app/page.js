@@ -12,6 +12,9 @@ class Page extends App {
     return `
             <div class="py-12 px-6 max-w-7xl mx-auto">
                 <section class="bg-indigo-600 rounded-2xl p-12 text-center text-white mb-12 shadow-xl overflow-hidden relative">
+                    <div class="absolute top-0 right-0 p-6 z-20">
+                        <a href="/login" class="text-white bg-indigo-500 hover:bg-indigo-400 px-6 py-2 rounded-full font-bold transition-all shadow-lg border border-indigo-400">Admin Login</a>
+                    </div>
                     <div class="relative z-10">
                         <h1 class="text-5xl font-extrabold mb-4">One Store, Infinite Possibilities</h1>
                         <p class="text-indigo-100 text-xl mb-8 max-w-2xl mx-auto">From real estate to fast food, cars to fashion. Our universal architecture handles it all.</p>
