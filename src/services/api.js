@@ -1,4 +1,5 @@
-import axios from "axios";
+// Using global axios from script tag in index.html
+const axios = window.axios;
 
 const api = axios.create({
   baseURL: "/api",
