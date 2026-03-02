@@ -1,23 +1,23 @@
 <?php
-// api/models/PageModel.php
+// api/models/OrderModel.php
 
 require_once __DIR__ . '/../core/BaseModel.php';
 
-class PageModel extends BaseModel
+class OrderModel extends BaseModel
 {
-    protected static $table = 'pages';
+    protected static $table = 'orders';
 
     protected static $fillable = [
-        'title',
-        'slug',
-        'content',
-        'meta_info',
-        'is_active'
+        'user_id',
+        'total_amount',
+        'status',
+        'payment_method',
+        'metadata'
     ];
 
     protected static $casts = [
-        'meta_info' => 'json',
-        'is_active' => 'boolean',
+        'total_amount' => 'float',
+        'metadata' => 'json',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];

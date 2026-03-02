@@ -1,22 +1,27 @@
 <?php
-// api/models/PageModel.php
+// api/models/ProductModel.php
 
 require_once __DIR__ . '/../core/BaseModel.php';
 
-class PageModel extends BaseModel
+class ProductModel extends BaseModel
 {
-    protected static $table = 'pages';
+    protected static $table = 'products';
 
     protected static $fillable = [
-        'title',
+        'category_id',
+        'created_by',
+        'name',
         'slug',
-        'content',
-        'meta_info',
+        'type',
+        'description',
+        'base_price',
+        'metadata',
         'is_active'
     ];
 
     protected static $casts = [
-        'meta_info' => 'json',
+        'base_price' => 'float',
+        'metadata' => 'json',
         'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'

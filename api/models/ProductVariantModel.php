@@ -1,22 +1,25 @@
 <?php
-// api/models/PageModel.php
+// api/models/ProductVariantModel.php
 
 require_once __DIR__ . '/../core/BaseModel.php';
 
-class PageModel extends BaseModel
+class ProductVariantModel extends BaseModel
 {
-    protected static $table = 'pages';
+    protected static $table = 'product_variants';
 
     protected static $fillable = [
-        'title',
-        'slug',
-        'content',
-        'meta_info',
+        'product_id',
+        'sku',
+        'price_override',
+        'stock',
+        'variant_options',
         'is_active'
     ];
 
     protected static $casts = [
-        'meta_info' => 'json',
+        'price_override' => 'float',
+        'stock' => 'integer',
+        'variant_options' => 'json',
         'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
