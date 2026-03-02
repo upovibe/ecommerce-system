@@ -3,9 +3,13 @@
  */
 export default {
   auth: {
+    requireAuth: false,
     redirectIfAuth: true,
     redirectTo: (user) =>
       user?.user_type === "admin" ? "/dashboard/admin" : "/profile",
+  },
+  "auth/forgot-password": {
+    requireAuth: false,
   },
   "dashboard/admin": {
     requireAuth: true,

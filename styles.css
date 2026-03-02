@@ -1,0 +1,36 @@
+@layer base {
+  html {
+    font-family: "Inter", ui-sans-serif, system-ui;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-brand {
+    font-family: "Outfit", sans-serif;
+  }
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  color: #0f172a; /* Slate-900 */
+  font-weight: 400;
+}
+
+/* Custom Utilities */
+.tracking-tightest {
+  letter-spacing: -0.05em;
+}
+.tracking-tighter {
+  letter-spacing: -0.025em;
+}
+
+/* Smooth transitions for links and buttons */
+a,
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
