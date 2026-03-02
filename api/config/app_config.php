@@ -3,7 +3,7 @@
 return [
     'db' => [
         'host' => 'localhost', // Change to your DB host
-        'name' => '4555497_church', // Change to your DB name
+        'name' => 'vastcommerce', // Change to your DB name
         'user' => 'root',      // Change to your DB user
         'pass' => '',          // Change to your DB password
     ],
@@ -16,9 +16,9 @@ return [
         'from_address' => 'info@piwcfranklincitytn.org',
         'from_name' => 'PIWC-FC',
     ],
-    'client_url' => 'http://localhost:8081',
-    'api_url' => 'http://localhost:8081/api',
-    'app_url' => 'http://localhost:8081',
+    'client_url' => 'http://localhost:8002',
+    'api_url' => 'http://localhost:8002/api',
+    'app_url' => 'http://localhost:8002',
 ]; 
 
 // cd church-system; php -S localhost:8081           # Run server
