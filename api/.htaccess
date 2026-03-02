@@ -1,0 +1,55 @@
+RewriteEngine On
+
+# Handle Authorization Header
+
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Force HTTPS
+
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301,NE]
+
+# Handle CORS preflight requests
+
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L]
+
+# Set CORS headers
+
+Header always set Access-Control-Allow-Origin "https://church.ntubedglobal.com"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-API-Key, Accept, Origin"
+Header always set Access-Control-Allow-Credentials "true"
+Header always set Access-Control-Max-Age "3600"
+
+# Allow direct access to uploads directory
+RewriteRule ^uploads/ - [L]
+
+# Route all requests to index.php except for existing files
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Protect sensitive directories
+
+<FilesMatch "^(config|controllers|database|models|core|routes|migrate|storage)/">
+    Deny from all
+</FilesMatch>
+
+# Allow access to index.php but block other PHP files
+
+<FilesMatch "^(?!index\.php$).*\.php$">
+    Deny from all
+</FilesMatch>
+
+# PHP settings
+
+<IfModule mod_php.c>
+    php_flag display_errors off
+    php_value max_execution_time 900
+    php_value memory_limit 128M
+    php_flag session.cookie_httponly on
+    php_flag session.use_only_cookies on
+    php_flag session.cookie_secure on
+</IfModule>

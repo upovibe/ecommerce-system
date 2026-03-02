@@ -1,0 +1,6 @@
+# Ignore sensitive env files
+.env
+
+# Other common ignores
+.DS_Store
+Thumbs.db 
