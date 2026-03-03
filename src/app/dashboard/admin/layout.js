@@ -26,9 +26,21 @@ class AdminLayout extends App {
     this.pageContent = "";
   }
 
+  rerender() {
+    if (this.isConnected) {
+      this.innerHTML = this.render();
+    }
+  }
+
   setPageContent(content) {
     this.pageContent = content;
-    this.render();
+    const contentContainer = this.querySelector("[data-page-content]");
+    if (contentContainer) {
+      contentContainer.innerHTML = this.pageContent;
+      this.updateRouteUI();
+      return;
+    }
+    this.rerender();
   }
 
   async connectedCallback() {
@@ -44,11 +56,11 @@ class AdminLayout extends App {
     // Listen for route changes
     window.addEventListener("route-changed", (e) => {
       this.currentPath = e.detail.path;
-      this.render();
+      this.updateRouteUI();
     });
     window.addEventListener("user-data-updated", () => {
       this.userData = JSON.parse(localStorage.getItem("userData") || "{}");
-      this.render();
+      this.rerender();
     });
 
     await this.loadTheme();
@@ -95,7 +107,7 @@ class AdminLayout extends App {
         this.set(key, value);
       });
 
-      this.render();
+      this.rerender();
     } catch (e) {
       console.warn("Theme loading failed", e);
     }
@@ -147,7 +159,38 @@ class AdminLayout extends App {
     } else {
       this.collapsedGroups.add(groupName);
     }
-    this.render();
+    this.rerender();
+  }
+
+  updateRouteUI() {
+    const textColor = this.get("text_color") || "#f8fafc";
+    const title = this.querySelector("[data-page-title]");
+    if (title) {
+      title.textContent = this.getPageTitle().toUpperCase();
+    }
+
+    const navLinks = this.querySelectorAll('ui-link[href]');
+    navLinks.forEach((link) => {
+      const href = link.getAttribute("href");
+      const icon = link.querySelector("i");
+      const isActive = href === this.currentPath;
+
+      if (isActive) {
+        link.classList.add("active", "shadow-lg", "shadow-black/10");
+        link.classList.remove(`text-[${textColor}]/70`, "hover:bg-white/5", "hover:text-white");
+        if (icon) {
+          icon.classList.add("text-white");
+          icon.classList.remove(`text-[${textColor}]/40`, "group-hover:text-white");
+        }
+      } else {
+        link.classList.remove("active", "shadow-lg", "shadow-black/10");
+        link.classList.add(`text-[${textColor}]/70`, "hover:bg-white/5", "hover:text-white");
+        if (icon) {
+          icon.classList.remove("text-white");
+          icon.classList.add(`text-[${textColor}]/40`, "group-hover:text-white");
+        }
+      }
+    });
   }
 
   handleLogout() {
@@ -308,7 +351,7 @@ class AdminLayout extends App {
                               <i class="fas fa-chevron-down text-[8px] transition-transform duration-300 ${this.collapsedGroups.has(group.group) ? "rotate-180" : ""} text-[${textColor}]/30"></i>
                           </div>
                           <div class="space-y-0.5 ${this.collapsedGroups.has(group.group) ? "hidden" : ""}">
-                              ${group.items
+                                  ${group.items
                                 .map(
                                   (item) => `
                                   <ui-link href="${item.href}" class="nav-item group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold no-underline transition-all ${item.active ? "active shadow-lg shadow-black/10" : `text-[${textColor}]/70 hover:bg-white/5 hover:text-white`}">
@@ -340,7 +383,7 @@ class AdminLayout extends App {
                       <button data-sidebar-toggle class="xl:hidden p-2 rounded-lg bg-slate-100 text-slate-600">
                           <i class="fas fa-bars"></i>
                       </button>
-                      <h1 class="text-lg font-black text-slate-800 tracking-tight font-brand uppercase">${this.getPageTitle()}</h1>
+                      <h1 data-page-title class="text-lg font-black text-slate-800 tracking-tight font-brand uppercase">${this.getPageTitle()}</h1>
                   </div>
 
                   <div class="flex items-center gap-4">
@@ -380,7 +423,7 @@ class AdminLayout extends App {
                   </div>
               </header>
 
-              <div class="flex-1 overflow-y-auto">
+              <div data-page-content class="flex-1 overflow-y-auto">
                   ${this.pageContent}
               </div>
           </main>
