@@ -13,6 +13,9 @@ class AdminModel extends BaseModel
         'email',
         'password',
         'phone',
+        'gender',
+        'date_of_birth',
+        'address',
         'status',
         'profile_image'
     ];

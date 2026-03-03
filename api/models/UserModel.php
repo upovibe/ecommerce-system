@@ -12,6 +12,9 @@ class UserModel extends BaseModel
         'email',
         'password',
         'phone',
+        'gender',
+        'date_of_birth',
+        'address',
         'is_guest',
         'status',
         'profile_image'

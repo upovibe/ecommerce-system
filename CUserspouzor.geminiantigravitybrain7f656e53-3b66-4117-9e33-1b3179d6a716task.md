@@ -1,0 +1,7 @@
+- [/] Profile UI Refinement & Email Security
+    - [ ] Update EmailService with email change notification
+    - [ ] Update UserController to trigger email notification on email change
+    - [ ] Separate Email Update from Name Update in AdminProfilePage
+    - [ ] Restrict Email Update button to Super Admins only
+    - [ ] Increase label font sizes and fix casing to Sentence case
+    - [ ] Fix character encoding issues in page.js

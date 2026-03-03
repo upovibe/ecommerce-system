@@ -395,8 +395,19 @@ class UserController
             unset($data['role_id']);
             unset($data['status']);
 
+            $oldEmail = $existingUser['email'];
+            $newEmail = $data['email'] ?? $oldEmail;
+            $emailChanged = isset($data['email']) && $data['email'] !== $oldEmail;
+
             // Check email uniqueness if email is being updated
-            if (isset($data['email']) && $data['email'] !== $existingUser['email']) {
+            if ($emailChanged) {
+                // Check if user has permission to change email (only Admin/Super Admin)
+                if ($existingUser['role_id'] != 1) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'You do not have permission to change your email address'], JSON_PRETTY_PRINT);
+                    return;
+                }
+
                 $emailExists = $model->findByEmail($data['email']);
                 if ($emailExists) {
                     http_response_code(400);
@@ -415,6 +426,17 @@ class UserController
             if ($result) {
                 // Log profile update
                 $this->logModel->logAction($id, 'profile_updated', 'Profile updated', $data);
+
+                // Send email notification if email was changed
+                if ($emailChanged) {
+                    try {
+                        require_once __DIR__ . '/../core/EmailService.php';
+                        $emailService = new EmailService();
+                        $emailService->sendEmailChangeNotification($newEmail, $existingUser['name'], $oldEmail, $newEmail);
+                    } catch (Exception $e) {
+                        error_log("Failed to send email change notification: " . $e->getMessage());
+                    }
+                }
 
                 echo json_encode(['success' => true, 'message' => 'Profile updated successfully'], JSON_PRETTY_PRINT);
             } else {
