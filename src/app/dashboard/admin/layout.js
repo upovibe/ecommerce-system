@@ -1,13 +1,114 @@
 import App from "@/core/App.js";
+import "@/components/ui/DropdownMenu.js";
+import "@/components/ui/Avatar.js";
+import "@/components/ui/Button.js";
+import "@/components/ui/Link.js";
+import api from "@/services/api.js";
+import { fetchColorSettings } from "@/utils/colorSettings.js";
 
 class AdminLayout extends App {
-  connectedCallback() {
+  constructor() {
+    super();
+    this.userData = JSON.parse(localStorage.getItem("userData") || "{}");
+    this.currentPath = window.location.pathname;
+    this.sidebarOpen = false;
+    this.collapsedGroups = new Set();
+    this.logoUrl = null;
+    this.brandName = "VastCommerce";
+
+    // Default colors while loading
+    this.set("primary_color", "#2563eb");
+    this.set("secondary_color", "#3b82f6");
+    this.set("accent_color", "#4f46e5");
+    this.set("text_color", "#f8fafc");
+    this.set("dark_color", "#0f172a");
+  }
+
+  async connectedCallback() {
     super.connectedCallback();
-    // Check auth
+
     if (!localStorage.getItem("token")) {
       window.location.href = "/auth/login";
       return;
     }
+
+    // Listen for route changes
+    window.addEventListener("route-changed", (e) => {
+      this.currentPath = e.detail.path;
+      this.render();
+    });
+
+    await this.loadTheme();
+    this.setupEventListeners();
+  }
+
+  async loadTheme() {
+    try {
+      // Fetch logo
+      const logoResp = await api.get("/settings/key/site_logo");
+      if (logoResp.data?.success) {
+        this.logoUrl = logoResp.data.data.setting_value;
+      }
+
+      // Fetch name
+      const nameResp = await api.get("/settings/key/site_name");
+      if (nameResp.data?.success) {
+        this.brandName = nameResp.data.data.setting_value;
+      }
+
+      // Fetch colors
+      const colors = await fetchColorSettings();
+      Object.entries(colors).forEach(([key, value]) => {
+        this.set(key, value);
+      });
+
+      this.render();
+    } catch (e) {
+      console.warn("Theme loading failed", e);
+    }
+  }
+
+  setupEventListeners() {
+    this.addEventListener("click", (e) => {
+      const toggleBtn = e.target.closest("[data-sidebar-toggle]");
+      if (toggleBtn) {
+        e.preventDefault();
+        this.toggleSidebar();
+      }
+
+      const groupToggle = e.target.closest("[data-group-toggle]");
+      if (groupToggle) {
+        e.preventDefault();
+        const groupName = groupToggle.getAttribute("data-group-name");
+        this.toggleGroup(groupName);
+      }
+    });
+
+    const dropdown = this.querySelector("ui-dropdown-menu");
+    if (dropdown) {
+      dropdown.addEventListener("item-click", (e) => {
+        if (e.detail.action === "logout") this.handleLogout();
+      });
+    }
+  }
+
+  toggleSidebar() {
+    this.sidebarOpen = !this.sidebarOpen;
+    const container = this.querySelector("[data-layout-container]");
+    if (this.sidebarOpen) {
+      container.classList.add("sidebar-open");
+    } else {
+      container.classList.remove("sidebar-open");
+    }
+  }
+
+  toggleGroup(groupName) {
+    if (this.collapsedGroups.has(groupName)) {
+      this.collapsedGroups.delete(groupName);
+    } else {
+      this.collapsedGroups.add(groupName);
+    }
+    this.render();
   }
 
   handleLogout() {
@@ -16,87 +117,235 @@ class AdminLayout extends App {
     window.location.href = "/auth/login";
   }
 
-  render() {
-    return `
-            <div class="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-                <!-- Sidebar -->
-                <aside class="w-80 bg-white border-r border-slate-100 flex flex-col fixed inset-y-0 shadow-sm z-30">
-                    <div class="p-10 pb-6">
-                        <div class="flex items-center gap-4 mb-12">
-                            <div class="w-12 h-12 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-                                <i class="fas fa-shopping-bag text-xl"></i>
-                            </div>
-                            <span class="text-2xl font-black tracking-tighter text-slate-900">Vast<span class="text-indigo-600">Admin</span></span>
-                        </div>
-                        
-                        <nav class="space-y-2">
-                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 px-6 mb-4 opacity-70">Main Menu</p>
-                            ${this.renderNavLink("/dashboard/admin", "fas fa-th-large", "Dashboard", true)}
-                            ${this.renderNavLink("/dashboard/admin/products", "fas fa-shopping-basket", "Inventory")}
-                            ${this.renderNavLink("/dashboard/admin/orders", "fas fa-receipt", "Orders")}
-                            ${this.renderNavLink("/dashboard/admin/categories", "fas fa-layer-group", "Collections")}
-                            
-                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 px-6 mt-8 mb-4 opacity-70">Management</p>
-                            ${this.renderNavLink("/dashboard/admin/users", "fas fa-user-shield", "Staff & Users")}
-                            ${this.renderNavLink("/dashboard/admin/pages", "fas fa-pager", "Cloud Pages")}
-                            ${this.renderNavLink("/dashboard/admin/settings", "fas fa-sliders-h", "Preferences")}
-                        </nav>
-                    </div>
-
-                    <div class="mt-auto p-8 pt-0">
-                        <div class="bg-indigo-50 p-6 rounded-3xl mb-8 border border-indigo-100/50">
-                            <p class="text-xs font-bold text-indigo-900 mb-1">Vast Cloud System</p>
-                            <p class="text-[10px] font-medium text-indigo-600">Enterprise Edition v1.0</p>
-                        </div>
-                        <button onclick="this.closest('app-admin-layout').handleLogout()" class="w-full py-4 px-6 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center justify-center gap-3 font-bold transition-all shadow-lg shadow-slate-200">
-                            <i class="fas fa-power-off text-sm"></i> Logout
-                        </button>
-                    </div>
-                </aside>
-
-                <!-- Main Content -->
-                <main class="flex-1 ml-80 overflow-y-auto">
-                    <header class="h-24 px-10 flex items-center justify-between border-b border-slate-50 bg-white/80 backdrop-blur-md sticky top-0 z-20">
-                        <div class="flex items-center gap-4 bg-slate-50 px-5 py-2.5 rounded-2xl border border-slate-200/50 w-96">
-                            <i class="fas fa-search text-slate-400"></i>
-                            <input type="text" placeholder="Global search..." class="bg-transparent border-none outline-none text-sm font-medium text-slate-700 w-full">
-                        </div>
-                        <div class="flex items-center gap-6">
-                            <button class="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-500 hover:text-indigo-600 transition-colors relative">
-                                <i class="fas fa-bell"></i>
-                                <span class="absolute top-3 right-3 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
-                            </button>
-                            <div class="w-px h-8 bg-slate-100"></div>
-                            <div class="flex items-center gap-4">
-                                <div class="text-right">
-                                    <p class="text-sm font-black text-slate-900">Vast Admin</p>
-                                    <p class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Master Admin</p>
-                                </div>
-                                <div class="w-12 h-12 bg-slate-100 rounded-2xl overflow-hidden border-2 border-white shadow-md">
-                                    <img src="https://ui-avatars.com/api/?name=Vast+Admin&background=4f46e5&color=fff" alt="Avatar">
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-                    <div class="bg-slate-50/50">
-                        <slot></slot>
-                    </div>
-                </main>
-            </div>
-        `;
+  getNavigationItems() {
+    const path = this.currentPath;
+    return [
+      {
+        group: "Dashboard",
+        items: [
+          {
+            label: "Overview",
+            icon: "fas fa-th-large",
+            href: "/dashboard/admin",
+          },
+        ],
+      },
+      {
+        group: "Management",
+        items: [
+          {
+            label: "Inventory",
+            icon: "fas fa-shopping-basket",
+            href: "/dashboard/admin/products",
+          },
+          {
+            label: "Orders",
+            icon: "fas fa-receipt",
+            href: "/dashboard/admin/orders",
+          },
+          {
+            label: "Collections",
+            icon: "fas fa-layer-group",
+            href: "/dashboard/admin/categories",
+          },
+        ],
+      },
+      {
+        group: "Administration",
+        items: [
+          {
+            label: "Staff & Users",
+            icon: "fas fa-user-shield",
+            href: "/dashboard/admin/users",
+          },
+          {
+            label: "Cloud Pages",
+            icon: "fas fa-pager",
+            href: "/dashboard/admin/pages",
+          },
+        ],
+      },
+      {
+        group: "Settings",
+        items: [
+          {
+            label: "Preferences",
+            icon: "fas fa-sliders-h",
+            href: "/dashboard/admin/settings",
+          },
+        ],
+      },
+    ].map((group) => ({
+      ...group,
+      items: group.items.map((item) => ({
+        ...item,
+        active: path === item.href,
+      })),
+    }));
   }
 
-  renderNavLink(href, icon, label, active = false) {
-    const activeClass = active
-      ? "bg-indigo-600 text-white shadow-xl shadow-indigo-100"
-      : "text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors";
+  getPageTitle() {
+    const segments = this.currentPath.split("/").filter(Boolean);
+    const last = segments[segments.length - 1] || "Dashboard";
+    return last.charAt(0).toUpperCase() + last.slice(1);
+  }
+
+  render() {
+    const primaryColor = this.get("primary_color");
+    const secondaryColor = this.get("secondary_color");
+    const accentColor = this.get("accent_color");
+    const textColor = this.get("text_color");
+    const darkColor = this.get("dark_color");
+
+    const navigationGroups = this.getNavigationItems();
+
     return `
-            <a href="${href}" class="flex items-center gap-4 py-4 px-6 rounded-2xl font-bold transition-all ${activeClass}">
-                <i class="${icon} ${active ? "text-white" : "text-lg"}"></i>
-                <span class="tracking-tight leading-none">${label}</span>
-                ${active ? '<i class="fas fa-chevron-right ml-auto text-[10px] opacity-70"></i>' : ""}
-            </a>
-        `;
+      <style>
+          [data-layout-container] {
+              display: flex;
+              height: 100vh;
+              width: 100%;
+              overflow: hidden;
+          }
+          [data-sidebar] {
+              width: 280px;
+              flex-shrink: 0;
+              background-color: ${primaryColor};
+              transform: translateX(-100%);
+              transition: transform 0.3s ease-in-out;
+              z-index: 50;
+          }
+          @media (min-width: 1280px) {
+              [data-sidebar] { transform: translateX(0); }
+          }
+          .sidebar-open [data-sidebar] { transform: translateX(0); }
+          [data-sidebar-overlay] {
+              position: fixed;
+              inset: 0;
+              background: rgba(0,0,0,0.5);
+              z-index: 40;
+              opacity: 0;
+              pointer-events: none;
+              transition: opacity 0.3s;
+          }
+          .sidebar-open [data-sidebar-overlay] { opacity: 1; pointer-events: auto; }
+          .nav-item.active {
+              background-color: ${accentColor};
+              color: white;
+          }
+      </style>
+
+      <div data-layout-container class="${this.sidebarOpen ? "sidebar-open" : ""}">
+          <!-- Sidebar Overlay -->
+          <div data-sidebar-overlay data-sidebar-toggle></div>
+
+          <!-- Sidebar -->
+          <aside data-sidebar class="fixed inset-y-0 left-0 text-white flex flex-col shadow-2xl">
+              <div class="flex items-center justify-between h-20 px-6 border-b border-[${secondaryColor}]/30 flex-shrink-0 bg-[${darkColor}]/10">
+                  <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md">
+                          ${this.logoUrl ? `<img src="${this.logoUrl}" class="w-7 h-7 object-contain">` : `<i class="fas fa-shopping-bag text-white"></i>`}
+                      </div>
+                      <span class="text-xl font-black tracking-tight font-brand">${this.brandName}</span>
+                  </div>
+                  <button data-sidebar-toggle class="xl:hidden p-2 rounded-lg hover:bg-white/10">
+                      <i class="fas fa-times"></i>
+                  </button>
+              </div>
+
+              <nav class="flex-1 px-4 py-6 overflow-y-auto space-y-6">
+                  ${navigationGroups
+                    .map(
+                      (group) => `
+                      <div>
+                          <div data-group-toggle data-group-name="${group.group}" class="flex items-center justify-between px-3 mb-2 cursor-pointer group">
+                              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-[${textColor}]/50 group-hover:text-white transition-colors">${group.group}</span>
+                              <i class="fas fa-chevron-down text-[8px] transition-transform duration-300 ${this.collapsedGroups.has(group.group) ? "rotate-180" : ""} text-[${textColor}]/30"></i>
+                          </div>
+                          <div class="space-y-1 ${this.collapsedGroups.has(group.group) ? "hidden" : ""}">
+                              ${group.items
+                                .map(
+                                  (item) => `
+                                  <ui-link href="${item.href}" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold no-underline transition-all ${item.active ? "active shadow-lg shadow-black/10" : `text-[${textColor}]/70 hover:bg-white/5 hover:text-white`}">
+                                      <i class="${item.icon} w-5 text-center ${item.active ? "text-white" : `text-[${textColor}]/40 group-hover:text-white`}"></i>
+                                      <span>${item.label}</span>
+                                  </ui-link>
+                              `,
+                                )
+                                .join("")}
+                          </div>
+                      </div>
+                  `,
+                    )
+                    .join("")}
+              </nav>
+
+              <div class="p-4 border-t border-[${secondaryColor}]/30 bg-[${darkColor}]/5">
+                  <button data-action="logout" class="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-bold text-rose-200 hover:bg-rose-500 hover:text-white transition-all">
+                      <i class="fas fa-sign-out-alt w-5"></i>
+                      <span>Terminate Session</span>
+                  </button>
+              </div>
+          </aside>
+
+          <!-- Main Content -->
+          <main class="flex-1 xl:ml-[280px] flex flex-col min-h-screen bg-slate-50 relative">
+              <header class="h-20 px-8 flex items-center justify-between bg-white border-b border-slate-200 sticky top-0 z-30">
+                  <div class="flex items-center gap-4">
+                      <button data-sidebar-toggle class="xl:hidden p-2 rounded-lg bg-slate-100 text-slate-600">
+                          <i class="fas fa-bars"></i>
+                      </button>
+                      <h1 class="text-xl font-black text-slate-800 tracking-tight font-brand uppercase">${this.getPageTitle()}</h1>
+                  </div>
+
+                  <div class="flex items-center gap-5">
+                      <div class="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-xl border border-slate-200">
+                          <i class="fas fa-search text-slate-400 text-xs"></i>
+                          <input type="text" placeholder="Global search..." class="bg-transparent border-none outline-none text-xs font-bold text-slate-700 w-48">
+                      </div>
+
+                      <div class="w-px h-6 bg-slate-200"></div>
+
+                      <ui-dropdown-menu position="bottom">
+                          <ui-dropdown-menu-trigger>
+                              <div class="flex items-center gap-3 cursor-pointer p-1 hover:bg-slate-50 rounded-xl transition-all">
+                                  <div class="text-right hidden sm:block">
+                                      <p class="text-xs font-black text-slate-900 leading-none mb-1 font-brand uppercase tracking-tighter">${this.userData.name || "Admin"}</p>
+                                      <p class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest leading-none">Super Admin</p>
+                                  </div>
+                                  <ui-avatar name="${this.userData.name || "Admin"}" src="${this.userData.avatar || ""}" size="md" class="shadow-sm shadow-slate-200 rounded-full"></ui-avatar>
+                              </div>
+                          </ui-dropdown-menu-trigger>
+                          <ui-dropdown-menu-content class="w-56">
+                              <ui-dropdown-menu-label>Account Options</ui-dropdown-menu-label>
+                              <ui-dropdown-menu-separator></ui-dropdown-menu-separator>
+                              <ui-dropdown-menu-item>
+                                  <a href="/profile" class="flex items-center w-full font-bold">
+                                      <i class="fas fa-user-circle mr-2 opacity-50"></i> Profile Details
+                                  </a>
+                              </ui-dropdown-menu-item>
+                              <ui-dropdown-menu-item>
+                                  <a href="/dashboard/admin/settings" class="flex items-center w-full font-bold">
+                                      <i class="fas fa-cog mr-2 opacity-50"></i> Preferences
+                                  </a>
+                              </ui-dropdown-menu-item>
+                              <ui-dropdown-menu-separator></ui-dropdown-menu-separator>
+                              <ui-dropdown-menu-item color="red">
+                                  <button data-action="logout" class="flex items-center w-full font-black text-rose-600">
+                                      <i class="fas fa-power-off mr-2"></i> Log Out
+                                  </button>
+                              </ui-dropdown-menu-item>
+                          </ui-dropdown-menu-content>
+                      </ui-dropdown-menu>
+                  </div>
+              </header>
+
+              <div class="flex-1 overflow-y-auto">
+                  ${this.pageContent}
+              </div>
+          </main>
+      </div>
+    `;
   }
 }
 
