@@ -141,6 +141,8 @@ class AdminProfilePage extends App {
           this.userData.date_of_birth = dobInput.value || null;
           this.userData.address = addressInput.value;
           localStorage.setItem("userData", JSON.stringify(this.userData));
+          // Dispatch so the layout header also updates in real-time
+          window.dispatchEvent(new CustomEvent("user-data-updated"));
           this.render();
           dialog.remove();
           Toast.show({
@@ -172,17 +174,20 @@ class AdminProfilePage extends App {
   }
 
   showEditEmailDialog() {
+    // Step 1: Enter new email and request the verification code
     const dialog = document.createElement("ui-dialog");
     dialog.setAttribute("title", "Change Email Address");
     dialog.setAttribute("open", "");
-    dialog.setAttribute("confirm-label", "Update Email");
+    dialog.setAttribute("confirm-label", "Send Verification Code");
 
     dialog.innerHTML = `
       <form slot="content" class="space-y-4">
-          <p class="text-xs text-slate-500 font-medium px-1">Updating your email will require you to log in again with the new address.</p>
+          <div class="p-3 bg-amber-50 border border-amber-100 rounded-xl">
+            <p class="text-xs text-amber-700 font-medium">A 6-digit verification code will be sent to your <strong>current</strong> email address for security.</p>
+          </div>
           <div>
               <label class="block text-xs font-bold text-slate-500 mb-1 ml-1">New Email Address</label>
-              <ui-input id="edit-email" type="email" value="${this.userData.email || ""}" placeholder="Enter new email" class="w-full"></ui-input>
+              <ui-input id="edit-email" type="email" placeholder="Enter new email" class="w-full"></ui-input>
           </div>
       </form>
     `;
@@ -205,26 +210,23 @@ class AdminProfilePage extends App {
       dialog.setAttribute("confirm-loading", "true");
 
       try {
-        const response = await api.put(`/users/${this.userData.id}/profile`, {
-          email: emailInput.value,
-        });
+        const response = await api.post(
+          `/users/${this.userData.id}/request-email-change`,
+          {
+            new_email: emailInput.value,
+          },
+        );
 
         if (response.data.success) {
-          this.userData.email = emailInput.value;
-          localStorage.setItem("userData", JSON.stringify(this.userData));
-          this.render();
           dialog.remove();
-          Toast.show({
-            title: "Success",
-            message: "Email updated successfully.",
-            variant: "success",
-          });
+          // Step 2: Enter the verification code
+          this.showEmailVerificationDialog(emailInput.value);
         } else {
           dialog.setAttribute("confirm-loading", "false");
           validateForm();
           Toast.show({
-            title: "Update Failed",
-            message: response.data.error || "Could not update email",
+            title: "Error",
+            message: response.data.error || "Could not send verification code",
             variant: "error",
           });
         }
@@ -232,10 +234,86 @@ class AdminProfilePage extends App {
         dialog.setAttribute("confirm-loading", "false");
         validateForm();
         Toast.show({
-          title: "Update Failed",
-          message:
-            error.response?.data?.error ||
-            "Permission denied or connection error",
+          title: "Error",
+          message: error.response?.data?.error || "Connection error",
+          variant: "error",
+        });
+      }
+    });
+
+    dialog.addEventListener("cancel", () => dialog.remove());
+  }
+
+  showEmailVerificationDialog(newEmail) {
+    const dialog = document.createElement("ui-dialog");
+    dialog.setAttribute("title", "Enter Verification Code");
+    dialog.setAttribute("open", "");
+    dialog.setAttribute("confirm-label", "Confirm Change");
+
+    dialog.innerHTML = `
+      <form slot="content" class="space-y-4">
+          <div class="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+            <p class="text-xs text-emerald-700 font-medium">A 6-digit code has been sent to your current email. It expires in 15 minutes.</p>
+          </div>
+          <div>
+              <label class="block text-xs font-bold text-slate-500 mb-1 ml-1">Verification Code</label>
+              <ui-input id="verify-code" type="text" placeholder="Enter 6-digit code" class="w-full"></ui-input>
+          </div>
+          <p class="text-[10px] text-slate-400 px-1">Changing to: <strong>${newEmail}</strong></p>
+      </form>
+    `;
+
+    document.body.appendChild(dialog);
+
+    const codeInput = dialog.querySelector("#verify-code");
+
+    const validateCode = () => {
+      const isInvalid = codeInput.value.trim().length !== 6;
+      dialog.setAttribute("confirm-disabled", isInvalid ? "true" : "false");
+    };
+
+    codeInput.addEventListener("input", validateCode);
+    validateCode();
+
+    dialog.addEventListener("confirm", async () => {
+      if (dialog.getAttribute("confirm-disabled") === "true") return;
+      dialog.setAttribute("confirm-loading", "true");
+
+      try {
+        const response = await api.post(
+          `/users/${this.userData.id}/verify-email-change`,
+          {
+            code: codeInput.value.trim(),
+            new_email: newEmail,
+          },
+        );
+
+        if (response.data.success) {
+          this.userData.email = newEmail;
+          localStorage.setItem("userData", JSON.stringify(this.userData));
+          window.dispatchEvent(new CustomEvent("user-data-updated"));
+          this.render();
+          dialog.remove();
+          Toast.show({
+            title: "Email Changed",
+            message: "Your email address has been updated successfully.",
+            variant: "success",
+          });
+        } else {
+          dialog.setAttribute("confirm-loading", "false");
+          validateCode();
+          Toast.show({
+            title: "Verification Failed",
+            message: response.data.error || "Invalid code",
+            variant: "error",
+          });
+        }
+      } catch (error) {
+        dialog.setAttribute("confirm-loading", "false");
+        validateCode();
+        Toast.show({
+          title: "Verification Failed",
+          message: error.response?.data?.error || "Invalid or expired code",
           variant: "error",
         });
       }
@@ -299,11 +377,20 @@ class AdminProfilePage extends App {
         });
 
         dialog.remove();
+
+        // Show toast then log out for security
         Toast.show({
-          title: "Success",
-          message: "Password updated successfully.",
+          title: "Password Changed",
+          message:
+            "Your password was updated. You will be logged out for security.",
           variant: "success",
         });
+
+        setTimeout(() => {
+          localStorage.removeItem("token");
+          localStorage.removeItem("userData");
+          window.location.href = "/auth/login";
+        }, 2500);
       } catch (e) {
         dialog.setAttribute("confirm-loading", "false");
         validatePass();
@@ -369,6 +456,14 @@ class AdminProfilePage extends App {
     return (
       window.location.origin + (path.startsWith("/") ? "" : "/api/") + path
     );
+  }
+
+  maskEmail(email) {
+    if (!email) return "N/A";
+    const [local, domain] = email.split("@");
+    if (!domain) return email;
+    const visible = local.slice(0, 2);
+    return `${visible}***@${domain}`;
   }
 
   setupEventListeners() {
@@ -510,7 +605,7 @@ class AdminProfilePage extends App {
                   </div>
                   <div class="overflow-hidden">
                     <label class="text-xs font-bold text-slate-400 block mb-0.5">Email</label>
-                    <p class="font-bold text-slate-800 text-sm truncate">${this.userData.email || "N/A"}</p>
+                    <p class="font-bold text-slate-800 text-sm truncate">${this.maskEmail(this.userData.email)}</p>
                   </div>
                 </div>
 

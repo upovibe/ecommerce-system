@@ -25,4 +25,10 @@ class EmailService
         error_log("Email to $to: Hello $name, your email has been changed from $oldEmail to $newEmail.");
         return true;
     }
+
+    public function sendEmailVerificationCode($to, $name, $code, $newEmail)
+    {
+        error_log("Email to $to: Hello $name, your verification code for changing to $newEmail is: $code (expires in 15 minutes).");
+        return true;
+    }
 }

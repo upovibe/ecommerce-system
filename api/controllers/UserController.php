@@ -13,9 +13,11 @@ class UserController
     private $userModel;
     private $roleModel;
     private $logModel;
+    private $pdo;
 
     public function __construct($pdo)
     {
+        $this->pdo = $pdo;
         $this->userModel = new UserModel($pdo);
         $this->roleModel = new RoleModel($pdo);
         $this->logModel = new UserLogModel($pdo);
@@ -516,6 +518,144 @@ class UserController
             } else {
                 http_response_code(500);
                 echo json_encode(['error' => 'Failed to change password'], JSON_PRETTY_PRINT);
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()], JSON_PRETTY_PRINT);
+        }
+    }
+
+    public function requestEmailChange($id)
+    {
+        try {
+            ob_clean();
+
+            $data = json_decode(file_get_contents('php://input'), true);
+            $model = $this->resolveModel($id);
+
+            $user = $model->findById($id);
+            if (!$user) {
+                http_response_code(404);
+                echo json_encode(['error' => 'User not found'], JSON_PRETTY_PRINT);
+                return;
+            }
+
+            if (!isset($data['new_email']) || empty(trim($data['new_email']))) {
+                http_response_code(400);
+                echo json_encode(['error' => 'New email is required'], JSON_PRETTY_PRINT);
+                return;
+            }
+
+            $newEmail = trim($data['new_email']);
+
+            // Check if email is already in use
+            $emailExists = $model->findByEmail($newEmail);
+            if ($emailExists) {
+                http_response_code(400);
+                echo json_encode(['error' => 'This email is already in use by another account'], JSON_PRETTY_PRINT);
+                return;
+            }
+
+            // Generate a 6-digit verification code
+            $code = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+            $expiry = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+            // Ensure email_verifications table exists
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS email_verifications (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    user_type VARCHAR(20) DEFAULT 'admin',
+                    new_email VARCHAR(255) NOT NULL,
+                    code VARCHAR(10) NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    UNIQUE KEY unique_user (user_id, user_type)
+                )
+            ");
+
+            $stmt = $this->pdo->prepare("
+                INSERT INTO email_verifications (user_id, user_type, new_email, code, expires_at, created_at)
+                VALUES (?, ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE new_email = VALUES(new_email), code = VALUES(code), expires_at = VALUES(expires_at), created_at = NOW()
+            ");
+            $stmt->execute([
+                $id,
+                'admin',
+                $newEmail,
+                $code,
+                $expiry
+            ]);
+
+            // Send the verification code via email
+            require_once __DIR__ . '/../core/EmailService.php';
+            $emailService = new EmailService();
+            $emailService->sendEmailVerificationCode($user['email'], $user['name'], $code, $newEmail);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'A 6-digit verification code has been sent to your current email address'
+            ], JSON_PRETTY_PRINT);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()], JSON_PRETTY_PRINT);
+        }
+    }
+
+    public function verifyEmailChange($id)
+    {
+        try {
+            ob_clean();
+
+            $data = json_decode(file_get_contents('php://input'), true);
+            $model = $this->resolveModel($id);
+
+            $user = $model->findById($id);
+            if (!$user) {
+                http_response_code(404);
+                echo json_encode(['error' => 'User not found'], JSON_PRETTY_PRINT);
+                return;
+            }
+
+            if (!isset($data['code']) || !isset($data['new_email'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Verification code and new email are required'], JSON_PRETTY_PRINT);
+                return;
+            }
+
+            // Look up the valid verification record
+            $stmt = $this->pdo->prepare("
+                SELECT * FROM email_verifications
+                WHERE user_id = ? AND new_email = ? AND code = ? AND expires_at > NOW()
+                LIMIT 1
+            ");
+            $stmt->execute([$id, $data['new_email'], $data['code']]);
+            $verification = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$verification) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid or expired verification code. Please request a new one.'], JSON_PRETTY_PRINT);
+                return;
+            }
+
+            // Update the email
+            $result = $model->update($id, ['email' => $data['new_email']]);
+
+            if ($result) {
+                // Delete the verification record
+                $this->pdo->prepare("DELETE FROM email_verifications WHERE user_id = ?")->execute([$id]);
+
+                // Send change notification to old email
+                require_once __DIR__ . '/../core/EmailService.php';
+                $emailService = new EmailService();
+                $emailService->sendEmailChangeNotification($user['email'], $user['name'], $user['email'], $data['new_email']);
+
+                $this->logModel->logAction($id, 'email_changed', 'Email address changed', ['new_email' => $data['new_email']]);
+
+                echo json_encode(['success' => true, 'message' => 'Email updated successfully'], JSON_PRETTY_PRINT);
+            } else {
+                http_response_code(500);
+                echo json_encode(['error' => 'Failed to update email'], JSON_PRETTY_PRINT);
             }
         } catch (Exception $e) {
             http_response_code(500);

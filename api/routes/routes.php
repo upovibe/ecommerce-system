@@ -26,6 +26,8 @@ Router::get('/users/{id}/profile', 'UserController@profile');
 Router::put('/users/{id}/profile', 'UserController@updateProfile');
 Router::post('/users/{id}/change-password', 'UserController@changePassword');
 Router::put('/users/{id}/password', 'UserController@changePassword');
+Router::post('/users/{id}/request-email-change', 'UserController@requestEmailChange');
+Router::post('/users/{id}/verify-email-change', 'UserController@verifyEmailChange');
 Router::post('/users/{id}/upload-profile-image', 'UserController@uploadProfileImage');
 
 // Role management routes (admin only)
