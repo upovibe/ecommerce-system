@@ -13,7 +13,8 @@ class UserModel extends BaseModel
         'password',
         'phone',
         'is_guest',
-        'status'
+        'status',
+        'profile_image'
     ];
 
     protected static $hidden = [

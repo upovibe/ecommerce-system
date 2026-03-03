@@ -31,7 +31,15 @@ class SettingsSeeder
             ['card_bg_color', '#ffffff', 'color', 'theme', 'Background for cards and surfaces'],
             ['button_primary_bg', '#4f46e5', 'color', 'theme', 'Background for primary action buttons'],
             ['button_primary_text', '#ffffff', 'color', 'theme', 'Text color for primary action buttons'],
-            ['link_color', '#4f46e5', 'color', 'theme', 'Default text link color']
+            ['link_color', '#4f46e5', 'color', 'theme', 'Default text link color'],
+            ['success_color', '#10b981', 'color', 'theme', 'Success emerald color'],
+            ['error_color', '#ef4444', 'color', 'theme', 'Error red color'],
+            ['warning_color', '#f59e0b', 'color', 'theme', 'Warning amber color'],
+            ['hover_primary', '#4338ca', 'color', 'theme', 'Primary color hover state'],
+            ['hover_secondary', '#475569', 'color', 'theme', 'Secondary color hover state'],
+            ['hover_accent', '#d97706', 'color', 'theme', 'Accent color hover state'],
+            ['text_color', '#1e293b', 'color', 'theme', 'Default text color'],
+            ['dark_color', '#0f172a', 'color', 'theme', 'Dark slate color for contrast']
         ];
 
         foreach ($settings as $s) {

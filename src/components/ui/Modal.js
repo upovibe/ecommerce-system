@@ -1,9 +1,9 @@
 /**
  * Modal Component
- * 
+ *
  * A side modal component that slides in from different directions (left, right, top, bottom).
  * Perfect for navigation panels, forms, and content overlays.
- * 
+ *
  * Attributes:
  * - open: boolean (default: false) - controls modal visibility
  * - position: string (default: "right") - modal position: "left", "right", "top", "bottom"
@@ -13,18 +13,18 @@
  * - close-on-backdrop-click: boolean (default: true) - close on backdrop click
  * - close-button: boolean (default: true) - show/hide close button
  * - variant: string (default: "default") - button variant: "default", "danger" for delete confirmations
- * 
+ *
  * Slots:
  * - default: Main modal content
  * - title: Modal header title
  * - footer: Modal footer content
- * 
+ *
  * Events:
  * - modal-open: Fired when modal opens
  * - modal-close: Fired when modal closes
  * - cancel: Fired when cancel button is clicked
  * - confirm: Fired when confirm button is clicked
- * 
+ *
  * Usage:
  * <ui-modal open position="right" size="md" variant="danger">
  *   <div slot="title">Modal Title</div>
@@ -33,123 +33,156 @@
  * </ui-modal>
  */
 class Modal extends HTMLElement {
-    constructor() {
-        super();
-        this.attachShadow({ mode: 'open' });
-        this.isOpen = false;
-        this.escapeHandler = this.handleEscape.bind(this);
-        this.backdropClickHandler = this.handleBackdropClick.bind(this);
-    }
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this.isOpen = false;
+    this.escapeHandler = this.handleEscape.bind(this);
+    this.backdropClickHandler = this.handleBackdropClick.bind(this);
+  }
 
-    static get observedAttributes() {
-        return ['open', 'position', 'size', 'backdrop', 'close-on-escape', 'close-on-backdrop-click', 'close-button', 'variant'];
-    }
+  static get observedAttributes() {
+    return [
+      "open",
+      "position",
+      "size",
+      "backdrop",
+      "close-on-escape",
+      "close-on-backdrop-click",
+      "close-button",
+      "variant",
+      "confirm-disabled",
+      "confirm-loading",
+      "confirm-label",
+    ];
+  }
 
-    connectedCallback() {
-        this.render();
-        this.setupEventListeners();
+  connectedCallback() {
+    this.render();
+    this.setupEventListeners();
+    this.updateOpenState();
+    // Add explicit close button event after render
+    this.addCloseButtonHandler();
+    this.addFooterButtonHandlers();
+  }
+
+  disconnectedCallback() {
+    this.removeEventListeners();
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    if (oldValue !== newValue) {
+      if (name === "open") {
         this.updateOpenState();
-        // Add explicit close button event after render
+      } else if (
+        name === "position" ||
+        name === "size" ||
+        name === "backdrop" ||
+        name === "close-on-escape" ||
+        name === "close-on-backdrop-click" ||
+        name === "close-button" ||
+        name === "variant" ||
+        name === "confirm-disabled" ||
+        name === "confirm-loading" ||
+        name === "confirm-label"
+      ) {
+        this.render();
         this.addCloseButtonHandler();
         this.addFooterButtonHandlers();
+      }
+    }
+  }
+
+  setupEventListeners() {
+    // Backdrop click
+    this.shadowRoot.addEventListener("click", (e) => {
+      if (
+        e.target.classList.contains("modal-backdrop") &&
+        this.getAttribute("close-on-backdrop-click") !== "false"
+      ) {
+        this.showCloseConfirmation();
+      }
+    });
+
+    // Escape key
+    document.addEventListener("keydown", this.escapeHandler);
+  }
+
+  removeEventListeners() {
+    document.removeEventListener("keydown", this.escapeHandler);
+  }
+
+  handleEscape(event) {
+    if (
+      event.key === "Escape" &&
+      this.isOpen &&
+      this.getAttribute("close-on-escape") !== "false"
+    ) {
+      this.close();
+    }
+  }
+
+  handleBackdropClick(event) {
+    if (
+      event.target.classList.contains("modal-backdrop") &&
+      this.getAttribute("close-on-backdrop-click") !== "false"
+    ) {
+      this.showCloseConfirmation();
+    }
+  }
+
+  updateOpenState() {
+    const shouldBeOpen = this.hasAttribute("open");
+
+    if (shouldBeOpen && !this.isOpen) {
+      this.open();
+    } else if (!shouldBeOpen && this.isOpen) {
+      this.close();
+    }
+  }
+
+  open() {
+    if (this.isOpen) return;
+
+    this.isOpen = true;
+    this.setAttribute("open", "");
+
+    // Add to body if not already there
+    if (!document.body.contains(this)) {
+      document.body.appendChild(this);
     }
 
-    disconnectedCallback() {
-        this.removeEventListeners();
-    }
+    // Focus management
+    this.focus();
 
-    attributeChangedCallback(name, oldValue, newValue) {
-        if (oldValue !== newValue) {
-            if (name === 'open') {
-                this.updateOpenState();
-            } else {
-                this.render();
-                this.addCloseButtonHandler();
-                this.addFooterButtonHandlers();
-            }
-        }
-    }
+    // Prevent body scroll
+    document.body.style.overflow = "hidden";
 
-    setupEventListeners() {
-        // Backdrop click
-        this.shadowRoot.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal-backdrop') && this.getAttribute('close-on-backdrop-click') !== 'false') {
-                this.showCloseConfirmation();
-            }
-        });
+    // Trigger open event
+    this.dispatchEvent(new CustomEvent("modal-open"));
+  }
 
-        // Escape key
-        document.addEventListener('keydown', this.escapeHandler);
-    }
+  close() {
+    if (!this.isOpen) return;
 
-    removeEventListeners() {
-        document.removeEventListener('keydown', this.escapeHandler);
-    }
+    this.isOpen = false;
+    this.removeAttribute("open");
 
-    handleEscape(event) {
-        if (event.key === 'Escape' && this.isOpen && this.getAttribute('close-on-escape') !== 'false') {
-            this.close();
-        }
-    }
+    // Restore body scroll
+    document.body.style.overflow = "";
 
-    handleBackdropClick(event) {
-        if (event.target.classList.contains('modal-backdrop') && this.getAttribute('close-on-backdrop-click') !== 'false') {
-            this.showCloseConfirmation();
-        }
-    }
+    // Trigger close event
+    this.dispatchEvent(new CustomEvent("modal-close"));
+  }
 
-    updateOpenState() {
-        const shouldBeOpen = this.hasAttribute('open');
-        
-        if (shouldBeOpen && !this.isOpen) {
-            this.open();
-        } else if (!shouldBeOpen && this.isOpen) {
-            this.close();
-        }
-    }
+  render() {
+    const position = this.getAttribute("position") || "right";
+    const size = this.getAttribute("size") || "md";
+    const backdrop = this.getAttribute("backdrop") !== "false";
+    const showClose = this.getAttribute("close-button") === "true";
+    const variant = this.getAttribute("variant") || "default";
 
-    open() {
-        if (this.isOpen) return;
-        
-        this.isOpen = true;
-        this.setAttribute('open', '');
-        
-        // Add to body if not already there
-        if (!document.body.contains(this)) {
-            document.body.appendChild(this);
-        }
-
-        // Focus management
-        this.focus();
-        
-        // Prevent body scroll
-        document.body.style.overflow = 'hidden';
-        
-        // Trigger open event
-        this.dispatchEvent(new CustomEvent('modal-open'));
-    }
-
-    close() {
-        if (!this.isOpen) return;
-        
-        this.isOpen = false;
-        this.removeAttribute('open');
-        
-        // Restore body scroll
-        document.body.style.overflow = '';
-        
-        // Trigger close event
-        this.dispatchEvent(new CustomEvent('modal-close'));
-    }
-
-    render() {
-        const position = this.getAttribute('position') || 'right';
-        const size = this.getAttribute('size') || 'md';
-        const backdrop = this.getAttribute('backdrop') !== 'false';
-        const showClose = this.getAttribute('close-button') === 'true';
-        const variant = this.getAttribute('variant') || 'default';
-
-        this.shadowRoot.innerHTML = `
+    this.shadowRoot.innerHTML = `
             <style>
                 :host {
                     display: none;
@@ -458,15 +491,40 @@ class Modal extends HTMLElement {
                     border-color: #2563eb;
                 }
                 
-                .modal-footer button.danger {
-                    background-color: #ef4444;
-                    border-color: #ef4444;
-                    color: white;
-                }
-                
                 .modal-footer button.danger:hover {
                     background-color: #dc2626;
                     border-color: #dc2626;
+                }
+
+                /* Slotted footer buttons with higher specificity */
+                ::slotted(button[slot="footer"]),
+                ::slotted(ui-button[slot="footer"]) {
+                    padding: 0.5rem 1rem !important;
+                    font-size: 0.875rem !important;
+                    font-weight: 500 !important;
+                    border-radius: 0.375rem !important;
+                    border: 1px solid #d1d5db !important;
+                    background: white !important;
+                    color: #374151 !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease-in-out !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                }
+
+                ::slotted(button[slot="footer"].primary),
+                ::slotted(ui-button[slot="footer"].primary) {
+                    background-color: #3b82f6 !important;
+                    border-color: #3b82f6 !important;
+                    color: white !important;
+                }
+
+                ::slotted(button[slot="footer"].secondary),
+                ::slotted(ui-button[slot="footer"].secondary) {
+                    background-color: white !important;
+                    border-color: #d1d5db !important;
+                    color: #374151 !important;
                 }
 
                 /* Responsive adjustments */
@@ -500,10 +558,12 @@ class Modal extends HTMLElement {
                 }
             </style>
 
-            ${backdrop ? '<div class="modal-backdrop"></div>' : ''}
+            ${backdrop ? '<div class="modal-backdrop"></div>' : ""}
             
             <div class="modal-content" data-position="${position}" data-size="${size}" tabindex="-1">
-                ${showClose ? `
+                ${
+                  showClose
+                    ? `
                     <div class="modal-header">
                         <h3 class="modal-title">
                             <slot name="title">Modal Title</slot>
@@ -512,13 +572,15 @@ class Modal extends HTMLElement {
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x-circle"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                         </button>
                     </div>
-                ` : `
+                `
+                    : `
                     <div class="modal-header">
                         <h3 class="modal-title">
                             <slot name="title">Modal Title</slot>
                         </h3>
                     </div>
-                `}
+                `
+                }
                 
                 <div class="modal-body">
                     <slot></slot>
@@ -527,79 +589,93 @@ class Modal extends HTMLElement {
                 <div class="modal-footer">
                     <slot name="footer">
                         <button class="secondary" id="cancel-btn">Cancel</button>
-                        <button class="${variant === 'danger' ? 'danger' : 'primary'}" id="confirm-btn">
-                            ${variant === 'danger' ? 'Delete' : 'Confirm'}
+                        <button 
+                            class="${variant === "danger" ? "danger" : "primary"}" 
+                            id="confirm-btn"
+                            ${this.getAttribute("confirm-disabled") === "true" ? "disabled" : ""}
+                        >
+                            ${this.getAttribute("confirm-loading") === "true" ? "Saving..." : this.getAttribute("confirm-label") || (variant === "danger" ? "Delete" : "Confirm")}
                         </button>
                     </slot>
                 </div>
             </div>
         `;
+  }
+
+  addCloseButtonHandler() {
+    const closeBtn = this.shadowRoot.querySelector(".modal-close");
+    if (closeBtn) {
+      closeBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.close();
+      };
+    }
+  }
+
+  addFooterButtonHandlers() {
+    const cancelBtn = this.shadowRoot.getElementById("cancel-btn");
+    const confirmBtn = this.shadowRoot.getElementById("confirm-btn");
+
+    // Cancel button
+    if (cancelBtn && !cancelBtn._handlerAdded) {
+      cancelBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
+        this.close();
+      };
+      cancelBtn._handlerAdded = true;
     }
 
-    addCloseButtonHandler() {
-        const closeBtn = this.shadowRoot.querySelector('.modal-close');
-        if (closeBtn) {
-            closeBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.close();
-            };
-        }
+    // Confirm button
+    if (confirmBtn && !confirmBtn._handlerAdded) {
+      confirmBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.dispatchEvent(new CustomEvent("confirm", { bubbles: true }));
+        this.close();
+      };
+      confirmBtn._handlerAdded = true;
     }
 
-    addFooterButtonHandlers() {
-        const cancelBtn = this.shadowRoot.getElementById('cancel-btn');
-        const confirmBtn = this.shadowRoot.getElementById('confirm-btn');
-
-        // Cancel button
-        if (cancelBtn && !cancelBtn._handlerAdded) {
-            cancelBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.dispatchEvent(new CustomEvent('cancel', { bubbles: true }));
-                this.close();
-            };
-            cancelBtn._handlerAdded = true;
-        }
-
-        // Confirm button
-        if (confirmBtn && !confirmBtn._handlerAdded) {
-            confirmBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.dispatchEvent(new CustomEvent('confirm', { bubbles: true }));
-                this.close();
-            };
-            confirmBtn._handlerAdded = true;
-        }
-
-        // Support custom footer buttons placed in the light DOM with modal-action or dialog-action attributes
-        if (!this._customFooterBound) {
-            this.addEventListener('click', (e) => {
-                try {
-                    const path = (e.composedPath && e.composedPath()) || [];
-                    const actionEl = path.find((el) => el && el.getAttribute && (el.getAttribute('modal-action') || el.getAttribute('dialog-action')));
-                    if (!actionEl) return;
-                    const action = actionEl.getAttribute('modal-action') || actionEl.getAttribute('dialog-action');
-                    if (action === 'cancel') {
-                        e.stopPropagation();
-                        this.dispatchEvent(new CustomEvent('cancel', { bubbles: true }));
-                        this.close();
-                    } else if (action === 'confirm') {
-                        e.stopPropagation();
-                        this.dispatchEvent(new CustomEvent('confirm', { bubbles: true }));
-                        this.close();
-                    }
-                } catch (_) { /* noop */ }
-            });
-            this._customFooterBound = true;
-        }
-    }
-
-    showCloseConfirmation() {
-        const userWantsToClose = confirm('Do you want to close this modal?');
-        if (userWantsToClose) {
+    // Support custom footer buttons placed in the light DOM with modal-action or dialog-action attributes
+    if (!this._customFooterBound) {
+      this.addEventListener("click", (e) => {
+        try {
+          const path = (e.composedPath && e.composedPath()) || [];
+          const actionEl = path.find(
+            (el) =>
+              el &&
+              el.getAttribute &&
+              (el.getAttribute("modal-action") ||
+                el.getAttribute("dialog-action")),
+          );
+          if (!actionEl) return;
+          const action =
+            actionEl.getAttribute("modal-action") ||
+            actionEl.getAttribute("dialog-action");
+          if (action === "cancel") {
+            e.stopPropagation();
+            this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
             this.close();
+          } else if (action === "confirm") {
+            e.stopPropagation();
+            this.dispatchEvent(new CustomEvent("confirm", { bubbles: true }));
+            this.close();
+          }
+        } catch (_) {
+          /* noop */
         }
+      });
+      this._customFooterBound = true;
     }
+  }
+
+  showCloseConfirmation() {
+    const userWantsToClose = confirm("Do you want to close this modal?");
+    if (userWantsToClose) {
+      this.close();
+    }
+  }
 }
 
-customElements.define('ui-modal', Modal);
-export default Modal; 
+customElements.define("ui-modal", Modal);
+export default Modal;

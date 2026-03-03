@@ -22,6 +22,13 @@ class AdminLayout extends App {
     this.set("accent_color", "#4f46e5");
     this.set("text_color", "#f8fafc");
     this.set("dark_color", "#0f172a");
+
+    this.pageContent = "";
+  }
+
+  setPageContent(content) {
+    this.pageContent = content;
+    this.render();
   }
 
   async connectedCallback() {
@@ -32,14 +39,40 @@ class AdminLayout extends App {
       return;
     }
 
+    await this.loadUserData();
+
     // Listen for route changes
     window.addEventListener("route-changed", (e) => {
       this.currentPath = e.detail.path;
       this.render();
     });
+    window.addEventListener("user-data-updated", () => {
+      this.userData = JSON.parse(localStorage.getItem("userData") || "{}");
+      this.render();
+    });
 
     await this.loadTheme();
     this.setupEventListeners();
+  }
+
+  async loadUserData() {
+    const storedUserData = JSON.parse(localStorage.getItem("userData") || "{}");
+    const userId = storedUserData?.id;
+    const token = localStorage.getItem("token");
+
+    if (!userId || !token) {
+      this.userData = storedUserData;
+      return;
+    }
+
+    try {
+      const response = await api.withToken(token).get(`/users/${userId}/profile`);
+      this.userData = { ...storedUserData, ...(response.data || {}) };
+      localStorage.setItem("userData", JSON.stringify(this.userData));
+    } catch (error) {
+      this.userData = storedUserData;
+      console.warn("Failed to refresh user profile in layout", error);
+    }
   }
 
   async loadTheme() {
@@ -74,6 +107,12 @@ class AdminLayout extends App {
       if (toggleBtn) {
         e.preventDefault();
         this.toggleSidebar();
+      }
+
+      const logoutBtn = e.target.closest('[data-action="logout"]');
+      if (logoutBtn) {
+        e.preventDefault();
+        this.handleLogout();
       }
 
       const groupToggle = e.target.closest("[data-group-toggle]");
@@ -188,6 +227,12 @@ class AdminLayout extends App {
     const segments = this.currentPath.split("/").filter(Boolean);
     const last = segments[segments.length - 1] || "Dashboard";
     return last.charAt(0).toUpperCase() + last.slice(1);
+  }
+
+  getImageUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://")) return path;
+    return window.location.origin + (path.startsWith("/") ? path : `/api/${path}`);
   }
 
   render() {
@@ -308,14 +353,14 @@ class AdminLayout extends App {
                                       <p class="text-[11px] font-black text-slate-900 leading-none mb-0.5 font-brand uppercase tracking-tighter">${this.userData.name || "Admin"}</p>
                                       <p class="text-[8px] font-bold text-indigo-600 uppercase tracking-widest leading-none">Super Admin</p>
                                   </div>
-                                  <ui-avatar name="${this.userData.name || "Admin"}" src="${this.userData.avatar || ""}" size="sm" class="shadow-sm shadow-slate-200 rounded-full"></ui-avatar>
+                                  <ui-avatar name="${this.userData.name || "Admin"}" src="${this.userData.profile_image ? this.getImageUrl(this.userData.profile_image) : ""}" size="sm" class="shadow-sm shadow-slate-200 rounded-full"></ui-avatar>
                               </div>
                           </ui-dropdown-menu-trigger>
                           <ui-dropdown-menu-content class="w-56">
                               <ui-dropdown-menu-label>Account Options</ui-dropdown-menu-label>
                               <ui-dropdown-menu-separator></ui-dropdown-menu-separator>
                               <ui-dropdown-menu-item>
-                                  <a href="/profile" class="flex items-center w-full font-bold">
+                                  <a href="/dashboard/admin/profile" class="flex items-center w-full font-bold">
                                       <i class="fas fa-user-circle mr-2 opacity-50"></i> Profile Details
                                   </a>
                               </ui-dropdown-menu-item>

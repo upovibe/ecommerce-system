@@ -22,4 +22,24 @@ api.interceptors.request.use(
   },
 );
 
+// Compatibility helper used across the app.
+// Returns request methods that force a specific bearer token.
+api.withToken = (token) => {
+  const withAuthHeader = (config = {}) => ({
+    ...config,
+    headers: {
+      ...(config.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return {
+    get: (url, config) => api.get(url, withAuthHeader(config)),
+    post: (url, data, config) => api.post(url, data, withAuthHeader(config)),
+    put: (url, data, config) => api.put(url, data, withAuthHeader(config)),
+    patch: (url, data, config) => api.patch(url, data, withAuthHeader(config)),
+    delete: (url, config) => api.delete(url, withAuthHeader(config)),
+  };
+};
+
 export default api;

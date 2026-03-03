@@ -13,7 +13,8 @@ class AdminModel extends BaseModel
         'email',
         'password',
         'phone',
-        'status'
+        'status',
+        'profile_image'
     ];
 
     protected static $hidden = [
