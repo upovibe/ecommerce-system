@@ -208,7 +208,7 @@ class AdminLayout extends App {
               overflow: hidden;
           }
           [data-sidebar] {
-              width: 280px;
+              width: 256px;
               flex-shrink: 0;
               background-color: ${primaryColor};
               transform: translateX(-100%);
@@ -241,32 +241,32 @@ class AdminLayout extends App {
 
           <!-- Sidebar -->
           <aside data-sidebar class="fixed inset-y-0 left-0 text-white flex flex-col shadow-2xl">
-              <div class="flex items-center justify-between h-20 px-6 border-b border-[${secondaryColor}]/30 flex-shrink-0 bg-[${darkColor}]/10">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md">
-                          ${this.logoUrl ? `<img src="${this.logoUrl}" class="w-7 h-7 object-contain">` : `<i class="fas fa-shopping-bag text-white"></i>`}
+              <div class="flex items-center justify-between h-16 px-5 border-b border-[${secondaryColor}]/30 flex-shrink-0 bg-[${darkColor}]/10">
+                  <div class="flex items-center gap-2.5">
+                      <div class="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md">
+                          ${this.logoUrl ? `<img src="${this.logoUrl}" class="w-6 h-6 object-contain">` : `<i class="fas fa-shopping-bag text-white text-sm"></i>`}
                       </div>
-                      <span class="text-xl font-black tracking-tight font-brand">${this.brandName}</span>
+                      <span class="text-lg font-black tracking-tight font-brand">${this.brandName}</span>
                   </div>
                   <button data-sidebar-toggle class="xl:hidden p-2 rounded-lg hover:bg-white/10">
                       <i class="fas fa-times"></i>
                   </button>
               </div>
 
-              <nav class="flex-1 px-4 py-6 overflow-y-auto space-y-6">
+              <nav class="flex-1 px-3 py-4 overflow-y-auto space-y-5">
                   ${navigationGroups
                     .map(
                       (group) => `
                       <div>
-                          <div data-group-toggle data-group-name="${group.group}" class="flex items-center justify-between px-3 mb-2 cursor-pointer group">
+                          <div data-group-toggle data-group-name="${group.group}" class="flex items-center justify-between px-3 mb-1.5 cursor-pointer group">
                               <span class="text-[10px] font-black uppercase tracking-[0.2em] text-[${textColor}]/50 group-hover:text-white transition-colors">${group.group}</span>
                               <i class="fas fa-chevron-down text-[8px] transition-transform duration-300 ${this.collapsedGroups.has(group.group) ? "rotate-180" : ""} text-[${textColor}]/30"></i>
                           </div>
-                          <div class="space-y-1 ${this.collapsedGroups.has(group.group) ? "hidden" : ""}">
+                          <div class="space-y-0.5 ${this.collapsedGroups.has(group.group) ? "hidden" : ""}">
                               ${group.items
                                 .map(
                                   (item) => `
-                                  <ui-link href="${item.href}" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold no-underline transition-all ${item.active ? "active shadow-lg shadow-black/10" : `text-[${textColor}]/70 hover:bg-white/5 hover:text-white`}">
+                                  <ui-link href="${item.href}" class="nav-item group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold no-underline transition-all ${item.active ? "active shadow-lg shadow-black/10" : `text-[${textColor}]/70 hover:bg-white/5 hover:text-white`}">
                                       <i class="${item.icon} w-5 text-center ${item.active ? "text-white" : `text-[${textColor}]/40 group-hover:text-white`}"></i>
                                       <span>${item.label}</span>
                                   </ui-link>
@@ -280,8 +280,8 @@ class AdminLayout extends App {
                     .join("")}
               </nav>
 
-              <div class="p-4 border-t border-[${secondaryColor}]/30 bg-[${darkColor}]/5">
-                  <button data-action="logout" class="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-bold text-rose-200 hover:bg-rose-500 hover:text-white transition-all">
+              <div class="p-3 border-t border-[${secondaryColor}]/30 bg-[${darkColor}]/5">
+                  <button data-action="logout" class="flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-bold text-rose-200 hover:bg-rose-500 hover:text-white transition-all">
                       <i class="fas fa-sign-out-alt w-5"></i>
                       <span>Terminate Session</span>
                   </button>
@@ -289,31 +289,26 @@ class AdminLayout extends App {
           </aside>
 
           <!-- Main Content -->
-          <main class="flex-1 xl:ml-[280px] flex flex-col min-h-screen bg-slate-50 relative">
-              <header class="h-20 px-8 flex items-center justify-between bg-white border-b border-slate-200 sticky top-0 z-30">
+          <main class="flex-1 xl:ml-[256px] flex flex-col min-h-screen bg-slate-50 relative">
+              <header class="h-16 px-6 flex items-center justify-between bg-white border-b border-slate-200 sticky top-0 z-30">
                   <div class="flex items-center gap-4">
                       <button data-sidebar-toggle class="xl:hidden p-2 rounded-lg bg-slate-100 text-slate-600">
                           <i class="fas fa-bars"></i>
                       </button>
-                      <h1 class="text-xl font-black text-slate-800 tracking-tight font-brand uppercase">${this.getPageTitle()}</h1>
+                      <h1 class="text-lg font-black text-slate-800 tracking-tight font-brand uppercase">${this.getPageTitle()}</h1>
                   </div>
 
-                  <div class="flex items-center gap-5">
-                      <div class="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-xl border border-slate-200">
-                          <i class="fas fa-search text-slate-400 text-xs"></i>
-                          <input type="text" placeholder="Global search..." class="bg-transparent border-none outline-none text-xs font-bold text-slate-700 w-48">
-                      </div>
-
-                      <div class="w-px h-6 bg-slate-200"></div>
+                  <div class="flex items-center gap-4">
+                      <div class="w-px h-5 bg-slate-200"></div>
 
                       <ui-dropdown-menu position="bottom">
                           <ui-dropdown-menu-trigger>
-                              <div class="flex items-center gap-3 cursor-pointer p-1 hover:bg-slate-50 rounded-xl transition-all">
+                              <div class="flex items-center gap-2.5 cursor-pointer p-1 hover:bg-slate-50 rounded-xl transition-all">
                                   <div class="text-right hidden sm:block">
-                                      <p class="text-xs font-black text-slate-900 leading-none mb-1 font-brand uppercase tracking-tighter">${this.userData.name || "Admin"}</p>
-                                      <p class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest leading-none">Super Admin</p>
+                                      <p class="text-[11px] font-black text-slate-900 leading-none mb-0.5 font-brand uppercase tracking-tighter">${this.userData.name || "Admin"}</p>
+                                      <p class="text-[8px] font-bold text-indigo-600 uppercase tracking-widest leading-none">Super Admin</p>
                                   </div>
-                                  <ui-avatar name="${this.userData.name || "Admin"}" src="${this.userData.avatar || ""}" size="md" class="shadow-sm shadow-slate-200 rounded-full"></ui-avatar>
+                                  <ui-avatar name="${this.userData.name || "Admin"}" src="${this.userData.avatar || ""}" size="sm" class="shadow-sm shadow-slate-200 rounded-full"></ui-avatar>
                               </div>
                           </ui-dropdown-menu-trigger>
                           <ui-dropdown-menu-content class="w-56">
