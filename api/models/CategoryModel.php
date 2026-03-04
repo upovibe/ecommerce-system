@@ -11,6 +11,8 @@ class CategoryModel extends BaseModel
         'parent_id',
         'name',
         'slug',
+        'description',
+        'image',
         'meta_schema',
         'is_active',
         'sort_order'

@@ -13,6 +13,15 @@ Router::post('/auth/reset-password', 'AuthController@resetPassword');
 // Contact form routes (public - no middleware needed)
 Router::post('/contact/submit', 'ContactController@submit');
 
+// Category routes (public GET, protected POST/PUT/DELETE)
+Router::get('/categories', 'CategoryController@index');
+Router::post('/categories', 'CategoryController@store');
+Router::get('/categories/{id}', 'CategoryController@show');
+Router::put('/categories/{id}', 'CategoryController@update');
+Router::delete('/categories/{id}', 'CategoryController@destroy');
+Router::post('/categories/{id}/upload-image', 'CategoryController@uploadImage');
+Router::put('/categories/{id}/toggle-active', 'CategoryController@toggleActive');
+
 // User management routes (protected - require authentication)
 // Note: Middleware will be called inside controllers using:
 // AuthMiddleware::requireAuth($pdo);
