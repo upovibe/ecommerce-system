@@ -182,6 +182,16 @@ class FileUpload extends HTMLElement {
           color: #6b7280;
           flex-shrink: 0;
           margin-bottom: 0.25rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .file-preview-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 0.25rem;
         }
 
         .file-info {
@@ -450,7 +460,7 @@ class FileUpload extends HTMLElement {
         </div>
         
         <div class="file-icon">
-          ${this.getFileIcon(file)}
+          ${this.getFileVisual(file)}
         </div>
         
         <div class="file-info">
@@ -481,6 +491,9 @@ class FileUpload extends HTMLElement {
 
   removeFile(index) {
     const file = this.files[index];
+    if (file && file._previewUrl) {
+      URL.revokeObjectURL(file._previewUrl);
+    }
     this.files.splice(index, 1);
     delete this.uploadProgress[file.name];
     
@@ -506,6 +519,51 @@ class FileUpload extends HTMLElement {
     setTimeout(() => {
       errorDiv.remove();
     }, 5000);
+  }
+
+  // Get appropriate icon based on file type
+  isImageFile(file) {
+    const fileType = file?.type || '';
+    const fileName = file?.name || '';
+    const extension = fileName.split('.').pop()?.toLowerCase() || '';
+
+    return (
+      fileType.startsWith('image/') ||
+      ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(extension)
+    );
+  }
+
+  resolveFileSrc(file) {
+    if (!file) return '';
+
+    // Existing file path from server
+    if (file.isExisting) {
+      const path = file.path || '';
+      if (!path) return '';
+      if (path.startsWith('http') || path.startsWith('data:')) return path;
+      return window.location.origin + (path.startsWith('/') ? '' : '/') + path;
+    }
+
+    // Newly selected local file
+    if (file instanceof File) {
+      if (!file._previewUrl) {
+        file._previewUrl = URL.createObjectURL(file);
+      }
+      return file._previewUrl;
+    }
+
+    return '';
+  }
+
+  getFileVisual(file) {
+    if (this.isImageFile(file)) {
+      const src = this.resolveFileSrc(file);
+      if (src) {
+        return `<img src="${src}" alt="${file.name || 'image'}" class="file-preview-image">`;
+      }
+    }
+
+    return this.getFileIcon(file);
   }
 
   // Get appropriate icon based on file type
@@ -637,6 +695,11 @@ class FileUpload extends HTMLElement {
   }
 
   clear() {
+    this.files.forEach((file) => {
+      if (file && file._previewUrl) {
+        URL.revokeObjectURL(file._previewUrl);
+      }
+    });
     this.files = [];
     this.uploadProgress = {};
     this.updateFileList();

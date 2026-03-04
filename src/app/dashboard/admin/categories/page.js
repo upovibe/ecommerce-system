@@ -3,6 +3,11 @@ import "@/components/ui/Button.js";
 import "@/components/ui/Modal.js";
 import "@/components/ui/Toast.js";
 import "@/components/ui/Input.js";
+import "@/components/ui/Table.js";
+import "@/components/ui/Tabs.js";
+import "@/components/ui/Dropdown.js";
+import "@/components/ui/Switch.js";
+import "@/components/ui/FileUpload.js";
 import api from "@/services/api.js";
 
 class CategoriesPage extends App {
@@ -10,28 +15,64 @@ class CategoriesPage extends App {
     super();
     this.categories = [];
     this.loading = true;
+    this._isInitialized = false;
+    this._onTableAdd = () => this.showCreateDialog();
+    this._onTableRefresh = () => this.loadCategories();
+    this._onTableEdit = (event) => {
+      const id = event?.detail?.row?.id;
+      if (id != null) this.showEditDialog(id);
+    };
+    this._onTableDelete = (event) => {
+      const id = event?.detail?.row?.id;
+      if (id != null) this.deleteCategory(id);
+    };
+    this._onTableCustomAction = (event) => {
+      const id = event?.detail?.row?.id;
+      const actionName = event?.detail?.actionName;
+      if (actionName === "toggle-active" && id != null) {
+        this.toggleActive(id);
+      }
+    };
+  }
+
+  updateView() {
+    this.innerHTML = this.render();
   }
 
   async connectedCallback() {
     super.connectedCallback();
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+
+    this.addEventListener("table-add", this._onTableAdd);
+    this.addEventListener("table-refresh", this._onTableRefresh);
+    this.addEventListener("table-edit", this._onTableEdit);
+    this.addEventListener("table-delete", this._onTableDelete);
+    this.addEventListener("table-custom-action", this._onTableCustomAction);
     await this.loadCategories();
   }
 
   async loadCategories() {
     this.loading = true;
-    this.render();
+    this.updateView();
     try {
-      const res = await api.get("/categories");
-      this.categories = res.data.data || [];
+      const res = await api.get("/categories", { timeout: 10000 });
+      const categoryData = res?.data?.data;
+      this.categories = Array.isArray(categoryData) ? categoryData : [];
     } catch (e) {
-      Toast.show({
-        title: "Error",
-        message: "Failed to load categories",
-        variant: "error",
-      });
+      if (window.Toast?.show) {
+        window.Toast.show({
+          title: "Error",
+          message: "Failed to load categories",
+          variant: "error",
+        });
+      } else {
+        console.error("Failed to load categories", e);
+      }
+    } finally {
+      this.loading = false;
+      this.updateView();
     }
-    this.loading = false;
-    this.render();
   }
 
   getImageUrl(path) {
@@ -51,6 +92,13 @@ class CategoriesPage extends App {
 
   _showCategoryDialog(category) {
     const isEdit = !!category;
+    const parentOptions = (this.categories || [])
+      .filter((c) => !c.parent_id && (!isEdit || c.id !== category.id))
+      .map(
+        (c) => `<ui-option value="${c.id}">${c.name}</ui-option>`,
+      )
+      .join("");
+
     const modal = document.createElement("ui-modal");
     modal.setAttribute("title", isEdit ? "Edit Category" : "New Category");
     modal.setAttribute("position", "right");
@@ -68,36 +116,33 @@ class CategoriesPage extends App {
           <ui-input id="cat-name" value="${category?.name || ""}" placeholder="e.g. Electronics" class="w-full"></ui-input>
         </div>
         <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Parent Category</label>
+          <ui-dropdown id="cat-parent" placeholder="None (Main category)" class="w-full">
+            <ui-option value="">None (Main category)</ui-option>
+            ${parentOptions}
+          </ui-dropdown>
+        </div>
+        <div>
           <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Description</label>
           <textarea id="cat-desc" placeholder="Describe this category..." rows="3"
             class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none font-brand">${category?.description || ""}</textarea>
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Category Image</label>
-          ${
-            isEdit && category?.image
-              ? `
-            <div class="mb-3 relative w-full h-28 rounded-2xl overflow-hidden border border-slate-200">
-              <img id="cat-img-preview" src="${this.getImageUrl(category.image)}" class="w-full h-full object-cover" />
-            </div>
-          `
-              : `
-            <div id="cat-img-preview-wrap" class="mb-3 hidden">
-              <div class="relative w-full h-28 rounded-2xl overflow-hidden border border-slate-200">
-                <img id="cat-img-preview" class="w-full h-full object-cover" />
-              </div>
-            </div>
-          `
-          }
-          <label class="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-            <i class="fas fa-image text-slate-400"></i>
-            <span id="cat-img-label" class="text-sm text-slate-500 font-medium">Choose an image</span>
-            <input id="cat-img-file" type="file" accept="image/*" class="hidden" />
-          </label>
+          <ui-file-upload
+            id="cat-img-file"
+            data-field="cat-image"
+            accept="image/*"
+            max-size="5242880"
+            max-files="1"
+            ${isEdit && category?.image ? `value="${category.image}"` : ""}
+            class="w-full">
+          </ui-file-upload>
         </div>
-        <div class="flex items-center gap-3 mt-1">
-          <input id="cat-active" type="checkbox" ${category?.is_active !== false ? "checked" : ""} class="w-4 h-4 rounded accent-indigo-500">
-          <label for="cat-active" class="text-xs font-bold text-slate-500">Active (visible on storefront)</label>
+        <div class="pt-1">
+          <ui-switch name="is_active" id="cat-active" ${category?.is_active !== false ? "checked" : ""}>
+            <span slot="label">Active (visible on storefront)</span>
+          </ui-switch>
         </div>
       </form>
     `;
@@ -105,25 +150,16 @@ class CategoriesPage extends App {
     document.body.appendChild(modal);
 
     const nameInput = modal.querySelector("#cat-name");
+    const parentInput = modal.querySelector("#cat-parent");
     const descInput = modal.querySelector("#cat-desc");
-    const fileInput = modal.querySelector("#cat-img-file");
-    const imgLabel = modal.querySelector("#cat-img-label");
-    const imgPreviewWrap = modal.querySelector("#cat-img-preview-wrap");
-    const imgPreview = modal.querySelector("#cat-img-preview");
+    const fileInput = modal.querySelector('ui-file-upload[data-field="cat-image"]');
     const activeCheck = modal.querySelector("#cat-active");
 
-    // Image preview
-    fileInput?.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      imgLabel.textContent = file.name;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (imgPreview) imgPreview.src = ev.target.result;
-        if (imgPreviewWrap) imgPreviewWrap.classList.remove("hidden");
-      };
-      reader.readAsDataURL(file);
-    });
+    if (parentInput && isEdit && category?.parent_id) {
+      setTimeout(() => {
+        parentInput.value = String(category.parent_id);
+      }, 0);
+    }
 
     // Validation
     const validate = () => {
@@ -141,11 +177,13 @@ class CategoriesPage extends App {
 
       try {
         let imageUrl = category?.image || null;
+        const selectedFiles = fileInput?.getFiles?.() || [];
+        const newImageFile = selectedFiles.find((f) => f instanceof File);
 
         // If a new file was selected, upload it first (only for edit)
-        if (isEdit && fileInput?.files?.[0]) {
+        if (isEdit && newImageFile) {
           const formData = new FormData();
-          formData.append("image", fileInput.files[0]);
+          formData.append("image", newImageFile);
           const uploadRes = await api.uploadFile(
             `/categories/${category.id}/upload-image`,
             formData,
@@ -158,7 +196,8 @@ class CategoriesPage extends App {
         const payload = {
           name: nameInput.value.trim(),
           description: descInput.value.trim() || null,
-          is_active: activeCheck.checked,
+          parent_id: parentInput?.value ? Number(parentInput.value) : null,
+          is_active: activeCheck?.checked ? true : false,
         };
 
         if (!isEdit) {
@@ -167,9 +206,9 @@ class CategoriesPage extends App {
           if (createRes.data.success) {
             const newId = createRes.data.data.id;
             // Upload image for newly created category
-            if (fileInput?.files?.[0]) {
+            if (newImageFile) {
               const formData = new FormData();
-              formData.append("image", fileInput.files[0]);
+              formData.append("image", newImageFile);
               await api.uploadFile(
                 `/categories/${newId}/upload-image`,
                 formData,
@@ -250,74 +289,130 @@ class CategoriesPage extends App {
       `;
     }
 
-    return `
-      <div class="p-6 md:p-10 space-y-8 max-w-7xl mx-auto font-brand text-slate-600">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 class="text-3xl font-black text-slate-900 tracking-tight mb-1">Categories</h1>
-            <p class="text-slate-500 text-sm font-medium">Organise your products into browsable groups.</p>
-          </div>
-          <ui-button color="primary" onclick="this.closest('app-categories-page').showCreateDialog()">
-            <i class="fas fa-plus mr-2"></i> New Category
-          </ui-button>
-        </div>
+    const parentNameById = {};
+    (this.categories || []).forEach((cat) => {
+      parentNameById[String(cat.id)] = cat.name || "";
+    });
 
-        ${
-          this.categories.length === 0
-            ? `
-          <div class="bg-white border border-slate-100 rounded-3xl p-16 text-center shadow-sm">
-            <div class="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 mx-auto mb-6">
-              <i class="fas fa-layer-group text-3xl"></i>
-            </div>
-            <h3 class="text-xl font-bold text-slate-900 mb-2">No Categories Yet</h3>
-            <p class="text-slate-500 max-w-xs mx-auto mb-8 text-sm">Create your first category to start organising products.</p>
-            <ui-button color="primary" onclick="this.closest('app-categories-page').showCreateDialog()">
-              <i class="fas fa-plus mr-2"></i> Create First Category
-            </ui-button>
-          </div>
-        `
-            : `
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            ${this.categories
-              .map(
-                (cat) => `
-              <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
-                <div class="relative h-40 bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden">
-                  ${
-                    cat.image
-                      ? `<img src="${this.getImageUrl(cat.image)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />`
-                      : `<div class="w-full h-full flex items-center justify-center">
-                        <i class="fas fa-layer-group text-4xl text-slate-200"></i>
-                       </div>`
-                  }
-                  <div class="absolute top-3 right-3">
-                    <span class="px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${cat.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}">
-                      ${cat.is_active ? "Active" : "Hidden"}
-                    </span>
-                  </div>
-                </div>
-                <div class="p-5">
-                  <h3 class="font-black text-slate-900 text-base mb-1">${cat.name}</h3>
-                  <p class="text-xs text-slate-400 mb-4 line-clamp-2">${cat.description || '<span class="italic">No description</span>'}</p>
-                  <div class="flex items-center gap-2">
-                    <ui-button variant="outline" size="sm" color="primary" onclick="this.closest('app-categories-page').showEditDialog(${cat.id})">
-                      <i class="fas fa-edit mr-1"></i> Edit
-                    </ui-button>
-                    <ui-button variant="outline" size="sm" color="${cat.is_active ? "warning" : "success"}" onclick="this.closest('app-categories-page').toggleActive(${cat.id})">
-                      <i class="fas fa-${cat.is_active ? "eye-slash" : "eye"} mr-1"></i> ${cat.is_active ? "Hide" : "Show"}
-                    </ui-button>
-                    <ui-button variant="outline" size="sm" color="danger" onclick="this.closest('app-categories-page').deleteCategory(${cat.id})">
-                      <i class="fas fa-trash"></i>
-                    </ui-button>
-                  </div>
-                </div>
-              </div>
-            `,
-              )
-              .join("")}
-          </div>
-        `
-        }
+    const mainCategories = (this.categories || []).filter((cat) => !cat.parent_id);
+    const subCategories = (this.categories || []).filter((cat) => !!cat.parent_id);
+    const subCountByParentId = {};
+    subCategories.forEach((sub) => {
+      const pid = String(sub.parent_id);
+      subCountByParentId[pid] = (subCountByParentId[pid] || 0) + 1;
+    });
+
+    const buildTableData = (rows, includeParent = false, includeSubCount = false) =>
+      rows.map((cat, index) => ({
+      id: cat.id,
+      no: index + 1,
+      image: cat.image
+        ? `<img src="${this.getImageUrl(cat.image)}" alt="${cat.name || "Category"}" class="w-10 h-10 rounded-lg object-cover border border-slate-200" />`
+        : `<div class="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400"><i class="fas fa-image text-xs"></i></div>`,
+      name: cat.name || "",
+      ...(includeSubCount
+        ? { subcategories: subCountByParentId[String(cat.id)] || 0 }
+        : {}),
+      ...(includeParent
+        ? { parent: parentNameById[String(cat.parent_id)] || `#${cat.parent_id}` }
+        : {}),
+      description: cat.description || "No description",
+      status: cat.is_active ? "Active" : "Hidden",
+      updated: cat.updated_at || "",
+    }));
+
+    const buildColumns = (includeParent = false, includeSubCount = false) => [
+      { key: "no", label: "No.", html: false },
+      { key: "image", label: "Image" },
+      { key: "name", label: "Category", html: false },
+      ...(includeSubCount
+        ? [{ key: "subcategories", label: "Subcategories", html: false }]
+        : []),
+      ...(includeParent ? [{ key: "parent", label: "Parent", html: false }] : []),
+      { key: "description", label: "Description", html: false },
+      { key: "status", label: "Status", html: false },
+      { key: "updated", label: "Updated", html: false },
+    ];
+
+    const customActions = [
+      { name: "toggle-active", label: "Toggle status", icon: "fas fa-eye" },
+    ];
+
+    const safeMainTableData = JSON.stringify(buildTableData(mainCategories, false, true)).replace(/"/g, "&quot;");
+    const safeMainTableColumns = JSON.stringify(buildColumns(false, true)).replace(
+      /"/g,
+      "&quot;",
+    );
+    const safeSubTableData = JSON.stringify(buildTableData(subCategories, true)).replace(
+      /"/g,
+      "&quot;",
+    );
+    const safeSubTableColumns = JSON.stringify(buildColumns(true)).replace(
+      /"/g,
+      "&quot;",
+    );
+    const safeCustomActions = JSON.stringify(customActions).replace(
+      /"/g,
+      "&quot;",
+    );
+
+    return `
+      <div class="px-6 md:px-10 pb-8 space-y-6 max-w-7xl mx-auto font-brand text-slate-600">
+        <style>
+          app-categories-page .category-table-wrap .upo-table-title {
+            display: none;
+          }
+        </style>
+        <div class="category-table-wrap bg-white border border-slate-100 rounded-3xl p-4 shadow-sm">
+          <ui-tabs>
+            <ui-tab-list>
+              <ui-tab value="main-categories">Main Categories</ui-tab>
+              <ui-tab value="sub-categories">Subcategories</ui-tab>
+            </ui-tab-list>
+
+            <ui-tab-panel value="main-categories">
+              <ui-table
+                title=""
+                data="${safeMainTableData}"
+                columns="${safeMainTableColumns}"
+                custom-actions="${safeCustomActions}"
+                sortable
+                searchable
+                search-placeholder="Search main categories..."
+                pagination
+                page-size="25"
+                action
+                actions="edit,delete"
+                addable
+                refresh
+                bordered
+                striped
+                class="w-full">
+              </ui-table>
+            </ui-tab-panel>
+
+            <ui-tab-panel value="sub-categories">
+              <ui-table
+                title=""
+                data="${safeSubTableData}"
+                columns="${safeSubTableColumns}"
+                custom-actions="${safeCustomActions}"
+                sortable
+                searchable
+                search-placeholder="Search subcategories..."
+                pagination
+                page-size="25"
+                action
+                actions="edit,delete"
+                addable
+                refresh
+                bordered
+                striped
+                class="w-full">
+              </ui-table>
+            </ui-tab-panel>
+          </ui-tabs>
+        </div>
       </div>
     `;
   }

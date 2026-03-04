@@ -78,7 +78,9 @@ class AdminLayout extends App {
     }
 
     try {
-      const response = await api.withToken(token).get(`/users/${userId}/profile`);
+      const response = await api
+        .withToken(token)
+        .get(`/users/${userId}/profile`);
       this.userData = { ...storedUserData, ...(response.data || {}) };
       localStorage.setItem("userData", JSON.stringify(this.userData));
     } catch (error) {
@@ -169,7 +171,7 @@ class AdminLayout extends App {
       title.textContent = this.getPageTitle().toUpperCase();
     }
 
-    const navLinks = this.querySelectorAll('ui-link[href]');
+    const navLinks = this.querySelectorAll("ui-link[href]");
     navLinks.forEach((link) => {
       const href = link.getAttribute("href");
       const icon = link.querySelector("i");
@@ -177,17 +179,31 @@ class AdminLayout extends App {
 
       if (isActive) {
         link.classList.add("active", "shadow-lg", "shadow-black/10");
-        link.classList.remove(`text-[${textColor}]/70`, "hover:bg-white/5", "hover:text-white");
+        link.classList.remove(
+          `text-[${textColor}]/70`,
+          "hover:bg-white/5",
+          "hover:text-white",
+        );
         if (icon) {
           icon.classList.add("text-white");
-          icon.classList.remove(`text-[${textColor}]/40`, "group-hover:text-white");
+          icon.classList.remove(
+            `text-[${textColor}]/40`,
+            "group-hover:text-white",
+          );
         }
       } else {
         link.classList.remove("active", "shadow-lg", "shadow-black/10");
-        link.classList.add(`text-[${textColor}]/70`, "hover:bg-white/5", "hover:text-white");
+        link.classList.add(
+          `text-[${textColor}]/70`,
+          "hover:bg-white/5",
+          "hover:text-white",
+        );
         if (icon) {
           icon.classList.remove("text-white");
-          icon.classList.add(`text-[${textColor}]/40`, "group-hover:text-white");
+          icon.classList.add(
+            `text-[${textColor}]/40`,
+            "group-hover:text-white",
+          );
         }
       }
     });
@@ -226,7 +242,7 @@ class AdminLayout extends App {
             href: "/dashboard/admin/orders",
           },
           {
-            label: "Collections",
+            label: "Categories",
             icon: "fas fa-layer-group",
             href: "/dashboard/admin/categories",
           },
@@ -275,7 +291,9 @@ class AdminLayout extends App {
   getImageUrl(path) {
     if (!path) return "";
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
-    return window.location.origin + (path.startsWith("/") ? path : `/api/${path}`);
+    return (
+      window.location.origin + (path.startsWith("/") ? path : `/api/${path}`)
+    );
   }
 
   render() {
@@ -352,15 +370,15 @@ class AdminLayout extends App {
                           </div>
                           <div class="space-y-0.5 ${this.collapsedGroups.has(group.group) ? "hidden" : ""}">
                                   ${group.items
-                                .map(
-                                  (item) => `
+                                    .map(
+                                      (item) => `
                                   <ui-link href="${item.href}" class="nav-item group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold no-underline transition-all ${item.active ? "active shadow-lg shadow-black/10" : `text-[${textColor}]/70 hover:bg-white/5 hover:text-white`}">
                                       <i class="${item.icon} w-5 text-center ${item.active ? "text-white" : `text-[${textColor}]/40 group-hover:text-white`}"></i>
                                       <span>${item.label}</span>
                                   </ui-link>
                               `,
-                                )
-                                .join("")}
+                                    )
+                                    .join("")}
                           </div>
                       </div>
                   `,

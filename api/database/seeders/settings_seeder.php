@@ -17,7 +17,7 @@ class SettingsSeeder
         $settings = [
             ['site_name', 'VastCommerce', 'text', 'general', 'Official storefront name'],
             ['site_description', 'Your One-Stop Universal Shop', 'text', 'general', 'Meta description for SEO'],
-            ['site_logo', '/src/public/images/logo.png', 'image', 'general', 'Main header logo'],
+            ['site_logo', '/src/assets/logo.png', 'image', 'general', 'Main header logo'],
             ['currency', 'NGN', 'text', 'localization', 'Base currency code'],
             ['contact_email', 'info@vastcommerce.com', 'text', 'contact', 'Primary support email'],
             ['phone_number', '+234 800 VAST', 'text', 'contact', 'Customer service line'],
