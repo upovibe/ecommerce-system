@@ -544,22 +544,8 @@ class AdminProfilePage extends App {
                   <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-600">Verified</span>
               </div>
             </div>
-
-            <!-- quick stats -->
-            <div class="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden">
-                <h4 class="text-[9px] font-bold tracking-[0.2em] text-slate-500 mb-6">Quick Stats</h4>
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between border-b border-white/5 pb-3">
-                        <span class="text-xs text-slate-400">Total Logins</span>
-                        <span class="text-lg font-black">42</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs text-slate-400">Last Active</span>
-                        <span class="text-xs font-bold uppercase text-slate-300">Today</span>
-                    </div>
-                </div>
-            </div>
           </div>
+
 
           <!-- main content -->
           <div class="lg:col-span-8 space-y-8">
