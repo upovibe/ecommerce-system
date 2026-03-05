@@ -1,46 +1,28 @@
 import App from "@/core/App.js";
-import "@/components/ui/DropdownMenu.js";
-import "@/components/ui/Avatar.js";
-import "@/components/ui/Button.js";
-import "@/components/ui/Link.js";
 import api from "@/services/api.js";
 import { fetchColorSettings } from "@/utils/colorSettings.js";
+import "@/components/ui/Link.js";
+import "@/components/ui/Toast.js";
+import "@/components/ui/DropdownMenu.js";
+import "@/components/ui/Avatar.js";
 
 class AdminLayout extends App {
   constructor() {
     super();
-    this.userData = JSON.parse(localStorage.getItem("userData") || "{}");
-    this.currentPath = window.location.pathname;
+    this.pageContent = "";
+    this.currentUser = null;
     this.sidebarOpen = false;
-    this.collapsedGroups = new Set();
     this.logoUrl = null;
     this.brandName = "VastCommerce";
+    this.collapsedGroups = new Set();
 
-    // Default colors while loading
-    this.set("primary_color", "#2563eb");
-    this.set("secondary_color", "#3b82f6");
-    this.set("accent_color", "#4f46e5");
+    // Default colours while loading
+    this.set("primary_color", "#4f46e5");
+    this.set("secondary_color", "#64748b");
+    this.set("accent_color", "#4338ca");
     this.set("text_color", "#f8fafc");
     this.set("dark_color", "#0f172a");
-
-    this.pageContent = "";
-  }
-
-  rerender() {
-    if (this.isConnected) {
-      this.innerHTML = this.render();
-    }
-  }
-
-  setPageContent(content) {
-    this.pageContent = content;
-    const contentContainer = this.querySelector("[data-page-content]");
-    if (contentContainer) {
-      contentContainer.innerHTML = this.pageContent;
-      this.updateRouteUI();
-      return;
-    }
-    this.rerender();
+    this.set("error_color", "#ef4444");
   }
 
   async connectedCallback() {
@@ -52,64 +34,52 @@ class AdminLayout extends App {
     }
 
     await this.loadUserData();
-
-    // Listen for route changes
-    window.addEventListener("route-changed", (e) => {
-      this.currentPath = e.detail.path;
-      this.updateRouteUI();
-    });
-    window.addEventListener("user-data-updated", () => {
-      this.userData = JSON.parse(localStorage.getItem("userData") || "{}");
-      this.rerender();
-    });
-
     await this.loadTheme();
     this.setupEventListeners();
+
+    window.addEventListener("route-changed", (e) => {
+      this.updateActiveNav();
+    });
+    window.addEventListener("user-data-updated", () => {
+      this.currentUser = JSON.parse(localStorage.getItem("userData") || "{}");
+      this.innerHTML = this.render();
+    });
   }
 
   async loadUserData() {
-    const storedUserData = JSON.parse(localStorage.getItem("userData") || "{}");
-    const userId = storedUserData?.id;
+    const stored = JSON.parse(localStorage.getItem("userData") || "{}");
+    const userId = stored?.id;
     const token = localStorage.getItem("token");
 
-    if (!userId || !token) {
-      this.userData = storedUserData;
-      return;
-    }
-
-    try {
-      const response = await api
-        .withToken(token)
-        .get(`/users/${userId}/profile`);
-      this.userData = { ...storedUserData, ...(response.data || {}) };
-      localStorage.setItem("userData", JSON.stringify(this.userData));
-    } catch (error) {
-      this.userData = storedUserData;
-      console.warn("Failed to refresh user profile in layout", error);
+    if (userId && token) {
+      try {
+        const res = await api.withToken(token).get(`/users/${userId}/profile`);
+        this.currentUser = { ...stored, ...(res.data || {}) };
+        localStorage.setItem("userData", JSON.stringify(this.currentUser));
+      } catch (e) {
+        this.currentUser = stored;
+      }
+    } else {
+      this.currentUser = stored;
     }
   }
 
   async loadTheme() {
     try {
-      // Fetch logo
-      const logoResp = await api.get("/settings/key/site_logo");
-      if (logoResp.data?.success) {
-        this.logoUrl = logoResp.data.data.setting_value;
-      }
+      const [logoRes, nameRes, colors] = await Promise.all([
+        api.get("/settings/key/site_logo").catch(() => null),
+        api.get("/settings/key/site_name").catch(() => null),
+        fetchColorSettings().catch(() => ({})),
+      ]);
 
-      // Fetch name
-      const nameResp = await api.get("/settings/key/site_name");
-      if (nameResp.data?.success) {
-        this.brandName = nameResp.data.data.setting_value;
-      }
+      if (logoRes?.data?.success)
+        this.logoUrl = logoRes.data.data.setting_value;
+      if (nameRes?.data?.success)
+        this.brandName = nameRes.data.data.setting_value;
+      Object.entries(colors).forEach(([k, v]) => this.set(k, v));
 
-      // Fetch colors
-      const colors = await fetchColorSettings();
-      Object.entries(colors).forEach(([key, value]) => {
-        this.set(key, value);
-      });
-
-      this.rerender();
+      this.innerHTML = this.render();
+      this.setupEventListeners();
     } catch (e) {
       console.warn("Theme loading failed", e);
     }
@@ -117,41 +87,27 @@ class AdminLayout extends App {
 
   setupEventListeners() {
     this.addEventListener("click", (e) => {
-      const toggleBtn = e.target.closest("[data-sidebar-toggle]");
-      if (toggleBtn) {
+      if (e.target.closest("[data-sidebar-toggle]")) {
         e.preventDefault();
         this.toggleSidebar();
       }
-
-      const logoutBtn = e.target.closest('[data-action="logout"]');
-      if (logoutBtn) {
+      if (e.target.closest('[data-action="logout"]')) {
         e.preventDefault();
         this.handleLogout();
       }
-
       const groupToggle = e.target.closest("[data-group-toggle]");
       if (groupToggle) {
         e.preventDefault();
-        const groupName = groupToggle.getAttribute("data-group-name");
-        this.toggleGroup(groupName);
+        this.toggleGroup(groupToggle.getAttribute("data-group-name"));
       }
     });
-
-    const dropdown = this.querySelector("ui-dropdown-menu");
-    if (dropdown) {
-      dropdown.addEventListener("item-click", (e) => {
-        if (e.detail.action === "logout") this.handleLogout();
-      });
-    }
   }
 
   toggleSidebar() {
     this.sidebarOpen = !this.sidebarOpen;
     const container = this.querySelector("[data-layout-container]");
-    if (this.sidebarOpen) {
-      container.classList.add("sidebar-open");
-    } else {
-      container.classList.remove("sidebar-open");
+    if (container) {
+      container.classList.toggle("sidebar-open", this.sidebarOpen);
     }
   }
 
@@ -161,52 +117,23 @@ class AdminLayout extends App {
     } else {
       this.collapsedGroups.add(groupName);
     }
-    this.rerender();
+    this.updateSidebarNavigation();
   }
 
-  updateRouteUI() {
-    const textColor = this.get("text_color") || "#f8fafc";
-    const title = this.querySelector("[data-page-title]");
-    if (title) {
-      title.textContent = this.getPageTitle().toUpperCase();
+  updateSidebarNavigation() {
+    const nav = this.querySelector("nav");
+    if (nav) {
+      nav.innerHTML = this.renderNav();
     }
+  }
 
-    const navLinks = this.querySelectorAll("ui-link[href]");
-    navLinks.forEach((link) => {
-      const href = link.getAttribute("href");
-      const icon = link.querySelector("i");
-      const isActive = href === this.currentPath;
-
-      if (isActive) {
-        link.classList.add("active", "shadow-lg", "shadow-black/10");
-        link.classList.remove(
-          `text-[${textColor}]/70`,
-          "hover:bg-white/5",
-          "hover:text-white",
-        );
-        if (icon) {
-          icon.classList.add("text-white");
-          icon.classList.remove(
-            `text-[${textColor}]/40`,
-            "group-hover:text-white",
-          );
-        }
-      } else {
-        link.classList.remove("active", "shadow-lg", "shadow-black/10");
-        link.classList.add(
-          `text-[${textColor}]/70`,
-          "hover:bg-white/5",
-          "hover:text-white",
-        );
-        if (icon) {
-          icon.classList.remove("text-white");
-          icon.classList.add(
-            `text-[${textColor}]/40`,
-            "group-hover:text-white",
-          );
-        }
-      }
-    });
+  updateActiveNav() {
+    // Just re-render nav to update active states
+    const nav = this.querySelector("nav");
+    if (nav) nav.innerHTML = this.renderNav();
+    // Update page title
+    const title = this.querySelector("[data-page-title]");
+    if (title) title.textContent = this.getPageTitle();
   }
 
   handleLogout() {
@@ -215,9 +142,22 @@ class AdminLayout extends App {
     window.location.href = "/auth/login";
   }
 
+  setPageContent(content) {
+    this.pageContent = content;
+    // Prefer partial update to avoid layout flicker
+    const pageInner = this.querySelector("[data-page-inner]");
+    if (pageInner) {
+      pageInner.innerHTML = this.pageContent;
+      this.updateActiveNav();
+      return;
+    }
+    this.innerHTML = this.render();
+    this.setupEventListeners();
+  }
+
   getNavigationItems() {
-    const path = this.currentPath;
-    return [
+    const path = window.location.pathname;
+    const groups = [
       {
         group: "Dashboard",
         items: [
@@ -273,19 +213,32 @@ class AdminLayout extends App {
           },
         ],
       },
-    ].map((group) => ({
-      ...group,
-      items: group.items.map((item) => ({
+    ];
+
+    groups.forEach((g) => {
+      g.items = g.items.map((item) => ({
         ...item,
         active: path === item.href,
-      })),
-    }));
+      }));
+    });
+    return groups;
   }
 
   getPageTitle() {
-    const segments = this.currentPath.split("/").filter(Boolean);
-    const last = segments[segments.length - 1] || "Dashboard";
-    return last.charAt(0).toUpperCase() + last.slice(1);
+    const segments = window.location.pathname.split("/").filter(Boolean);
+    const last = segments[segments.length - 1] || "dashboard";
+    const map = {
+      admin: "Overview",
+      overview: "Overview",
+      products: "Inventory",
+      orders: "Orders",
+      categories: "Categories",
+      users: "Staff & Users",
+      pages: "Cloud Pages",
+      settings: "Preferences",
+      profile: "Profile",
+    };
+    return map[last] || last.charAt(0).toUpperCase() + last.slice(1);
   }
 
   getImageUrl(path) {
@@ -296,155 +249,191 @@ class AdminLayout extends App {
     );
   }
 
-  render() {
+  renderNav() {
+    const path = window.location.pathname;
     const primaryColor = this.get("primary_color");
-    const secondaryColor = this.get("secondary_color");
     const accentColor = this.get("accent_color");
     const textColor = this.get("text_color");
-    const darkColor = this.get("dark_color");
+    const secondaryColor = this.get("secondary_color");
+    const groups = this.getNavigationItems();
 
-    const navigationGroups = this.getNavigationItems();
+    return groups
+      .map(
+        (group) => `
+      <div class="mb-4">
+        <div
+          data-group-toggle
+          data-group-name="${group.group}"
+          class="flex items-center justify-between text-xs font-semibold uppercase text-[${textColor || "#bfdbfe"}]/60 mb-2 pl-2 tracking-wide cursor-pointer hover:text-white transition-colors"
+        >
+          <span>${group.group}</span>
+          <i class="fas fa-chevron-down text-xs transition-transform duration-200 ${this.collapsedGroups.has(group.group) ? "rotate-180" : ""}"></i>
+        </div>
+        <div class="flex flex-col gap-1 ${this.collapsedGroups.has(group.group) ? "hidden" : ""}">
+          ${group.items
+            .map(
+              (item) => `
+            <ui-link
+              href="${item.href}"
+              class="group flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors no-underline ${
+                item.active
+                  ? `bg-[${accentColor}] text-white`
+                  : `text-[${textColor}]/80 hover:bg-[${secondaryColor}]/30 hover:text-white`
+              }"
+            >
+              <i class="${item.icon} w-5 flex items-center justify-center"></i>
+              <span>${item.label}</span>
+            </ui-link>
+          `,
+            )
+            .join("")}
+        </div>
+      </div>
+    `,
+      )
+      .join("");
+  }
+
+  render() {
+    const primaryColor = this.get("primary_color") || "#4f46e5";
+    const secondaryColor = this.get("secondary_color") || "#64748b";
+    const textColor = this.get("text_color") || "#f8fafc";
+    const darkColor = this.get("dark_color") || "#0f172a";
+    const errorColor = this.get("error_color") || "#ef4444";
+
+    const user = this.currentUser || {};
+    const userName = user.name || user.username || "Admin";
+    const email = user.email || "";
 
     return `
       <style>
-          [data-layout-container] {
-              display: flex;
-              height: 100vh;
-              width: 100%;
-              overflow: hidden;
-          }
-          [data-sidebar] {
-              width: 256px;
-              flex-shrink: 0;
-              background-color: ${primaryColor};
-              transform: translateX(-100%);
-              transition: transform 0.3s ease-in-out;
-              z-index: 50;
-          }
-          @media (min-width: 1280px) {
-              [data-sidebar] { transform: translateX(0); }
-          }
-          .sidebar-open [data-sidebar] { transform: translateX(0); }
-          [data-sidebar-overlay] {
-              position: fixed;
-              inset: 0;
-              background: rgba(0,0,0,0.5);
-              z-index: 40;
-              opacity: 0;
-              pointer-events: none;
-              transition: opacity 0.3s;
-          }
-          .sidebar-open [data-sidebar-overlay] { opacity: 1; pointer-events: auto; }
-          .nav-item.active {
-              background-color: ${accentColor};
-              color: white;
-          }
+        [data-layout-container] {
+          display: flex;
+          height: 100vh;
+          width: 100%;
+          overflow: hidden;
+        }
+        [data-sidebar] {
+          width: 256px;
+          flex-shrink: 0;
+          background-color: ${primaryColor};
+          transform: translateX(-100%);
+          transition: transform 0.3s ease-in-out;
+          z-index: 50;
+        }
+        @media (min-width: 1280px) {
+          [data-sidebar] { transform: translateX(0); }
+        }
+        .sidebar-open [data-sidebar] { transform: translateX(0); }
+        [data-sidebar-overlay] {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.5);
+          z-index: 40;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.3s;
+        }
+        .sidebar-open [data-sidebar-overlay] { opacity: 1; pointer-events: auto; }
+        @media (min-width: 1280px) { [data-sidebar-overlay] { display: none; } }
       </style>
 
-      <div data-layout-container class="${this.sidebarOpen ? "sidebar-open" : ""}">
-          <!-- Sidebar Overlay -->
-          <div data-sidebar-overlay data-sidebar-toggle></div>
+      <div data-layout-container>
+        <!-- Overlay -->
+        <div data-sidebar-overlay data-sidebar-toggle></div>
 
-          <!-- Sidebar -->
-          <aside data-sidebar class="fixed inset-y-0 left-0 text-white flex flex-col shadow-2xl">
-              <div class="flex items-center justify-between h-16 px-5 border-b border-[${secondaryColor}]/30 flex-shrink-0 bg-[${darkColor}]/10">
-                  <div class="flex items-center gap-2.5">
-                      <div class="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md">
-                          ${this.logoUrl ? `<img src="${this.logoUrl}" class="w-6 h-6 object-contain">` : `<i class="fas fa-shopping-bag text-white text-sm"></i>`}
-                      </div>
-                      <span class="text-lg font-black tracking-tight font-brand">${this.brandName}</span>
-                  </div>
-                  <button data-sidebar-toggle class="xl:hidden p-2 rounded-lg hover:bg-white/10">
-                      <i class="fas fa-times"></i>
-                  </button>
+        <!-- Sidebar -->
+        <aside data-sidebar class="fixed inset-y-0 left-0 text-white flex flex-col shadow-lg">
+          <div class="flex items-center justify-between h-16 px-4 border-b border-[${secondaryColor}]/40 flex-shrink-0">
+            <div class="flex items-center gap-3">
+              ${
+                this.logoUrl
+                  ? `<img src="${this.getImageUrl(this.logoUrl)}" alt="Logo" class="w-8 h-8 object-contain" />`
+                  : `<i class="fas fa-shopping-bag text-white text-xl"></i>`
+              }
+              <span class="text-base font-black tracking-tight">${this.brandName}</span>
+            </div>
+            <button type="button" data-sidebar-toggle class="xl:hidden w-8 h-8 flex items-center justify-center rounded-md text-white/70 hover:text-white hover:bg-white/10">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <nav class="flex-1 px-4 py-4 overflow-y-auto flex flex-col gap-2">
+            ${this.renderNav()}
+          </nav>
+
+          <div class="p-4 border-t border-[${secondaryColor}]/40 flex-shrink-0">
+            <button data-action="logout" class="group flex items-center gap-3 w-full px-3 py-2 text-sm font-medium text-[${errorColor}]/80 hover:bg-[${errorColor}] hover:text-white rounded-md transition-colors">
+              <i class="fas fa-sign-out-alt w-5 flex items-center justify-center"></i>
+              <span>Logout</span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Main Content — same pattern as church/school system -->
+        <div class="flex-1 flex flex-col xl:ml-64 overflow-hidden">
+          <!-- Header -->
+          <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200/50 flex-shrink-0 h-16">
+            <div class="flex items-center justify-between px-4 h-full">
+              <div class="flex items-center gap-4 min-w-0 flex-1">
+                <button type="button" data-sidebar-toggle class="xl:hidden w-8 h-8 flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100">
+                  <i class="fas fa-bars"></i>
+                </button>
+                <h1 data-page-title class="text-lg font-bold text-[${darkColor}]">${this.getPageTitle()}</h1>
               </div>
 
-              <nav class="flex-1 px-3 py-4 overflow-y-auto space-y-5">
-                  ${navigationGroups
-                    .map(
-                      (group) => `
-                      <div>
-                          <div data-group-toggle data-group-name="${group.group}" class="flex items-center justify-between px-3 mb-1.5 cursor-pointer group">
-                              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-[${textColor}]/50 group-hover:text-white transition-colors">${group.group}</span>
-                              <i class="fas fa-chevron-down text-[8px] transition-transform duration-300 ${this.collapsedGroups.has(group.group) ? "rotate-180" : ""} text-[${textColor}]/30"></i>
-                          </div>
-                          <div class="space-y-0.5 ${this.collapsedGroups.has(group.group) ? "hidden" : ""}">
-                                  ${group.items
-                                    .map(
-                                      (item) => `
-                                  <ui-link href="${item.href}" class="nav-item group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-bold no-underline transition-all ${item.active ? "active shadow-lg shadow-black/10" : `text-[${textColor}]/70 hover:bg-white/5 hover:text-white`}">
-                                      <i class="${item.icon} w-5 text-center ${item.active ? "text-white" : `text-[${textColor}]/40 group-hover:text-white`}"></i>
-                                      <span>${item.label}</span>
-                                  </ui-link>
-                              `,
-                                    )
-                                    .join("")}
-                          </div>
+              <div class="flex items-center gap-4 flex-shrink-0">
+                <ui-dropdown-menu>
+                  <ui-dropdown-menu-trigger>
+                    <div class="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer">
+                      <div class="text-right hidden sm:block">
+                        <p class="text-xs font-black text-slate-900 leading-none">${userName}</p>
+                        <p class="text-[10px] text-indigo-600 font-semibold leading-none mt-0.5">Super Admin</p>
                       </div>
-                  `,
-                    )
-                    .join("")}
-              </nav>
-
-              <div class="p-3 border-t border-[${secondaryColor}]/30 bg-[${darkColor}]/5">
-                  <button data-action="logout" class="flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-bold text-rose-200 hover:bg-rose-500 hover:text-white transition-all">
-                      <i class="fas fa-sign-out-alt w-5"></i>
-                      <span>Terminate Session</span>
-                  </button>
-              </div>
-          </aside>
-
-          <!-- Main Content -->
-          <main class="flex-1 xl:ml-[256px] flex flex-col min-h-screen bg-slate-50 relative">
-              <header class="h-16 px-6 flex items-center justify-between bg-white border-b border-slate-200 sticky top-0 z-30">
-                  <div class="flex items-center gap-4">
-                      <button data-sidebar-toggle class="xl:hidden p-2 rounded-lg bg-slate-100 text-slate-600">
-                          <i class="fas fa-bars"></i>
+                      <ui-avatar
+                        name="${userName}"
+                        src="${user.profile_image ? this.getImageUrl(user.profile_image) : ""}"
+                        size="md">
+                      </ui-avatar>
+                    </div>
+                  </ui-dropdown-menu-trigger>
+                  <ui-dropdown-menu-content>
+                    <ui-dropdown-menu-label>My Account</ui-dropdown-menu-label>
+                    <ui-dropdown-menu-separator></ui-dropdown-menu-separator>
+                    <div class="px-3 py-2">
+                      <p class="text-sm font-semibold text-gray-700">${userName}</p>
+                      <p class="text-xs text-gray-500">${email}</p>
+                    </div>
+                    <ui-dropdown-menu-separator></ui-dropdown-menu-separator>
+                    <ui-dropdown-menu-item>
+                      <a href="/dashboard/admin/profile" class="w-full flex items-center no-underline text-gray-700 hover:text-gray-900">
+                        <i class="fas fa-user w-4 h-4 mr-3"></i> Profile
+                      </a>
+                    </ui-dropdown-menu-item>
+                    <ui-dropdown-menu-item>
+                      <a href="/dashboard/admin/settings" class="w-full flex items-center no-underline text-gray-700 hover:text-gray-900">
+                        <i class="fas fa-cog w-4 h-4 mr-3"></i> Preferences
+                      </a>
+                    </ui-dropdown-menu-item>
+                    <ui-dropdown-menu-separator></ui-dropdown-menu-separator>
+                    <ui-dropdown-menu-item color="red">
+                      <button data-action="logout" class="w-full flex items-center text-[${errorColor}] hover:text-red-700 bg-transparent border-none cursor-pointer p-0">
+                        <i class="fas fa-sign-out-alt w-4 h-4 mr-3"></i> Logout
                       </button>
-                      <h1 data-page-title class="text-lg font-black text-slate-800 tracking-tight font-brand uppercase">${this.getPageTitle()}</h1>
-                  </div>
-
-                  <div class="flex items-center gap-4">
-                      <div class="w-px h-5 bg-slate-200"></div>
-
-                      <ui-dropdown-menu position="bottom">
-                          <ui-dropdown-menu-trigger>
-                              <div class="flex items-center gap-2.5 cursor-pointer p-1 hover:bg-slate-50 rounded-xl transition-all">
-                                  <div class="text-right hidden sm:block">
-                                      <p class="text-[11px] font-black text-slate-900 leading-none mb-0.5 font-brand uppercase tracking-tighter">${this.userData.name || "Admin"}</p>
-                                      <p class="text-[8px] font-bold text-indigo-600 uppercase tracking-widest leading-none">Super Admin</p>
-                                  </div>
-                                  <ui-avatar name="${this.userData.name || "Admin"}" src="${this.userData.profile_image ? this.getImageUrl(this.userData.profile_image) : ""}" size="sm" class="shadow-sm shadow-slate-200 rounded-full"></ui-avatar>
-                              </div>
-                          </ui-dropdown-menu-trigger>
-                          <ui-dropdown-menu-content class="w-56">
-                              <ui-dropdown-menu-label>Account Options</ui-dropdown-menu-label>
-                              <ui-dropdown-menu-separator></ui-dropdown-menu-separator>
-                              <ui-dropdown-menu-item>
-                                  <a href="/dashboard/admin/profile" class="flex items-center w-full font-bold">
-                                      <i class="fas fa-user-circle mr-2 opacity-50"></i> Profile Details
-                                  </a>
-                              </ui-dropdown-menu-item>
-                              <ui-dropdown-menu-item>
-                                  <a href="/dashboard/admin/settings" class="flex items-center w-full font-bold">
-                                      <i class="fas fa-cog mr-2 opacity-50"></i> Preferences
-                                  </a>
-                              </ui-dropdown-menu-item>
-                              <ui-dropdown-menu-separator></ui-dropdown-menu-separator>
-                              <ui-dropdown-menu-item color="red">
-                                  <button data-action="logout" class="flex items-center w-full font-black text-rose-600">
-                                      <i class="fas fa-power-off mr-2"></i> Log Out
-                                  </button>
-                              </ui-dropdown-menu-item>
-                          </ui-dropdown-menu-content>
-                      </ui-dropdown-menu>
-                  </div>
-              </header>
-
-              <div data-page-content class="flex-1 overflow-y-auto">
-                  ${this.pageContent}
+                    </ui-dropdown-menu-item>
+                  </ui-dropdown-menu-content>
+                </ui-dropdown-menu>
               </div>
+            </div>
+          </header>
+
+          <!-- Page Content — overflow-y:auto scrolls the page independently -->
+          <main class="flex-1 bg-transparent overflow-y-auto">
+            <div data-page-inner class="container mx-auto p-6">
+              ${this.pageContent}
+            </div>
           </main>
+        </div>
       </div>
     `;
   }

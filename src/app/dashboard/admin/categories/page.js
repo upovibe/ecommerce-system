@@ -131,7 +131,11 @@ class CategoriesPage extends App {
 
   getImageUrl(path) {
     if (!path) return "";
-    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+    if (
+      path.startsWith("http://") ||
+      path.startsWith("https://") ||
+      path.startsWith("data:")
+    ) {
       return path;
     }
 
@@ -214,15 +218,112 @@ class CategoriesPage extends App {
     }
   }
 
+  getHeaderCounts() {
+    const categories = this.categories || [];
+    const total = categories.length;
+    const main = categories.filter((c) => !c.parent_id).length;
+    const sub = categories.filter((c) => !!c.parent_id).length;
+    const active = categories.filter((c) => !!c.is_active).length;
+    const hidden = total - active;
+    return { total, main, sub, active, hidden };
+  }
+
+  renderHeader() {
+    const c = this.getHeaderCounts();
+    return `
+      <div class="space-y-8 mb-4">
+        <div class="bg-slate-700 rounded-xl shadow-lg p-5 text-white">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
+            <div>
+              <div class="flex items-center gap-2">
+                <h1 class="text-2xl sm:text-3xl font-bold">Categories</h1>
+                <button
+                  onclick="this.closest('app-categories-page').loadCategories(true)"
+                  class="size-8 mt-2 flex items-center justify-center text-white/90 hover:text-white transition-colors duration-200 hover:bg-white/10 rounded-lg group"
+                  title="Refresh data">
+                  <i class="fas fa-sync-alt text-lg ${this.loading ? "animate-spin" : ""} group-hover:scale-110 transition-transform duration-200"></i>
+                </button>
+              </div>
+              <p class="text-blue-100 text-base sm:text-lg">Manage main and subcategories for products</p>
+            </div>
+            <div class="mt-4 sm:mt-0">
+              <div class="text-right">
+                <div class="text-xl sm:text-2xl font-bold">${c.total}</div>
+                <div class="text-blue-100 text-xs sm:text-sm">Total Categories</div>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
+            <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-4 sm:p-6 border border-white border-opacity-20">
+              <div class="flex items-center">
+                <div class="size-10 flex items-center justify-center bg-emerald-500 rounded-lg mr-3 sm:mr-4 flex-shrink-0">
+                  <i class="fas fa-check text-white text-lg sm:text-xl"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xl sm:text-2xl font-bold">${c.active}</div>
+                  <div class="text-blue-100 text-xs sm:text-sm">Active</div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-4 sm:p-6 border border-white border-opacity-20">
+              <div class="flex items-center">
+                <div class="size-10 flex items-center justify-center bg-yellow-500 rounded-lg mr-3 sm:mr-4 flex-shrink-0">
+                  <i class="fas fa-eye-slash text-white text-lg sm:text-xl"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xl sm:text-2xl font-bold">${c.hidden}</div>
+                  <div class="text-blue-100 text-xs sm:text-sm">Hidden</div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-4 sm:p-6 border border-white border-opacity-20">
+              <div class="flex items-center">
+                <div class="size-10 flex items-center justify-center bg-blue-500 rounded-lg mr-3 sm:mr-4 flex-shrink-0">
+                  <i class="fas fa-layer-group text-white text-lg sm:text-xl"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xl sm:text-2xl font-bold">${c.main}</div>
+                  <div class="text-blue-100 text-xs sm:text-sm">Main</div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-4 sm:p-6 border border-white border-opacity-20">
+              <div class="flex items-center">
+                <div class="size-10 flex items-center justify-center bg-purple-500 rounded-lg mr-3 sm:mr-4 flex-shrink-0">
+                  <i class="fas fa-sitemap text-white text-lg sm:text-xl"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xl sm:text-2xl font-bold">${c.sub}</div>
+                  <div class="text-blue-100 text-xs sm:text-sm">Subcategories</div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-4 sm:p-6 border border-white border-opacity-20">
+              <div class="flex items-center">
+                <div class="size-10 flex items-center justify-center bg-orange-500 rounded-lg mr-3 sm:mr-4 flex-shrink-0">
+                  <i class="fas fa-tags text-white text-lg sm:text-xl"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xl sm:text-2xl font-bold">${c.total}</div>
+                  <div class="text-blue-100 text-xs sm:text-sm">Total</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   render() {
     if (this.loading) {
       return `
-        <div class="px-6 md:px-10 pb-8 space-y-6 max-w-7xl mx-auto font-brand text-slate-600">
-          <div class="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm space-y-3">
-            <ui-skeleton class="h-10 w-80 rounded-lg"></ui-skeleton>
-            <ui-skeleton class="h-24 w-full rounded-xl"></ui-skeleton>
-            <ui-skeleton class="h-24 w-full rounded-xl"></ui-skeleton>
-            <ui-skeleton class="h-24 w-full rounded-xl"></ui-skeleton>
+        ${this.renderHeader()}
+        <div class="bg-white rounded-lg shadow-lg p-4">
+          <div class="space-y-4">
+            <ui-skeleton class="h-24 w-full"></ui-skeleton>
+            <ui-skeleton class="h-24 w-full"></ui-skeleton>
+            <ui-skeleton class="h-24 w-full"></ui-skeleton>
           </div>
         </div>
       `;
@@ -257,6 +358,11 @@ class CategoriesPage extends App {
           ? `<img src="${this.getImageUrl(cat.image)}" alt="${cat.name || "Category"}" class="w-10 h-10 rounded-lg object-cover border border-slate-200" />`
           : `<div class="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400"><i class="fas fa-image text-xs"></i></div>`,
         name: cat.name || "",
+        description: cat.description
+          ? cat.description.length > 60
+            ? cat.description.slice(0, 60) + "…"
+            : cat.description
+          : "—",
         ...(includeSubCount
           ? { subcategories: subCountByParentId[String(cat.id)] || 0 }
           : {}),
@@ -266,7 +372,6 @@ class CategoriesPage extends App {
                 parentNameById[String(cat.parent_id)] || `#${cat.parent_id}`,
             }
           : {}),
-        description: cat.description || "No description",
         status: cat.is_active ? "Active" : "Hidden",
         updated: cat.updated_at || "",
       }));
@@ -275,13 +380,13 @@ class CategoriesPage extends App {
       { key: "no", label: "No.", html: false },
       { key: "image", label: "Image" },
       { key: "name", label: "Category", html: false },
+      { key: "description", label: "Description", html: false },
       ...(includeSubCount
         ? [{ key: "subcategories", label: "Subcategories", html: false }]
         : []),
       ...(includeParent
         ? [{ key: "parent", label: "Parent", html: false }]
         : []),
-      { key: "description", label: "Description", html: false },
       { key: "status", label: "Status", html: false },
       { key: "updated", label: "Updated", html: false },
     ];
@@ -300,39 +405,16 @@ class CategoriesPage extends App {
       "&quot;",
     );
     return `
-      <div class="px-6 md:px-10 pb-8 space-y-6 max-w-7xl mx-auto font-brand text-slate-600">
-        <style>
-          app-categories-page .category-table-wrap .upo-table-title {
-            display: none;
-          }
-          app-categories-page .category-table-wrap .upo-tab-list {
-            width: 100%;
-            max-width: 100%;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-          }
-          app-categories-page .category-table-wrap .upo-tab-list::-webkit-scrollbar {
-            height: 6px;
-          }
-          app-categories-page .category-table-wrap .upo-tab-list::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 9999px;
-          }
-          @media (max-width: 640px) {
-            app-categories-page .category-table-wrap {
-              padding: 0.5rem;
-              border-radius: 1rem;
-            }
-          }
-        </style>
-        <div class="category-table-wrap bg-white border border-slate-100 rounded-3xl p-4 shadow-sm">
-          <ui-tabs>
-            <ui-tab-list>
-              <ui-tab value="main-categories">Main Categories</ui-tab>
-              <ui-tab value="sub-categories">Subcategories</ui-tab>
-            </ui-tab-list>
+      ${this.renderHeader()}
+      <div class="bg-white rounded-lg shadow-lg p-4">
+        <ui-tabs>
+          <ui-tab-list>
+            <ui-tab value="main-categories">Main Categories</ui-tab>
+            <ui-tab value="sub-categories">Subcategories</ui-tab>
+          </ui-tab-list>
 
-            <ui-tab-panel value="main-categories">
+          <ui-tab-panel value="main-categories">
+            <div class="mt-4 overflow-x-auto">
               <ui-table
                 title=""
                 data="${safeMainTableData}"
@@ -346,11 +428,16 @@ class CategoriesPage extends App {
                 actions="view,edit,delete"
                 addable
                 refresh
+                print
+                bordered
+                striped
                 class="w-full">
               </ui-table>
-            </ui-tab-panel>
+            </div>
+          </ui-tab-panel>
 
-            <ui-tab-panel value="sub-categories">
+          <ui-tab-panel value="sub-categories">
+            <div class="mt-4 overflow-x-auto">
               <ui-table
                 title=""
                 data="${safeSubTableData}"
@@ -364,17 +451,20 @@ class CategoriesPage extends App {
                 actions="view,edit,delete"
                 addable
                 refresh
+                print
+                bordered
+                striped
                 class="w-full">
               </ui-table>
-            </ui-tab-panel>
-          </ui-tabs>
-        </div>
-
-        <category-settings-modal></category-settings-modal>
-        <category-update-modal></category-update-modal>
-        <category-view-modal></category-view-modal>
-        <category-delete-dialog></category-delete-dialog>
+            </div>
+          </ui-tab-panel>
+        </ui-tabs>
       </div>
+
+      <category-settings-modal></category-settings-modal>
+      <category-update-modal></category-update-modal>
+      <category-view-modal></category-view-modal>
+      <category-delete-dialog></category-delete-dialog>
     `;
   }
 }
