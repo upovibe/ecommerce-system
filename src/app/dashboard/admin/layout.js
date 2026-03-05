@@ -192,9 +192,14 @@ class AdminLayout extends App {
         group: "Administration",
         items: [
           {
-            label: "Staff & Users",
+            label: "Staff",
             icon: "fas fa-user-shield",
-            href: "/dashboard/admin/users",
+            href: "/dashboard/admin/staff",
+          },
+          {
+            label: "Customers",
+            icon: "fas fa-users",
+            href: "/dashboard/admin/customers",
           },
           {
             label: "Cloud Pages",
@@ -233,7 +238,9 @@ class AdminLayout extends App {
       products: "Inventory",
       orders: "Orders",
       categories: "Categories",
-      users: "Staff & Users",
+      users: "Users",
+      staff: "Staff",
+      customers: "Customers",
       pages: "Cloud Pages",
       settings: "Preferences",
       profile: "Profile",
