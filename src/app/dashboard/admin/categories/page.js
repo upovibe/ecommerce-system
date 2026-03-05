@@ -8,16 +8,23 @@ import "@/components/ui/Tabs.js";
 import "@/components/ui/Dropdown.js";
 import "@/components/ui/Switch.js";
 import "@/components/ui/FileUpload.js";
+import "@/components/ui/Skeleton.js";
 import api from "@/services/api.js";
+
+let categoriesCache = null;
+let categoriesCacheTime = 0;
+let categoriesFetchPromise = null;
+const CATEGORIES_CACHE_TTL_MS = 30000;
 
 class CategoriesPage extends App {
   constructor() {
     super();
     this.categories = [];
     this.loading = true;
+    this._loadingPromise = null;
     this._isInitialized = false;
     this._onTableAdd = () => this.showCreateDialog();
-    this._onTableRefresh = () => this.loadCategories();
+    this._onTableRefresh = () => this.loadCategories(true);
     this._onTableEdit = (event) => {
       const id = event?.detail?.row?.id;
       if (id != null) this.showEditDialog(id);
@@ -52,27 +59,55 @@ class CategoriesPage extends App {
     await this.loadCategories();
   }
 
-  async loadCategories() {
-    this.loading = true;
-    this.updateView();
-    try {
-      const res = await api.get("/categories", { timeout: 10000 });
-      const categoryData = res?.data?.data;
-      this.categories = Array.isArray(categoryData) ? categoryData : [];
-    } catch (e) {
-      if (window.Toast?.show) {
-        window.Toast.show({
-          title: "Error",
-          message: "Failed to load categories",
-          variant: "error",
-        });
-      } else {
-        console.error("Failed to load categories", e);
-      }
-    } finally {
+  async loadCategories(force = false) {
+    const hasFreshCache =
+      !force &&
+      Array.isArray(categoriesCache) &&
+      Date.now() - categoriesCacheTime < CATEGORIES_CACHE_TTL_MS;
+
+    if (hasFreshCache) {
+      this.categories = categoriesCache;
       this.loading = false;
       this.updateView();
+      return Promise.resolve(this.categories);
     }
+
+    if (this._loadingPromise) {
+      return this._loadingPromise;
+    }
+
+    this.loading = true;
+    this.updateView();
+    this._loadingPromise = (async () => {
+      try {
+        if (!categoriesFetchPromise || force) {
+          categoriesFetchPromise = api.get("/categories", { timeout: 10000 });
+        }
+
+        const res = await categoriesFetchPromise;
+        const categoryData = res?.data?.data;
+        this.categories = Array.isArray(categoryData) ? categoryData : [];
+        categoriesCache = this.categories;
+        categoriesCacheTime = Date.now();
+      } catch (e) {
+        if (window.Toast?.show) {
+          window.Toast.show({
+            title: "Error",
+            message: "Failed to load categories",
+            variant: "error",
+          });
+        } else {
+          console.error("Failed to load categories", e);
+        }
+      } finally {
+        categoriesFetchPromise = null;
+        this.loading = false;
+        this._loadingPromise = null;
+        this.updateView();
+      }
+    })();
+
+    return this._loadingPromise;
   }
 
   getImageUrl(path) {
@@ -92,6 +127,7 @@ class CategoriesPage extends App {
 
   _showCategoryDialog(category) {
     const isEdit = !!category;
+    const isEditingMainCategory = isEdit && !category?.parent_id;
     const parentOptions = (this.categories || [])
       .filter((c) => !c.parent_id && (!isEdit || c.id !== category.id))
       .map(
@@ -117,10 +153,21 @@ class CategoriesPage extends App {
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Parent Category</label>
-          <ui-dropdown id="cat-parent" placeholder="None (Main category)" class="w-full">
-            <ui-option value="">None (Main category)</ui-option>
-            ${parentOptions}
-          </ui-dropdown>
+          ${
+            isEditingMainCategory
+              ? `
+            <input id="cat-parent-static" type="hidden" value="" />
+            <div class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-500 bg-slate-50">
+              Main Category
+            </div>
+          `
+              : `
+            <ui-dropdown id="cat-parent" placeholder="None (Main category)" class="w-full">
+              <ui-option value="">None (Main category)</ui-option>
+              ${parentOptions}
+            </ui-dropdown>
+          `
+          }
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Description</label>
@@ -151,6 +198,7 @@ class CategoriesPage extends App {
 
     const nameInput = modal.querySelector("#cat-name");
     const parentInput = modal.querySelector("#cat-parent");
+    const parentStaticInput = modal.querySelector("#cat-parent-static");
     const descInput = modal.querySelector("#cat-desc");
     const fileInput = modal.querySelector('ui-file-upload[data-field="cat-image"]');
     const activeCheck = modal.querySelector("#cat-active");
@@ -196,7 +244,9 @@ class CategoriesPage extends App {
         const payload = {
           name: nameInput.value.trim(),
           description: descInput.value.trim() || null,
-          parent_id: parentInput?.value ? Number(parentInput.value) : null,
+          parent_id: (parentInput?.value || parentStaticInput?.value)
+            ? Number(parentInput?.value || parentStaticInput?.value)
+            : null,
           is_active: activeCheck?.checked ? true : false,
         };
 
@@ -228,7 +278,8 @@ class CategoriesPage extends App {
           message: isEdit ? "Category updated." : "Category created.",
           variant: "success",
         });
-        await this.loadCategories();
+        categoriesCache = null;
+        await this.loadCategories(true);
       } catch (e) {
         modal.setAttribute("confirm-loading", "false");
         validate();
@@ -249,12 +300,13 @@ class CategoriesPage extends App {
 
     try {
       await api.delete(`/categories/${id}`);
+      categoriesCache = null;
       Toast.show({
         title: "Deleted",
         message: "Category removed.",
         variant: "success",
       });
-      await this.loadCategories();
+      await this.loadCategories(true);
     } catch (e) {
       Toast.show({
         title: "Error",
@@ -267,7 +319,8 @@ class CategoriesPage extends App {
   async toggleActive(id) {
     try {
       await api.put(`/categories/${id}/toggle-active`, {});
-      await this.loadCategories();
+      categoriesCache = null;
+      await this.loadCategories(true);
     } catch (e) {
       Toast.show({
         title: "Error",
@@ -280,10 +333,12 @@ class CategoriesPage extends App {
   render() {
     if (this.loading) {
       return `
-        <div class="p-10 flex items-center justify-center min-h-[60vh]">
-          <div class="text-center">
-            <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
-            <p class="text-slate-500 text-sm font-medium">Loading categories...</p>
+        <div class="px-6 md:px-10 pb-8 space-y-6 max-w-7xl mx-auto font-brand text-slate-600">
+          <div class="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm space-y-3">
+            <ui-skeleton class="h-10 w-80 rounded-lg"></ui-skeleton>
+            <ui-skeleton class="h-24 w-full rounded-xl"></ui-skeleton>
+            <ui-skeleton class="h-24 w-full rounded-xl"></ui-skeleton>
+            <ui-skeleton class="h-24 w-full rounded-xl"></ui-skeleton>
           </div>
         </div>
       `;
