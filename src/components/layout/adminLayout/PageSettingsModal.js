@@ -2,114 +2,182 @@ import "@/components/ui/Modal.js";
 import "@/components/ui/Input.js";
 import "@/components/ui/Textarea.js";
 import "@/components/ui/Switch.js";
+import "@/components/ui/Button.js";
+import "@/components/ui/Wysiwyg.js";
+import "@/components/ui/FileUpload.js";
 import api from "@/services/api.js";
+import Toast from "@/components/ui/Toast.js";
 
 class PageSettingsModal extends HTMLElement {
   constructor() {
     super();
-    this._listenersBound = false;
-  }
-
-  static get observedAttributes() {
-    return ["open"];
+    this.pageData = {
+      title: "",
+      name: "",
+      content: "",
+      is_active: true,
+      meta_info: {
+        keywords: "",
+        description: "",
+      },
+    };
   }
 
   connectedCallback() {
     this.render();
-    this.setupEventListeners();
-  }
-
-  attributeChangedCallback() {
-    this.render();
-    this.setupEventListeners();
   }
 
   open() {
-    this.setAttribute("open", "");
+    const modal = this.querySelector("ui-modal");
+    if (modal) modal.open();
   }
 
   close() {
-    this.removeAttribute("open");
+    const modal = this.querySelector("ui-modal");
+    if (modal) modal.close();
   }
 
-  setupEventListeners() {
-    if (this._listenersBound) return;
-    this._listenersBound = true;
-    this.addEventListener("confirm", this.onConfirm);
-    this.addEventListener("cancel", () => this.close());
-  }
+  async savePage() {
+    const saveBtn = this.querySelector("#save-page-btn");
+    if (saveBtn) saveBtn.setAttribute("loading", "true");
 
-  onConfirm = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const title = this.querySelector('ui-input[data-field="title"]')?.value;
-      const slug = this.querySelector('ui-input[data-field="slug"]')?.value;
-      const content = this.querySelector(
-        'ui-textarea[data-field="content"]',
-      )?.value;
-      const isActive = this.querySelector('ui-switch[name="is_active"]')
-        ?.checked
-        ? 1
-        : 0;
-
-      const payload = {
-        title: title.trim(),
-        slug: slug.trim(),
-        content: content,
-        is_active: isActive,
-      };
-
-      if (!payload.title || !payload.slug) {
-        Toast.show({
-          title: "Error",
-          message: "Title and Slug are required",
-          variant: "error",
-        });
-        return;
+      // Collect content from WYSIWYG
+      const wysiwyg = this.querySelector("ui-wysiwyg");
+      if (wysiwyg) {
+        this.pageData.content = wysiwyg.getValue();
       }
 
-      await api.withToken(token).post("/pages", payload);
-
-      Toast.show({
-        title: "Success",
-        message: "Page created successfully",
-        variant: "success",
+      // Create FormData for files
+      const formData = new FormData();
+      Object.keys(this.pageData).forEach((key) => {
+        if (key === "meta_info") {
+          formData.append(key, JSON.stringify(this.pageData[key]));
+        } else {
+          formData.append(key, this.pageData[key]);
+        }
       });
-      this.close();
-      this.dispatchEvent(
-        new CustomEvent("page-saved", { bubbles: true, composed: true }),
-      );
-    } catch (e) {
-      Toast.show({ title: "Error", message: e.message, variant: "error" });
+
+      // Handle multiple images
+      const imageUploader = this.querySelector("#page-images-uploader");
+      if (imageUploader && imageUploader.files) {
+        for (let i = 0; i < imageUploader.files.length; i++) {
+          formData.append("images[]", imageUploader.files[i]);
+        }
+      }
+
+      // Handle banner
+      const bannerUploader = this.querySelector("#page-banner-uploader");
+      if (bannerUploader && bannerUploader.files && bannerUploader.files[0]) {
+        formData.append("banner", bannerUploader.files[0]);
+      }
+
+      const res = await api.post("/pages", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data) {
+        Toast.show({
+          title: "Success",
+          message: "Page created successfully",
+          variant: "success",
+        });
+        this.dispatchEvent(new CustomEvent("page-saved", { bubbles: true }));
+        this.close();
+      }
+    } catch (error) {
+      console.error(error);
+      Toast.show({
+        title: "Error",
+        message: error.response?.data?.error || "Failed to create page",
+        variant: "error",
+      });
+    } finally {
+      if (saveBtn) saveBtn.removeAttribute("loading");
     }
-  };
+  }
 
   render() {
     this.innerHTML = `
-      <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="lg" close-button="true">
-        <div slot="title">Create Cloud Page</div>
-        <div class="space-y-4 py-2">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Page Title</label>
-            <ui-input data-field="title" placeholder="e.g. Terms of Service" class="w-full"></ui-input>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Slug</label>
-            <ui-input data-field="slug" placeholder="e.g. terms-of-service" class="w-full"></ui-input>
-            <p class="text-[10px] text-slate-400 mt-1 ml-1">The URL path for this page</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Content (HTML allowed)</label>
-            <ui-textarea data-field="content" rows="12" placeholder="Enter page content here..." class="w-full"></ui-textarea>
-          </div>
-          <div class="pt-2">
-            <ui-switch name="is_active" checked>
-              <span slot="label">Published Status</span>
-            </ui-switch>
-          </div>
-        </div>
-      </ui-modal>
-    `;
+            <ui-modal title="Create New Cloud Page" size="lg">
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ui-input 
+                            label="Page Title" 
+                            placeholder="Enter page title"
+                            id="page-title-input"
+                            value="${this.pageData.title}">
+                        </ui-input>
+
+                        <ui-input 
+                            label="Page Name (Internal)" 
+                            placeholder="Enter administrative name"
+                            id="page-name-input"
+                            value="${this.pageData.name}">
+                        </ui-input>
+                    </div>
+
+                    <div class="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                        <label class="text-sm font-medium text-gray-900 dark:text-gray-100">Page Content</label>
+                        <ui-wysiwyg 
+                            placeholder="Write your page content here..."
+                            height="400px"
+                            id="page-content-editor">
+                        </ui-wysiwyg>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ui-file-upload 
+                            label="Banner Image" 
+                            id="page-banner-uploader"
+                            accept="image/*">
+                        </ui-file-upload>
+
+                        <ui-file-upload 
+                            label="Page Gallery Images" 
+                            id="page-images-uploader"
+                            accept="image/*"
+                            multiple="true">
+                        </ui-file-upload>
+                    </div>
+
+                    <div class="pt-2">
+                        <ui-switch 
+                            id="page-status-switch" 
+                            ${this.pageData.is_active ? "checked" : ""}
+                            label="Published">
+                        </ui-switch>
+                    </div>
+                </div>
+
+                <div slot="footer" class="flex justify-end gap-3">
+                    <ui-button variant="ghost" id="cancel-page-btn">Cancel</ui-button>
+                    <ui-button variant="primary" id="save-page-btn">Create Page</ui-button>
+                </div>
+            </ui-modal>
+        `;
+
+    this.querySelector("#page-title-input").addEventListener(
+      "input",
+      (e) => (this.pageData.title = e.target.value),
+    );
+    this.querySelector("#page-name-input").addEventListener(
+      "input",
+      (e) => (this.pageData.name = e.target.value),
+    );
+    this.querySelector("#page-status-switch").addEventListener(
+      "change",
+      (e) => {
+        this.pageData.is_active = e.detail.checked;
+      },
+    );
+
+    this.querySelector("#cancel-page-btn").addEventListener("click", () =>
+      this.close(),
+    );
+    this.querySelector("#save-page-btn").addEventListener("click", () =>
+      this.savePage(),
+    );
   }
 }
 

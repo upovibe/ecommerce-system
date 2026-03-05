@@ -43,4 +43,11 @@ class UserModel extends BaseModel
         $stmt->execute([$email]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
+
+    public function findByEmailExcept($email, $id)
+    {
+        $stmt = $this->pdo->prepare("SELECT * FROM " . static::$table . " WHERE email = ? AND id != ? LIMIT 1");
+        $stmt->execute([$email, $id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 }

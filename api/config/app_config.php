@@ -21,20 +21,20 @@ return [
     'app_url' => 'http://localhost:8002',
 ]; 
 
-// cd church-system; php -S localhost:8081           # Run server
+// cd ecommerce-system; php -S localhost:8081           # Run server
 
-// cd church-system; php api/index.php --help       # Show help
+// cd ecommerce-system; php api/index.php --help       # Show help
 
-// cd church-system; php api/index.php --fresh    # Drop tables, create tables, add default data
+// cd ecommerce-system; php api/index.php --fresh    # Drop tables, create tables, add default data
 
-// cd church-system; php api/index.php --migrate    # Create tables
+// cd ecommerce-system; php api/index.php --migrate    # Create tables
 
-// cd church-system; php api/index.php --seed       # Add default data
+// cd ecommerce-system; php api/index.php --seed       # Add default data
 
-// cd church-system; php api/index.php --seed:admin   # Create only the admin user account
+// cd ecommerce-system; php api/index.php --seed:admin   # Create only the admin user account
 
-// cd church-system; php api/index.php --seed:essential   # Create essential system components
+// cd ecommerce-system; php api/index.php --seed:essential   # Create essential system components
 
-// cd church-system; php api/index.php --clear:data   # Remove all data from tables
+// cd ecommerce-system; php api/index.php --clear:data   # Remove all data from tables
 
-// cd church-system; php api/index.php --email:test@example.com   # Test email
+// cd ecommerce-system; php api/index.php --email:test@example.com   # Test email

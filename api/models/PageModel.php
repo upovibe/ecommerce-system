@@ -12,11 +12,15 @@ class PageModel extends BaseModel
         'slug',
         'content',
         'meta_info',
+        'images',
+        'banner_image',
         'is_active'
     ];
 
     protected static $casts = [
         'meta_info' => 'json',
+        'images' => 'json',
+        'banner_image' => 'json',
         'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'

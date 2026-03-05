@@ -2,135 +2,201 @@ import "@/components/ui/Modal.js";
 import "@/components/ui/Input.js";
 import "@/components/ui/Textarea.js";
 import "@/components/ui/Switch.js";
-import "@/components/ui/Toast.js";
+import "@/components/ui/Button.js";
+import "@/components/ui/Wysiwyg.js";
+import "@/components/ui/FileUpload.js";
 import api from "@/services/api.js";
+import Toast from "@/components/ui/Toast.js";
 
 class PageUpdateModal extends HTMLElement {
   constructor() {
     super();
-    this.pageData = null;
-    this._listenersBound = false;
-  }
-
-  static get observedAttributes() {
-    return ["open"];
+    this.page = null;
+    this.formData = {
+      title: "",
+      name: "",
+      content: "",
+      is_active: true,
+      meta_info: {
+        keywords: "",
+        description: "",
+      },
+    };
   }
 
   connectedCallback() {
     this.render();
-    this.setupEventListeners();
   }
 
-  attributeChangedCallback() {
+  open(page) {
+    this.page = page;
+    this.formData = {
+      title: page.title || "",
+      name: page.name || "",
+      slug: page.slug || "",
+      content: page.content || "",
+      is_active: page.is_active !== undefined ? !!page.is_active : true,
+      meta_info: page.meta_info || { keywords: "", description: "" },
+    };
     this.render();
-    this.setupEventListeners();
-  }
-
-  setPageData(page) {
-    this.pageData = page || null;
-    this.render();
-    this.setupEventListeners();
-  }
-
-  open() {
-    this.setAttribute("open", "");
+    const modal = this.querySelector("ui-modal");
+    if (modal) modal.open();
   }
 
   close() {
-    this.removeAttribute("open");
+    const modal = this.querySelector("ui-modal");
+    if (modal) modal.close();
   }
 
-  setupEventListeners() {
-    if (this._listenersBound) return;
-    this._listenersBound = true;
-    this.addEventListener("confirm", this.onConfirm);
-    this.addEventListener("cancel", () => this.close());
-  }
+  async savePage() {
+    const saveBtn = this.querySelector("#save-page-btn");
+    if (saveBtn) saveBtn.setAttribute("loading", "true");
 
-  onConfirm = async () => {
     try {
-      if (!this.pageData?.id) return;
-      const token = localStorage.getItem("token");
-
-      const title = this.querySelector('ui-input[data-field="title"]')?.value;
-      const slug = this.querySelector('ui-input[data-field="slug"]')?.value;
-      const content = this.querySelector(
-        'ui-textarea[data-field="content"]',
-      )?.value;
-      const isActive = this.querySelector('ui-switch[name="is_active"]')
-        ?.checked
-        ? 1
-        : 0;
-
-      const payload = {
-        title: title.trim(),
-        slug: slug.trim(),
-        content: content,
-        is_active: isActive,
-      };
-
-      if (!payload.title || !payload.slug) {
-        Toast.show({
-          title: "Error",
-          message: "Title and Slug are required",
-          variant: "error",
-        });
-        return;
+      // Collect content from WYSIWYG
+      const wysiwyg = this.querySelector("ui-wysiwyg");
+      if (wysiwyg) {
+        this.formData.content = wysiwyg.getValue();
       }
 
-      await api.withToken(token).put(`/pages/${this.pageData.id}`, payload);
+      // Create FormData for files
+      const formData = new FormData();
+      formData.append("_method", "PUT"); // For PHP to handle multipart PUT
 
-      Toast.show({
-        title: "Success",
-        message: "Page updated successfully",
-        variant: "success",
+      Object.keys(this.formData).forEach((key) => {
+        if (key === "meta_info") {
+          formData.append(key, JSON.stringify(this.formData[key]));
+        } else if (key !== "images" && key !== "banner_image") {
+          formData.append(key, this.formData[key]);
+        }
       });
-      this.close();
-      this.dispatchEvent(
-        new CustomEvent("page-updated", { bubbles: true, composed: true }),
-      );
-    } catch (e) {
-      Toast.show({ title: "Error", message: e.message, variant: "error" });
+
+      // Handle multiple images
+      const imageUploader = this.querySelector("#page-images-uploader");
+      if (imageUploader && imageUploader.files) {
+        for (let i = 0; i < imageUploader.files.length; i++) {
+          formData.append("images[]", imageUploader.files[i]);
+        }
+      }
+
+      // Handle banner
+      const bannerUploader = this.querySelector("#page-banner-uploader");
+      if (bannerUploader && bannerUploader.files && bannerUploader.files[0]) {
+        formData.append("banner", bannerUploader.files[0]);
+      }
+
+      const res = await api.post(`/pages/${this.page.id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data) {
+        Toast.show({
+          title: "Success",
+          message: "Page updated successfully",
+          variant: "success",
+        });
+        this.dispatchEvent(new CustomEvent("page-updated", { bubbles: true }));
+        this.close();
+      }
+    } catch (error) {
+      console.error(error);
+      Toast.show({
+        title: "Error",
+        message: error.response?.data?.error || "Failed to update page",
+        variant: "error",
+      });
+    } finally {
+      if (saveBtn) saveBtn.removeAttribute("loading");
     }
-  };
+  }
 
   render() {
-    const page = this.pageData || {};
-    const isActive = page.is_active !== false && page.is_active !== 0;
+    if (!this.page) return;
 
     this.innerHTML = `
-      <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="lg" close-button="true">
-        <div slot="title">Edit Cloud Page</div>
-        <div class="space-y-4 py-2">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Page Title</label>
-            <ui-input data-field="title" value="${page.title || ""}" placeholder="e.g. Terms of Service" class="w-full"></ui-input>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Slug</label>
-            <ui-input data-field="slug" value="${page.slug || ""}" placeholder="e.g. terms-of-service" class="w-full"></ui-input>
-            <p class="text-[10px] text-slate-400 mt-1 ml-1">The URL path for this page</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Content (HTML allowed)</label>
-            <ui-textarea data-field="content" rows="12" value="" placeholder="Enter page content here..." class="w-full"></ui-textarea>
-          </div>
-          <div class="pt-2">
-            <ui-switch name="is_active" ${isActive ? "checked" : ""}>
-              <span slot="label">Published Status</span>
-            </ui-switch>
-          </div>
-        </div>
-      </ui-modal>
-    `;
+            <ui-modal title="Update Cloud Page" size="lg">
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ui-input 
+                            label="Page Title" 
+                            id="page-title-input"
+                            value="${this.formData.title}"
+                            disabled="true">
+                        </ui-input>
 
-    // Handle initial content value for textarea
-    const contentArea = this.querySelector('ui-textarea[data-field="content"]');
-    if (contentArea && page.content) {
-      setTimeout(() => {
-        contentArea.value = page.content;
-      }, 0);
-    }
+                        <ui-input 
+                            label="Page Name (Internal)" 
+                            id="page-name-input"
+                            value="${this.formData.name}">
+                        </ui-input>
+                    </div>
+
+                    <ui-input 
+                        label="URL Slug" 
+                        prefix="/"
+                        id="page-slug-input"
+                        value="${this.formData.slug}"
+                        disabled="true">
+                    </ui-input>
+
+                    <div class="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                        <label class="text-sm font-medium text-gray-900 dark:text-white">Page Content</label>
+                        <ui-wysiwyg 
+                            placeholder="Write your page content here..."
+                            height="400px"
+                            id="page-content-editor"
+                            value='${this.formData.content.replace(/'/g, "&#39;")}'>
+                        </ui-wysiwyg>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ui-file-upload 
+                            label="Banner Image" 
+                            id="page-banner-uploader"
+                            accept="image/*">
+                        </ui-file-upload>
+
+                        <ui-file-upload 
+                            label="Page Gallery Images" 
+                            id="page-images-uploader"
+                            accept="image/*"
+                            multiple="true">
+                        </ui-file-upload>
+                    </div>
+
+                    <div class="pt-2">
+                        <ui-switch 
+                            id="page-status-switch" 
+                            ${this.formData.is_active ? "checked" : ""}
+                            label="Published">
+                        </ui-switch>
+                    </div>
+                </div>
+
+                <div slot="footer" class="flex justify-end gap-3">
+                    <ui-button variant="ghost" id="cancel-page-btn">Cancel</ui-button>
+                    <ui-button variant="primary" id="save-page-btn">Save Changes</ui-button>
+                </div>
+            </ui-modal>
+        `;
+
+    this.querySelector("#page-name-input").addEventListener(
+      "input",
+      (e) => (this.formData.name = e.target.value),
+    );
+    this.querySelector("#page-status-switch").addEventListener(
+      "change",
+      (e) => {
+        this.formData.is_active = e.detail.checked;
+      },
+    );
+
+    this.querySelector("#cancel-page-btn").addEventListener("click", () =>
+      this.close(),
+    );
+    this.querySelector("#save-page-btn").addEventListener("click", () =>
+      this.savePage(),
+    );
   }
 }
 

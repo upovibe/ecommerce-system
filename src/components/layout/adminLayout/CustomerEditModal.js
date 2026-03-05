@@ -141,7 +141,7 @@ class CustomerEditModal extends HTMLElement {
           </div>
           
           <div class="pt-2">
-            <ui-switch name="status" ${isActive ? "checked" : ""}>
+            <ui-switch name="status" ${isActive ? "checked" : ""} label="Active">
               <span slot="label">Active Status</span>
             </ui-switch>
             <p class="text-[11px] text-slate-500 mt-1 ml-1">Toggle account access for this customer</p>

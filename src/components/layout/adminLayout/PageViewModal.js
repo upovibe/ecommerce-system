@@ -85,11 +85,41 @@ class PageViewModal extends HTMLElement {
             </div>
           </div>
 
-          <div class="rounded-2xl border border-slate-200 bg-white p-5">
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Content Preview</h3>
-            <div class="prose prose-sm max-w-none text-slate-700 leading-relaxed max-h-[300px] overflow-y-auto pr-2">
-              ${page.content || '<p class="italic text-slate-400">No content available for this page.</p>'}
+          <div class="rounded-2xl border border-slate-200 bg-white">
+            <div class="p-6">
+              <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2 uppercase tracking-wider">Page Content</h4>
+              <div class="prose prose-sm dark:prose-invert max-w-none bg-gray-50 dark:bg-gray-800/50 p-6 rounded-xl border border-gray-100 dark:border-gray-700">
+                  ${page.content || '<span class="text-gray-400 italic">No content provided</span>'}
+              </div>
             </div>
+
+            ${
+              page.images &&
+              Array.isArray(page.images) &&
+              page.images.length > 0
+                ? `
+            <div class="p-6 border-t border-gray-100 dark:border-gray-700">
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Page Gallery</h4>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    ${page.images
+                      .map(
+                        (img) => `
+                        <div class="aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 group relative">
+                            <img src="/api/uploads/pages/${img}" class="w-full h-full object-cover transition-transform group-hover:scale-110" alt="Gallery">
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <ui-button variant="ghost" size="sm" class="text-white hover:bg-white/20">
+                                    <i class="fas fa-expand text-sm"></i>
+                                </ui-button>
+                            </div>
+                        </div>
+                    `,
+                      )
+                      .join("")}
+                </div>
+            </div>
+            `
+                : ""
+            }
           </div>
         </div>
       </ui-modal>

@@ -26,11 +26,21 @@ class UserController
     private function resolveModel($id)
     {
         global $pdo;
-        $currentUser = AuthMiddleware::requireAuth($pdo);
 
-        if ($currentUser['id'] == $id && $currentUser['user_type'] === 'admin') {
-            return new AdminModel($pdo);
+        // First check if user exists in users table
+        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE id = ?");
+        $stmt->execute([$id]);
+        if ($stmt->fetch()) {
+            return new UserModel($this->pdo);
         }
+
+        // Then check admins table
+        $stmt = $this->pdo->prepare("SELECT id FROM admins WHERE id = ?");
+        $stmt->execute([$id]);
+        if ($stmt->fetch()) {
+            return new AdminModel($this->pdo);
+        }
+
         return $this->userModel;
     }
 
@@ -44,18 +54,52 @@ class UserController
 
             ob_clean();
 
-            $users = $this->userModel->findAll();
+            $type = $_GET['type'] ?? 'all';
+            $users = [];
 
-            // Add role information to each user
-            foreach ($users as &$user) {
-                unset($user['password']); // Hide password
-                if (isset($user['role_id'])) {
-                    $role = $this->roleModel->findById($user['role_id']);
-                    $user['role'] = $role ? $role['name'] : null;
+            if ($type === 'admin') {
+                $adminModel = new AdminModel($this->pdo);
+                $users = $adminModel->findAll();
+                foreach ($users as &$u) {
+                    $u['user_type'] = 'admin';
+                    if (isset($u['role_id'])) {
+                        $role = $this->roleModel->findById($u['role_id']);
+                        $u['role'] = $role ? $role['name'] : 'Admin';
+                    }
                 }
+            } elseif ($type === 'customer') {
+                $users = $this->userModel->findAll();
+                foreach ($users as &$u) {
+                    $u['user_type'] = 'customer';
+                    $u['role'] = 'customer';
+                }
+            } else {
+                // Merge both for 'all'
+                $customers = $this->userModel->findAll();
+                foreach ($customers as &$c) {
+                    $c['user_type'] = 'customer';
+                    $c['role'] = 'customer';
+                }
+
+                $adminModel = new AdminModel($this->pdo);
+                $admins = $adminModel->findAll();
+                foreach ($admins as &$a) {
+                    $a['user_type'] = 'admin';
+                    if (isset($a['role_id'])) {
+                        $role = $this->roleModel->findById($a['role_id']);
+                        $a['role'] = $role ? $role['name'] : 'Admin';
+                    }
+                }
+
+                $users = array_merge($admins, $customers);
             }
 
-            echo json_encode($users, JSON_PRETTY_PRINT);
+            // Hide passwords
+            foreach ($users as &$user) {
+                unset($user['password']);
+            }
+
+            echo json_encode(['data' => $users], JSON_PRETTY_PRINT);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()], JSON_PRETTY_PRINT);
@@ -221,9 +265,9 @@ class UserController
                 return;
             }
 
-            // Check email uniqueness if email is being updated
-            if (isset($data['email']) && $data['email'] !== $existingUser['email']) {
-                $emailExists = $this->userModel->findByEmail($data['email']);
+            // Check email uniqueness if email is being updated OR provided
+            if (isset($data['email'])) {
+                $emailExists = $model->findByEmailExcept($data['email'], $id);
                 if ($emailExists) {
                     http_response_code(400);
                     echo json_encode(['error' => 'Email already exists'], JSON_PRETTY_PRINT);

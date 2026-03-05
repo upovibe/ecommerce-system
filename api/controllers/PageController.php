@@ -9,12 +9,14 @@ require_once __DIR__ . '/../models/PageModel.php';
 require_once __DIR__ . '/../models/UserLogModel.php';
 require_once __DIR__ . '/../helpers/SlugHelper.php';
 
-class PageController {
+class PageController
+{
     private $pdo;
     private $pageModel;
     private $userLogModel;
 
-    public function __construct($pdo) {
+    public function __construct($pdo)
+    {
         $this->pdo = $pdo;
         $this->pageModel = new PageModel($pdo);
         $this->userLogModel = new UserLogModel($pdo);
@@ -23,13 +25,14 @@ class PageController {
     /**
      * Get all pages (admin only)
      */
-    public function index() {
+    public function index()
+    {
         try {
             // Require admin authentication
             RoleMiddleware::requireAdmin($this->pdo);
-            
+
             $pages = $this->pageModel->findAll();
-            
+
             http_response_code(200);
             echo json_encode([
                 'success' => true,
@@ -48,19 +51,20 @@ class PageController {
     /**
      * Create a new page (admin only)
      */
-    public function store() {
+    public function store()
+    {
         try {
             // Require admin authentication
             RoleMiddleware::requireAdmin($this->pdo);
-            
+
             // Handle multipart form data first (for file uploads)
             if (!empty($_POST)) {
                 $data = $_POST;
             } else {
                 // Fall back to JSON if no form data
-            $data = json_decode(file_get_contents('php://input'), true);
+                $data = json_decode(file_get_contents('php://input'), true);
             }
-            
+
             // Validate required fields
             if (empty($data['title'])) {
                 http_response_code(400);
@@ -70,7 +74,7 @@ class PageController {
                 ]);
                 return;
             }
-            
+
             // Auto-generate slug from name only
             if (empty($data['name'])) {
                 http_response_code(400);
@@ -82,16 +86,16 @@ class PageController {
             }
             $generatedSlug = generateSlug($data['name']);
             $data['slug'] = ensureUniqueSlug($this->pdo, $generatedSlug, 'pages', 'slug');
-            
+
             // Create page first to get the ID
             $pageId = $this->pageModel->create($data);
-            
+
             // Handle banner upload if present
             $bannerPaths = [];
             if (!empty($_FILES)) {
                 // Handle different banner file structures
                 $bannerFiles = [];
-                
+
                 // Check for indexed banner files (banner[0], banner[1], etc.)
                 $indexedBanners = [];
                 foreach ($_FILES as $key => $file) {
@@ -100,7 +104,7 @@ class PageController {
                         $indexedBanners[$index] = $file;
                     }
                 }
-                
+
                 if (!empty($indexedBanners)) {
                     // Reconstruct the array structure from indexed files
                     $bannerFiles = [
@@ -110,7 +114,7 @@ class PageController {
                         'error' => [],
                         'size' => []
                     ];
-                    
+
                     ksort($indexedBanners); // Sort by index
                     foreach ($indexedBanners as $index => $file) {
                         $bannerFiles['name'][] = $file['name'];
@@ -123,15 +127,25 @@ class PageController {
                     // Handle standard banner files
                     $bannerFiles = $_FILES['banner'] ?? $_FILES['banner[]'] ?? [];
                 }
-                
+
                 // Use the uploadPageBanners function which handles multiple files properly
                 $bannerPaths = uploadPageBanners($bannerFiles);
             }
-            
+
             if (!empty($bannerPaths)) {
                 $this->pageModel->update($pageId, ['banner_image' => $bannerPaths]);
             }
-            
+
+            // Handle gallery images upload if present
+            $galleryPaths = [];
+            if (!empty($_FILES['images'])) {
+                $galleryPaths = uploadPageBanners($_FILES['images']);
+            }
+
+            if (!empty($galleryPaths)) {
+                $this->pageModel->update($pageId, ['images' => $galleryPaths]);
+            }
+
             // Log the action
             $this->logAction('page_created', "Created page: {$data['title']}", [
                 'page_id' => $pageId,
@@ -139,10 +153,10 @@ class PageController {
                 'title' => $data['title'],
                 'banners_uploaded' => count($bannerPaths)
             ]);
-            
+
             // Get banner info safely
             $bannerInfo = getPageBannerInfo($bannerPaths);
-            
+
             http_response_code(201);
             echo json_encode([
                 'success' => true,
@@ -166,10 +180,11 @@ class PageController {
     /**
      * Get a specific page (public)
      */
-    public function show($id) {
+    public function show($id)
+    {
         try {
             $page = $this->pageModel->findById($id);
-            
+
             if (!$page) {
                 http_response_code(404);
                 echo json_encode([
@@ -178,7 +193,7 @@ class PageController {
                 ]);
                 return;
             }
-            
+
             // If page is not active, only admins can view it
             if (!$page['is_active']) {
                 try {
@@ -192,7 +207,7 @@ class PageController {
                     return;
                 }
             }
-            
+
             http_response_code(200);
             echo json_encode([
                 'success' => true,
@@ -211,10 +226,11 @@ class PageController {
     /**
      * Get page by slug (public)
      */
-    public function showBySlug($slug) {
+    public function showBySlug($slug)
+    {
         try {
             $page = $this->pageModel->findBySlugInstance($slug);
-            
+
             if (!$page) {
                 http_response_code(404);
                 echo json_encode([
@@ -223,7 +239,7 @@ class PageController {
                 ]);
                 return;
             }
-            
+
             // If page is not active, only admins can view it
             if (!$page['is_active']) {
                 try {
@@ -237,7 +253,7 @@ class PageController {
                     return;
                 }
             }
-            
+
             http_response_code(200);
             echo json_encode([
                 'success' => true,
@@ -256,21 +272,24 @@ class PageController {
     /**
      * Update a page (admin only)
      */
-    public function update($id) {
+    public function update($id)
+    {
         try {
             // Require admin authentication
             RoleMiddleware::requireAdmin($this->pdo);
-            
+
             // Handle PUT/PATCH requests with multipart/form-data
-            if (in_array($_SERVER['REQUEST_METHOD'], ['PUT', 'PATCH']) && 
-                strpos($_SERVER['CONTENT_TYPE'], 'multipart/form-data') === 0) {
-                
+            if (
+                in_array($_SERVER['REQUEST_METHOD'], ['PUT', 'PATCH']) &&
+                strpos($_SERVER['CONTENT_TYPE'], 'multipart/form-data') === 0
+            ) {
+
                 // Get the raw request body
                 $rawData = file_get_contents('php://input');
-                
+
                 // Parse multipart data and populate $_POST and $_FILES
                 MultipartFormParser::processRequest($rawData, $_SERVER['CONTENT_TYPE']);
-                
+
                 $data = $_POST;
             } else {
                 // Handle multipart form data first (for file uploads)
@@ -278,10 +297,10 @@ class PageController {
                     $data = $_POST;
                 } else {
                     // Fall back to JSON if no form data
-            $data = json_decode(file_get_contents('php://input'), true);
+                    $data = json_decode(file_get_contents('php://input'), true);
                 }
             }
-            
+
             // Check if page exists
             $existingPage = $this->pageModel->findById($id);
             if (!$existingPage) {
@@ -292,13 +311,13 @@ class PageController {
                 ]);
                 return;
             }
-            
+
             // Auto-generate slug if name is changed and no slug is provided
             if ((isset($data['name']) && $data['name'] !== $existingPage['name']) && !isset($data['slug'])) {
                 $generatedSlug = generateSlug($data['name']);
                 $data['slug'] = ensureUniqueSlug($this->pdo, $generatedSlug, 'pages', 'slug', $id);
             }
-            
+
             // If slug is being manually updated, check for uniqueness
             if (isset($data['slug']) && $data['slug'] !== $existingPage['slug']) {
                 $duplicatePage = $this->pageModel->findBySlugInstance($data['slug']);
@@ -311,7 +330,7 @@ class PageController {
                     return;
                 }
             }
-            
+
             // Handle banner operations
             $bannerPaths = $existingPage['banner_image'] ?? [];
             if (is_string($bannerPaths)) {
@@ -330,10 +349,10 @@ class PageController {
             // Check for new file uploads
             $newBannerPaths = [];
             if (!empty($_FILES)) {
-                
+
                 // Handle different banner file structures
                 $bannerFiles = [];
-                
+
                 // Check for indexed banner files (banner[0], banner[1], etc.)
                 $indexedBanners = [];
                 foreach ($_FILES as $key => $file) {
@@ -342,7 +361,7 @@ class PageController {
                         $indexedBanners[$index] = $file;
                     }
                 }
-                
+
                 if (!empty($indexedBanners)) {
                     // Reconstruct the array structure from indexed files
                     $bannerFiles = [
@@ -352,7 +371,7 @@ class PageController {
                         'error' => [],
                         'size' => []
                     ];
-                    
+
                     ksort($indexedBanners); // Sort by index
                     foreach ($indexedBanners as $index => $file) {
                         $bannerFiles['name'][] = $file['name'];
@@ -365,10 +384,9 @@ class PageController {
                     // Handle standard banner files
                     $bannerFiles = $_FILES['banner'] ?? $_FILES['banner[]'] ?? [];
                 }
-                
+
                 // Use the uploadPageBanners function which handles multiple files properly
                 $newBannerPaths = uploadPageBanners($bannerFiles);
-                
             }
 
             if (!empty($newBannerPaths)) {
@@ -379,10 +397,35 @@ class PageController {
                 // And assign the new paths to be saved
                 $data['banner_image'] = $newBannerPaths;
                 $bannerPaths = $newBannerPaths; // Update for the response
+            } else {
+                // Keep existing banner if no new one is uploaded
+                unset($data['banner_image']);
             }
-            
+
+            // Handle gallery images
+            $existingImages = $existingPage['images'] ?? [];
+            if (is_string($existingImages)) {
+                $existingImages = json_decode($existingImages, true) ?: [];
+            }
+
+            $newGalleryPaths = [];
+            if (!empty($_FILES['images'])) {
+                $newGalleryPaths = uploadPageBanners($_FILES['images']);
+            }
+
+            if (!empty($newGalleryPaths)) {
+                // For gallery, we might want to APPEND or REPLACE. 
+                // Given the current UI, REPLACE is simpler and usually expected for "Upload Gallery"
+                if (!empty($existingImages)) {
+                    deletePageBanner($existingImages); // Reuse delete logic
+                }
+                $data['images'] = $newGalleryPaths;
+            } else {
+                unset($data['images']);
+            }
+
             $result = $this->pageModel->update($id, $data);
-            
+
             if ($result) {
                 // Log the action
                 $this->logAction('page_updated', "Updated page: {$existingPage['title']}", [
@@ -391,10 +434,10 @@ class PageController {
                     'title' => $data['title'] ?? $existingPage['title'],
                     'banners_uploaded' => count($newBannerPaths)
                 ]);
-                
+
                 // Get banner info safely
                 $bannerInfo = getPageBannerInfo($bannerPaths);
-                
+
                 http_response_code(200);
                 echo json_encode([
                     'success' => true,
@@ -423,11 +466,12 @@ class PageController {
     /**
      * Delete a page (admin only)
      */
-    public function destroy($id) {
+    public function destroy($id)
+    {
         try {
             // Require admin authentication
             RoleMiddleware::requireAdmin($this->pdo);
-            
+
             // Check if page exists
             $existingPage = $this->pageModel->findById($id);
             if (!$existingPage) {
@@ -438,11 +482,11 @@ class PageController {
                 ]);
                 return;
             }
-            
+
             // Store page info before deletion for logging
             $pageTitle = $existingPage['title'];
             $pageSlug = $existingPage['slug'];
-            
+
             // Delete banner images if they exist
             if (!empty($existingPage['banner_image'])) {
                 $bannerPaths = $existingPage['banner_image'];
@@ -451,9 +495,9 @@ class PageController {
                 }
                 deletePageBanner($bannerPaths);
             }
-            
+
             $result = $this->pageModel->delete($id);
-            
+
             if ($result) {
                 // Log the action
                 $this->logAction('page_deleted', "Deleted page: {$pageTitle}", [
@@ -461,7 +505,7 @@ class PageController {
                     'slug' => $pageSlug,
                     'title' => $pageTitle
                 ]);
-                
+
                 http_response_code(200);
                 echo json_encode([
                     'success' => true,
@@ -486,10 +530,11 @@ class PageController {
     /**
      * Get active pages (public)
      */
-    public function getActive() {
+    public function getActive()
+    {
         try {
             $pages = $this->pageModel->getActivePages();
-            
+
             http_response_code(200);
             echo json_encode([
                 'success' => true,
@@ -511,7 +556,8 @@ class PageController {
      * @param string $description Action description
      * @param array $metadata Additional metadata
      */
-    private function logAction($action, $description = null, $metadata = null) {
+    private function logAction($action, $description = null, $metadata = null)
+    {
         try {
             // Get current user from session
             $token = $this->getAuthToken();
@@ -532,17 +578,15 @@ class PageController {
      * Get auth token from headers
      * @return string|null
      */
-    private function getAuthToken() {
+    private function getAuthToken()
+    {
         $headers = getallheaders();
         $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-        
+
         if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
             return $matches[1];
         }
-        
+
         return null;
     }
-
-
 }
-?>

@@ -54,17 +54,8 @@ class CustomersPage extends App {
     this.loading = true;
     this.updateView();
     try {
-      const res = await api.get("/users");
-      const all = res?.data?.data ?? res?.data ?? [];
-      this.customers = Array.isArray(all)
-        ? all.filter(
-            (u) =>
-              !u.role ||
-              u.role === "customer" ||
-              u.user_type === "user" ||
-              u.user_type === "customer",
-          )
-        : [];
+      const res = await api.get("/users?type=customer");
+      this.customers = res?.data?.data ?? [];
     } catch (e) {
       Toast.show({
         title: "Error",

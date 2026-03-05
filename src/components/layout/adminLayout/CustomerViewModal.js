@@ -84,11 +84,11 @@ class CustomerViewModal extends HTMLElement {
             <h2 class="text-xl font-bold text-slate-900">${user.name || "Unknown Customer"}</h2>
             <p class="text-slate-500 font-medium">${user.email || "No email provided"}</p>
             <div class="mt-4 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-              user.is_active || user.status === "Active"
+              user.is_active || user.status?.toLowerCase() === "active"
                 ? "bg-emerald-100 text-emerald-700"
                 : "bg-slate-200 text-slate-600"
             }">
-              ${user.is_active || user.status === "Active" ? "Active Account" : "Inactive"}
+              ${user.is_active || user.status?.toLowerCase() === "active" ? "Active Account" : "Inactive"}
             </div>
           </div>
 
