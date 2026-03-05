@@ -1,6 +1,7 @@
 import "@/components/ui/Modal.js";
 import "@/components/ui/Toast.js";
 import "@/components/ui/Input.js";
+import "@/components/ui/Textarea.js";
 import "@/components/ui/Dropdown.js";
 import "@/components/ui/Switch.js";
 import "@/components/ui/FileUpload.js";
@@ -66,7 +67,7 @@ class CategorySettingsModal extends HTMLElement {
 
       const nameInput = this.querySelector('ui-input[data-field="name"]');
       const parentInput = this.querySelector('ui-dropdown[data-field="parent_id"]');
-      const descInput = this.querySelector('textarea[data-field="description"]');
+      const descInput = this.querySelector('ui-textarea[data-field="description"]');
       const activeSwitch = this.querySelector('ui-switch[name="is_active"]');
       const imageUpload = this.querySelector('ui-file-upload[data-field="image"]');
 
@@ -148,7 +149,7 @@ class CategorySettingsModal extends HTMLElement {
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-            <textarea data-field="description" rows="3" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 resize-none"></textarea>
+            <ui-textarea data-field="description" rows="3" placeholder="Add a short description..." class="w-full"></ui-textarea>
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Category Image</label>
