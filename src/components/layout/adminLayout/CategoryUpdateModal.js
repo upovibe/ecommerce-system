@@ -59,6 +59,28 @@ class CategoryUpdateModal extends HTMLElement {
     this.close();
   };
 
+  getImageUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+      return path;
+    }
+
+    const baseUrl = window.location.origin;
+    if (path.startsWith("/")) {
+      return baseUrl + path;
+    }
+
+    if (path.startsWith("uploads/")) {
+      return `${baseUrl}/${path}`;
+    }
+
+    if (!path.includes("/")) {
+      return `${baseUrl}/uploads/categories/${path}`;
+    }
+
+    return `${baseUrl}/api/${path}`;
+  }
+
   onConfirm = async () => {
     try {
       if (!this.categoryData?.id) return;
@@ -138,6 +160,9 @@ class CategoryUpdateModal extends HTMLElement {
 
   render() {
     const category = this.categoryData || {};
+    const imageValue = category.image
+      ? this.getImageUrl(category.image).replace(/"/g, "&quot;")
+      : "";
     const parentOptions = this.categories
       .filter((c) => !c.parent_id && c.id !== category.id)
       .map((c) => `<ui-option value="${c.id}">${c.name}</ui-option>`)
@@ -171,7 +196,7 @@ class CategoryUpdateModal extends HTMLElement {
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Category Image</label>
-            <ui-file-upload data-field="image" accept="image/*" max-size="5242880" max-files="1" ${category.image ? `value="${category.image}"` : ""} class="w-full"></ui-file-upload>
+            <ui-file-upload data-field="image" accept="image/*" max-size="5242880" max-files="1" ${imageValue ? `value="${imageValue}"` : ""} class="w-full"></ui-file-upload>
           </div>
           <div>
             <ui-switch name="is_active" ${category.is_active !== false ? "checked" : ""}>

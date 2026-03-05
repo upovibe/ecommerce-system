@@ -47,8 +47,24 @@ class CategoryViewModal extends HTMLElement {
 
   getImageUrl(path) {
     if (!path) return "";
-    if (path.startsWith("http")) return path;
-    return window.location.origin + (path.startsWith("/") ? "" : "/") + path;
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+      return path;
+    }
+
+    const baseUrl = window.location.origin;
+    if (path.startsWith("/")) {
+      return baseUrl + path;
+    }
+
+    if (path.startsWith("uploads/")) {
+      return `${baseUrl}/${path}`;
+    }
+
+    if (!path.includes("/")) {
+      return `${baseUrl}/uploads/categories/${path}`;
+    }
+
+    return `${baseUrl}/api/${path}`;
   }
 
   render() {

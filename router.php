@@ -4,6 +4,19 @@
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $filePath = __DIR__ . $uri;
+// Shared uploads live one level above this project root (C:\laragon\www\uploads)
+$sharedUploadPath = dirname(__DIR__) . $uri;
+
+// Serve shared uploads explicitly to avoid SPA fallback returning index.html for images.
+if (str_starts_with($uri, '/uploads/') && file_exists($sharedUploadPath) && !is_dir($sharedUploadPath)) {
+    $mimeType = function_exists('mime_content_type') ? mime_content_type($sharedUploadPath) : null;
+    if ($mimeType) {
+        header('Content-Type: ' . $mimeType);
+    }
+    header('Content-Length: ' . filesize($sharedUploadPath));
+    readfile($sharedUploadPath);
+    return;
+}
 
 // Serve real static files directly (JS, CSS, images, fonts, etc.)
 if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {

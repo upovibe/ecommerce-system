@@ -1,4 +1,4 @@
-import "@/components/ui/Modal.js";
+import "@/components/ui/Dialog.js";
 import "@/components/ui/Toast.js";
 import api from "@/services/api.js";
 
@@ -84,14 +84,13 @@ class CategoryDeleteDialog extends HTMLElement {
 
   render() {
     this.innerHTML = `
-      <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="sm" variant="danger" confirm-label="Delete" close-button="true">
-        <div slot="title">Delete Category</div>
-        <div class="space-y-2 text-sm text-slate-700">
+      <ui-dialog ${this.hasAttribute("open") ? "open" : ""} title="Delete Category" variant="danger" confirm-label="Delete">
+        <div slot="content" class="space-y-2 text-sm text-slate-700">
           <p>Are you sure you want to delete:</p>
           <p class="font-bold text-slate-900">${this.categoryData?.name || "this category"}?</p>
           <p class="text-slate-500">This action cannot be undone.</p>
         </div>
-      </ui-modal>
+      </ui-dialog>
     `;
   }
 }

@@ -125,8 +125,27 @@ class CategoriesPage extends App {
 
   getImageUrl(path) {
     if (!path) return "";
-    if (path.startsWith("http")) return path;
-    return window.location.origin + (path.startsWith("/") ? "" : "/") + path;
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+      return path;
+    }
+
+    const baseUrl = window.location.origin;
+    if (path.startsWith("/")) {
+      return baseUrl + path;
+    }
+
+    // Uploaded files are served from the web root /uploads path.
+    if (path.startsWith("uploads/")) {
+      return `${baseUrl}/${path}`;
+    }
+
+    // Category uploads may occasionally store only filename.
+    if (!path.includes("/")) {
+      return `${baseUrl}/uploads/categories/${path}`;
+    }
+
+    // Fallback for non-upload relative API paths.
+    return `${baseUrl}/api/${path}`;
   }
 
   showCreateDialog() {
