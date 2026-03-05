@@ -5,11 +5,6 @@ import "@/components/ui/Dropdown.js";
 import api from "@/services/api.js";
 import Toast from "@/components/ui/Toast.js";
 
-/**
- * StaffSettingsModal Component
- *
- * Logic for creating a new staff member.
- */
 class StaffSettingsModal extends HTMLElement {
   constructor() {
     super();
@@ -17,7 +12,7 @@ class StaffSettingsModal extends HTMLElement {
       name: "",
       email: "",
       password: "",
-      role_id: "3", // Default to staff
+      role: "manager",
       status: "active",
     };
     this._listenersBound = false;
@@ -58,7 +53,6 @@ class StaffSettingsModal extends HTMLElement {
 
   onConfirm = async () => {
     try {
-      // Create user as staff/admin
       const res = await api.post("/users", {
         ...this.staffData,
         user_type: "admin",
@@ -74,7 +68,6 @@ class StaffSettingsModal extends HTMLElement {
         this.close();
       }
     } catch (error) {
-      console.error(error);
       Toast.show({
         title: "Error",
         message: error.response?.data?.error || "Failed to create staff member",
@@ -85,77 +78,66 @@ class StaffSettingsModal extends HTMLElement {
 
   render() {
     this.innerHTML = `
-            <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="md" close-button="true">
-                <div slot="title">Add Staff Member</div>
-                <div class="space-y-6">
-                    <ui-input 
-                        label="Full Name" 
-                        placeholder="Enter full name"
-                        id="staff-name-input"
-                        value="${this.staffData.name}">
-                    </ui-input>
+      <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="md" close-button="true">
+        <div slot="title">Add Staff Member</div>
+        <form class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+            <ui-input id="staff-name-input" value="${this.staffData.name}" placeholder="Enter full name" class="w-full"></ui-input>
+          </div>
 
-                    <ui-input 
-                        label="Email Address" 
-                        type="email"
-                        placeholder="email@example.com"
-                        id="staff-email-input"
-                        value="${this.staffData.email}">
-                    </ui-input>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+            <ui-input id="staff-email-input" value="${this.staffData.email}" type="email" placeholder="email@example.com" class="w-full"></ui-input>
+          </div>
 
-                    <ui-input 
-                        label="Password" 
-                        type="password"
-                        placeholder="••••••••"
-                        id="staff-password-input"
-                        value="${this.staffData.password}">
-                    </ui-input>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+            <ui-input id="staff-password-input" value="${this.staffData.password}" type="password" placeholder="********" class="w-full"></ui-input>
+          </div>
 
-                    <ui-dropdown 
-                        label="Role" 
-                        id="staff-role-dropdown"
-                        placeholder="Select Role"
-                        options='[{"value": "1", "label": "Super Admin"}, {"value": "2", "label": "Manager"}, {"value": "3", "label": "Staff"}]'
-                        value="${this.staffData.role_id}">
-                    </ui-dropdown>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
+            <ui-dropdown
+              id="staff-role-dropdown"
+              placeholder="Select Role"
+              class="w-full">
+              <ui-option value="super_admin">Super Admin</ui-option>
+              <ui-option value="manager">Manager</ui-option>
+              <ui-option value="accountant">Accountant</ui-option>
+            </ui-dropdown>
+          </div>
 
-                    <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
-                        <div class="space-y-1">
-                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Staff Account Status</span>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Enable or disable this staff account</p>
-                        </div>
-                        <ui-switch 
-                            id="staff-status-switch" 
-                            ${this.staffData.status === "active" ? "checked" : ""}
-                            label="Active">
-                        </ui-switch>
-                    </div>
-                </div>
-            </ui-modal>
-        `;
+          <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+            <div class="space-y-1">
+              <span class="text-sm font-medium text-gray-900">Staff Account Status</span>
+              <p class="text-xs text-gray-500">Enable or disable this staff account</p>
+            </div>
+            <ui-switch id="staff-status-switch" ${this.staffData.status === "active" ? "checked" : ""} label="Active"></ui-switch>
+          </div>
+        </form>
+      </ui-modal>
+    `;
 
-    this.querySelector("#staff-name-input").addEventListener(
-      "input",
-      (e) => (this.staffData.name = e.target.value),
-    );
-    this.querySelector("#staff-email-input").addEventListener(
-      "input",
-      (e) => (this.staffData.email = e.target.value),
-    );
-    this.querySelector("#staff-password-input").addEventListener(
-      "input",
-      (e) => (this.staffData.password = e.target.value),
-    );
-    this.querySelector("#staff-role-dropdown").addEventListener(
-      "change",
-      (e) => (this.staffData.role_id = e.detail.value),
-    );
-    this.querySelector("#staff-status-switch").addEventListener(
-      "change",
-      (e) => {
-        this.staffData.status = e.detail.checked ? "active" : "inactive";
-      },
-    );
+    this.querySelector("#staff-name-input")?.addEventListener("input", (e) => {
+      this.staffData.name = e.target.value;
+    });
+    this.querySelector("#staff-email-input")?.addEventListener("input", (e) => {
+      this.staffData.email = e.target.value;
+    });
+    this.querySelector("#staff-password-input")?.addEventListener("input", (e) => {
+      this.staffData.password = e.target.value;
+    });
+    this.querySelector("#staff-role-dropdown")?.addEventListener("change", (e) => {
+      this.staffData.role = e.detail.value;
+    });
+    setTimeout(() => {
+      const roleDropdown = this.querySelector("#staff-role-dropdown");
+      if (roleDropdown) roleDropdown.value = String(this.staffData.role || "manager");
+    }, 0);
+    this.querySelector("#staff-status-switch")?.addEventListener("change", (e) => {
+      this.staffData.status = e.detail.checked ? "active" : "inactive";
+    });
   }
 }
 

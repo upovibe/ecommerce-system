@@ -222,12 +222,20 @@ class StaffPage extends App {
 
       const isActive = u.status === "active" || Number(u.is_active) === 1;
 
+      const roleLabelByValue = {
+        super_admin: "Super Admin",
+        manager: "Manager",
+        accountant: "Accountant",
+      };
+      const rawRole = String(u.role || "").toLowerCase();
+      const resolvedRole = roleLabelByValue[rawRole] || "Manager";
+
       return {
         id: u.id,
         no: i + 1,
         name: u.name || "Unknown",
         email: maskedEmail,
-        role: u.role || "Admin",
+        role: resolvedRole,
         status: isActive ? "Active" : "Inactive",
         joined: u.created_at
           ? new Date(u.created_at).toLocaleDateString()
