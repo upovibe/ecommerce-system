@@ -170,7 +170,17 @@ class CategoriesPage extends App {
     const category = this.categories.find((c) => c.id == id);
     const viewModal = this.querySelector("category-view-modal");
     if (category && viewModal) {
-      viewModal.setCategoryData(category);
+      const parent = category.parent_id
+        ? this.categories.find((c) => c.id == category.parent_id)
+        : null;
+      const subCount = (this.categories || []).filter(
+        (c) => c.parent_id == category.id,
+      ).length;
+      viewModal.setCategoryData({
+        ...category,
+        parent_name: parent?.name || "Main Category",
+        sub_count: subCount,
+      });
       viewModal.open();
     }
   }
@@ -288,6 +298,25 @@ class CategoriesPage extends App {
         <style>
           app-categories-page .category-table-wrap .upo-table-title {
             display: none;
+          }
+          app-categories-page .category-table-wrap .upo-tab-list {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+          app-categories-page .category-table-wrap .upo-tab-list::-webkit-scrollbar {
+            height: 6px;
+          }
+          app-categories-page .category-table-wrap .upo-tab-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+          }
+          @media (max-width: 640px) {
+            app-categories-page .category-table-wrap {
+              padding: 0.5rem;
+              border-radius: 1rem;
+            }
           }
         </style>
         <div class="category-table-wrap bg-white border border-slate-100 rounded-3xl p-4 shadow-sm">

@@ -69,33 +69,55 @@ class CategoryViewModal extends HTMLElement {
 
   render() {
     const cat = this.categoryData || {};
+    const isMainCategory = !cat.parent_id;
+    const updatedDate = cat.updated_at
+      ? new Date(cat.updated_at).toLocaleString()
+      : "-";
 
     this.innerHTML = `
       <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="md" close-button="true">
         <div slot="title">Category Details</div>
-        <div class="space-y-4 text-sm">
-          <div class="w-full h-44 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden flex items-center justify-center">
+        <div class="space-y-5 text-sm">
+          <div class="w-full h-48 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl overflow-hidden flex items-center justify-center">
             ${
               cat.image
                 ? `<img src="${this.getImageUrl(cat.image)}" class="w-full h-full object-cover" alt="${cat.name || "Category"}" />`
                 : `<i class="fas fa-image text-slate-300 text-3xl"></i>`
             }
           </div>
-          <div>
-            <p class="text-xs font-bold text-slate-500 mb-1">Name</p>
-            <p class="text-slate-800 font-semibold">${cat.name || "-"}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Name</p>
+              <p class="mt-1 text-slate-900 font-semibold">${cat.name || "-"}</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Type</p>
+              <p class="mt-1 text-slate-900 font-semibold">${isMainCategory ? "Main Category" : "Subcategory"}</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Parent</p>
+              <p class="mt-1 text-slate-800">${cat.parent_name || "Main Category"}</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Subcategories</p>
+              <p class="mt-1 text-slate-900 font-semibold">${cat.sub_count || 0}</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Status</p>
+              <p class="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                cat.is_active
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-slate-200 text-slate-600"
+              }">${cat.is_active ? "Active" : "Hidden"}</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Last Updated</p>
+              <p class="mt-1 text-slate-800">${updatedDate}</p>
+            </div>
           </div>
-          <div>
-            <p class="text-xs font-bold text-slate-500 mb-1">Parent</p>
-            <p class="text-slate-700">${cat.parent_id ? `#${cat.parent_id}` : "Main Category"}</p>
-          </div>
-          <div>
-            <p class="text-xs font-bold text-slate-500 mb-1">Description</p>
-            <p class="text-slate-700">${cat.description || "No description"}</p>
-          </div>
-          <div>
-            <p class="text-xs font-bold text-slate-500 mb-1">Status</p>
-            <p class="text-slate-700">${cat.is_active ? "Active" : "Hidden"}</p>
+          <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-2">Description</p>
+            <p class="text-slate-700 leading-relaxed">${cat.description || "No description"}</p>
           </div>
         </div>
       </ui-modal>
