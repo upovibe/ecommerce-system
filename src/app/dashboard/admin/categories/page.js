@@ -9,6 +9,10 @@ import "@/components/ui/Dropdown.js";
 import "@/components/ui/Switch.js";
 import "@/components/ui/FileUpload.js";
 import "@/components/ui/Skeleton.js";
+import "@/components/layout/adminLayout/CategorySettingsModal.js";
+import "@/components/layout/adminLayout/CategoryUpdateModal.js";
+import "@/components/layout/adminLayout/CategoryViewModal.js";
+import "@/components/layout/adminLayout/CategoryDeleteDialog.js";
 import api from "@/services/api.js";
 
 let categoriesCache = null;
@@ -29,16 +33,13 @@ class CategoriesPage extends App {
       const id = event?.detail?.row?.id;
       if (id != null) this.showEditDialog(id);
     };
+    this._onTableView = (event) => {
+      const id = event?.detail?.row?.id;
+      if (id != null) this.showViewDialog(id);
+    };
     this._onTableDelete = (event) => {
       const id = event?.detail?.row?.id;
       if (id != null) this.deleteCategory(id);
-    };
-    this._onTableCustomAction = (event) => {
-      const id = event?.detail?.row?.id;
-      const actionName = event?.detail?.actionName;
-      if (actionName === "toggle-active" && id != null) {
-        this.toggleActive(id);
-      }
     };
   }
 
@@ -54,8 +55,20 @@ class CategoriesPage extends App {
     this.addEventListener("table-add", this._onTableAdd);
     this.addEventListener("table-refresh", this._onTableRefresh);
     this.addEventListener("table-edit", this._onTableEdit);
+    this.addEventListener("table-view", this._onTableView);
     this.addEventListener("table-delete", this._onTableDelete);
-    this.addEventListener("table-custom-action", this._onTableCustomAction);
+    this.addEventListener("category-saved", async () => {
+      categoriesCache = null;
+      await this.loadCategories(true);
+    });
+    this.addEventListener("category-updated", async () => {
+      categoriesCache = null;
+      await this.loadCategories(true);
+    });
+    this.addEventListener("category-deleted", async () => {
+      categoriesCache = null;
+      await this.loadCategories(true);
+    });
     await this.loadCategories();
   }
 
@@ -117,202 +130,38 @@ class CategoriesPage extends App {
   }
 
   showCreateDialog() {
-    this._showCategoryDialog(null);
+    const addModal = this.querySelector("category-settings-modal");
+    if (addModal) {
+      addModal.setCategories(this.categories);
+      addModal.open();
+    }
   }
 
   showEditDialog(id) {
     const category = this.categories.find((c) => c.id == id);
-    if (category) this._showCategoryDialog(category);
+    const updateModal = this.querySelector("category-update-modal");
+    if (category && updateModal) {
+      updateModal.setCategories(this.categories);
+      updateModal.setCategoryData(category);
+      updateModal.open();
+    }
   }
 
-  _showCategoryDialog(category) {
-    const isEdit = !!category;
-    const isEditingMainCategory = isEdit && !category?.parent_id;
-    const parentOptions = (this.categories || [])
-      .filter((c) => !c.parent_id && (!isEdit || c.id !== category.id))
-      .map(
-        (c) => `<ui-option value="${c.id}">${c.name}</ui-option>`,
-      )
-      .join("");
-
-    const modal = document.createElement("ui-modal");
-    modal.setAttribute("title", isEdit ? "Edit Category" : "New Category");
-    modal.setAttribute("position", "right");
-    modal.setAttribute("size", "md");
-    modal.setAttribute("open", "");
-    modal.setAttribute(
-      "confirm-label",
-      isEdit ? "Save Changes" : "Create Category",
-    );
-
-    modal.innerHTML = `
-      <form class="space-y-5">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Category Name</label>
-          <ui-input id="cat-name" value="${category?.name || ""}" placeholder="e.g. Electronics" class="w-full"></ui-input>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Parent Category</label>
-          ${
-            isEditingMainCategory
-              ? `
-            <input id="cat-parent-static" type="hidden" value="" />
-            <div class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-500 bg-slate-50">
-              Main Category
-            </div>
-          `
-              : `
-            <ui-dropdown id="cat-parent" placeholder="None (Main category)" class="w-full">
-              <ui-option value="">None (Main category)</ui-option>
-              ${parentOptions}
-            </ui-dropdown>
-          `
-          }
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Description</label>
-          <textarea id="cat-desc" placeholder="Describe this category..." rows="3"
-            class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none font-brand">${category?.description || ""}</textarea>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">Category Image</label>
-          <ui-file-upload
-            id="cat-img-file"
-            data-field="cat-image"
-            accept="image/*"
-            max-size="5242880"
-            max-files="1"
-            ${isEdit && category?.image ? `value="${category.image}"` : ""}
-            class="w-full">
-          </ui-file-upload>
-        </div>
-        <div class="pt-1">
-          <ui-switch name="is_active" id="cat-active" ${category?.is_active !== false ? "checked" : ""}>
-            <span slot="label">Active (visible on storefront)</span>
-          </ui-switch>
-        </div>
-      </form>
-    `;
-
-    document.body.appendChild(modal);
-
-    const nameInput = modal.querySelector("#cat-name");
-    const parentInput = modal.querySelector("#cat-parent");
-    const parentStaticInput = modal.querySelector("#cat-parent-static");
-    const descInput = modal.querySelector("#cat-desc");
-    const fileInput = modal.querySelector('ui-file-upload[data-field="cat-image"]');
-    const activeCheck = modal.querySelector("#cat-active");
-
-    if (parentInput && isEdit && category?.parent_id) {
-      setTimeout(() => {
-        parentInput.value = String(category.parent_id);
-      }, 0);
+  showViewDialog(id) {
+    const category = this.categories.find((c) => c.id == id);
+    const viewModal = this.querySelector("category-view-modal");
+    if (category && viewModal) {
+      viewModal.setCategoryData(category);
+      viewModal.open();
     }
-
-    // Validation
-    const validate = () => {
-      modal.setAttribute(
-        "confirm-disabled",
-        !nameInput.value.trim() ? "true" : "false",
-      );
-    };
-    nameInput.addEventListener("input", validate);
-    validate();
-
-    modal.addEventListener("confirm", async () => {
-      if (modal.getAttribute("confirm-disabled") === "true") return;
-      modal.setAttribute("confirm-loading", "true");
-
-      try {
-        let imageUrl = category?.image || null;
-        const selectedFiles = fileInput?.getFiles?.() || [];
-        const newImageFile = selectedFiles.find((f) => f instanceof File);
-
-        // If a new file was selected, upload it first (only for edit)
-        if (isEdit && newImageFile) {
-          const formData = new FormData();
-          formData.append("image", newImageFile);
-          const uploadRes = await api.uploadFile(
-            `/categories/${category.id}/upload-image`,
-            formData,
-          );
-          if (uploadRes.data.success) {
-            imageUrl = uploadRes.data.image_url;
-          }
-        }
-
-        const payload = {
-          name: nameInput.value.trim(),
-          description: descInput.value.trim() || null,
-          parent_id: (parentInput?.value || parentStaticInput?.value)
-            ? Number(parentInput?.value || parentStaticInput?.value)
-            : null,
-          is_active: activeCheck?.checked ? true : false,
-        };
-
-        if (!isEdit) {
-          // For new categories, include the image path after create + upload
-          const createRes = await api.post("/categories", payload);
-          if (createRes.data.success) {
-            const newId = createRes.data.data.id;
-            // Upload image for newly created category
-            if (newImageFile) {
-              const formData = new FormData();
-              formData.append("image", newImageFile);
-              await api.uploadFile(
-                `/categories/${newId}/upload-image`,
-                formData,
-              );
-            }
-          }
-        } else {
-          await api.put(`/categories/${category.id}`, {
-            ...payload,
-            image: imageUrl,
-          });
-        }
-
-        modal.remove();
-        Toast.show({
-          title: "Success",
-          message: isEdit ? "Category updated." : "Category created.",
-          variant: "success",
-        });
-        categoriesCache = null;
-        await this.loadCategories(true);
-      } catch (e) {
-        modal.setAttribute("confirm-loading", "false");
-        validate();
-        Toast.show({
-          title: "Error",
-          message: e.response?.data?.error || "Operation failed",
-          variant: "error",
-        });
-      }
-    });
-
-    modal.addEventListener("cancel", () => modal.remove());
   }
 
   async deleteCategory(id) {
     const category = this.categories.find((c) => c.id == id);
-    if (!confirm(`Delete "${category?.name}"? This cannot be undone.`)) return;
-
-    try {
-      await api.delete(`/categories/${id}`);
-      categoriesCache = null;
-      Toast.show({
-        title: "Deleted",
-        message: "Category removed.",
-        variant: "success",
-      });
-      await this.loadCategories(true);
-    } catch (e) {
-      Toast.show({
-        title: "Error",
-        message: e.response?.data?.error || "Delete failed",
-        variant: "error",
-      });
+    const deleteDialog = this.querySelector("category-delete-dialog");
+    if (category && deleteDialog) {
+      deleteDialog.setCategoryData(category);
+      deleteDialog.open();
     }
   }
 
@@ -349,32 +198,43 @@ class CategoriesPage extends App {
       parentNameById[String(cat.id)] = cat.name || "";
     });
 
-    const mainCategories = (this.categories || []).filter((cat) => !cat.parent_id);
-    const subCategories = (this.categories || []).filter((cat) => !!cat.parent_id);
+    const mainCategories = (this.categories || []).filter(
+      (cat) => !cat.parent_id,
+    );
+    const subCategories = (this.categories || []).filter(
+      (cat) => !!cat.parent_id,
+    );
     const subCountByParentId = {};
     subCategories.forEach((sub) => {
       const pid = String(sub.parent_id);
       subCountByParentId[pid] = (subCountByParentId[pid] || 0) + 1;
     });
 
-    const buildTableData = (rows, includeParent = false, includeSubCount = false) =>
+    const buildTableData = (
+      rows,
+      includeParent = false,
+      includeSubCount = false,
+    ) =>
       rows.map((cat, index) => ({
-      id: cat.id,
-      no: index + 1,
-      image: cat.image
-        ? `<img src="${this.getImageUrl(cat.image)}" alt="${cat.name || "Category"}" class="w-10 h-10 rounded-lg object-cover border border-slate-200" />`
-        : `<div class="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400"><i class="fas fa-image text-xs"></i></div>`,
-      name: cat.name || "",
-      ...(includeSubCount
-        ? { subcategories: subCountByParentId[String(cat.id)] || 0 }
-        : {}),
-      ...(includeParent
-        ? { parent: parentNameById[String(cat.parent_id)] || `#${cat.parent_id}` }
-        : {}),
-      description: cat.description || "No description",
-      status: cat.is_active ? "Active" : "Hidden",
-      updated: cat.updated_at || "",
-    }));
+        id: cat.id,
+        no: index + 1,
+        image: cat.image
+          ? `<img src="${this.getImageUrl(cat.image)}" alt="${cat.name || "Category"}" class="w-10 h-10 rounded-lg object-cover border border-slate-200" />`
+          : `<div class="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400"><i class="fas fa-image text-xs"></i></div>`,
+        name: cat.name || "",
+        ...(includeSubCount
+          ? { subcategories: subCountByParentId[String(cat.id)] || 0 }
+          : {}),
+        ...(includeParent
+          ? {
+              parent:
+                parentNameById[String(cat.parent_id)] || `#${cat.parent_id}`,
+            }
+          : {}),
+        description: cat.description || "No description",
+        status: cat.is_active ? "Active" : "Hidden",
+        updated: cat.updated_at || "",
+      }));
 
     const buildColumns = (includeParent = false, includeSubCount = false) => [
       { key: "no", label: "No.", html: false },
@@ -383,34 +243,27 @@ class CategoriesPage extends App {
       ...(includeSubCount
         ? [{ key: "subcategories", label: "Subcategories", html: false }]
         : []),
-      ...(includeParent ? [{ key: "parent", label: "Parent", html: false }] : []),
+      ...(includeParent
+        ? [{ key: "parent", label: "Parent", html: false }]
+        : []),
       { key: "description", label: "Description", html: false },
       { key: "status", label: "Status", html: false },
       { key: "updated", label: "Updated", html: false },
     ];
 
-    const customActions = [
-      { name: "toggle-active", label: "Toggle status", icon: "fas fa-eye" },
-    ];
-
-    const safeMainTableData = JSON.stringify(buildTableData(mainCategories, false, true)).replace(/"/g, "&quot;");
-    const safeMainTableColumns = JSON.stringify(buildColumns(false, true)).replace(
-      /"/g,
-      "&quot;",
-    );
-    const safeSubTableData = JSON.stringify(buildTableData(subCategories, true)).replace(
-      /"/g,
-      "&quot;",
-    );
+    const safeMainTableData = JSON.stringify(
+      buildTableData(mainCategories, false, true),
+    ).replace(/"/g, "&quot;");
+    const safeMainTableColumns = JSON.stringify(
+      buildColumns(false, true),
+    ).replace(/"/g, "&quot;");
+    const safeSubTableData = JSON.stringify(
+      buildTableData(subCategories, true),
+    ).replace(/"/g, "&quot;");
     const safeSubTableColumns = JSON.stringify(buildColumns(true)).replace(
       /"/g,
       "&quot;",
     );
-    const safeCustomActions = JSON.stringify(customActions).replace(
-      /"/g,
-      "&quot;",
-    );
-
     return `
       <div class="px-6 md:px-10 pb-8 space-y-6 max-w-7xl mx-auto font-brand text-slate-600">
         <style>
@@ -430,18 +283,15 @@ class CategoriesPage extends App {
                 title=""
                 data="${safeMainTableData}"
                 columns="${safeMainTableColumns}"
-                custom-actions="${safeCustomActions}"
                 sortable
                 searchable
                 search-placeholder="Search main categories..."
                 pagination
                 page-size="25"
                 action
-                actions="edit,delete"
+                actions="view,edit,delete"
                 addable
                 refresh
-                bordered
-                striped
                 class="w-full">
               </ui-table>
             </ui-tab-panel>
@@ -451,23 +301,25 @@ class CategoriesPage extends App {
                 title=""
                 data="${safeSubTableData}"
                 columns="${safeSubTableColumns}"
-                custom-actions="${safeCustomActions}"
                 sortable
                 searchable
                 search-placeholder="Search subcategories..."
                 pagination
                 page-size="25"
                 action
-                actions="edit,delete"
+                actions="view,edit,delete"
                 addable
                 refresh
-                bordered
-                striped
                 class="w-full">
               </ui-table>
             </ui-tab-panel>
           </ui-tabs>
         </div>
+
+        <category-settings-modal></category-settings-modal>
+        <category-update-modal></category-update-modal>
+        <category-view-modal></category-view-modal>
+        <category-delete-dialog></category-delete-dialog>
       </div>
     `;
   }
