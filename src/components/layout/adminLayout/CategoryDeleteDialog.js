@@ -48,6 +48,23 @@ class CategoryDeleteDialog extends HTMLElement {
     this.close();
   };
 
+  getImageUrl(path) {
+    if (!path) return "";
+    if (
+      path.startsWith("http://") ||
+      path.startsWith("https://") ||
+      path.startsWith("data:")
+    ) {
+      return path;
+    }
+
+    const baseUrl = window.location.origin;
+    if (path.startsWith("/")) return baseUrl + path;
+    if (path.startsWith("uploads/")) return `${baseUrl}/${path}`;
+    if (!path.includes("/")) return `${baseUrl}/uploads/categories/${path}`;
+    return `${baseUrl}/api/${path}`;
+  }
+
   onConfirm = async () => {
     try {
       if (!this.categoryData?.id) return;
@@ -83,11 +100,19 @@ class CategoryDeleteDialog extends HTMLElement {
   };
 
   render() {
+    const cat = this.categoryData || {};
     this.innerHTML = `
       <ui-dialog ${this.hasAttribute("open") ? "open" : ""} title="Delete Category" variant="danger" confirm-label="Delete">
-        <div slot="content" class="space-y-2 text-sm text-slate-700">
+        <div slot="content" class="space-y-3 text-sm text-slate-700">
+          <div class="w-full h-36 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden flex items-center justify-center">
+            ${
+              cat.image
+                ? `<img src="${this.getImageUrl(cat.image)}" alt="${cat.name || "Category"}" class="w-full h-full object-cover" />`
+                : `<i class="fas fa-image text-slate-300 text-2xl"></i>`
+            }
+          </div>
           <p>Are you sure you want to delete:</p>
-          <p class="font-bold text-slate-900">${this.categoryData?.name || "this category"}?</p>
+          <p class="font-bold text-slate-900">${cat.name || "this category"}?</p>
           <p class="text-slate-500">This action cannot be undone.</p>
         </div>
       </ui-dialog>

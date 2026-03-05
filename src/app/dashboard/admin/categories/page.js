@@ -25,6 +25,7 @@ class CategoriesPage extends App {
     super();
     this.categories = [];
     this.loading = true;
+    this._lastRendered = "";
     this._loadingPromise = null;
     this._isInitialized = false;
     this._onTableAdd = () => this.showCreateDialog();
@@ -44,7 +45,10 @@ class CategoriesPage extends App {
   }
 
   updateView() {
-    this.innerHTML = this.render();
+    const next = this.render();
+    if (next === this._lastRendered) return;
+    this._lastRendered = next;
+    this.innerHTML = next;
   }
 
   async connectedCallback() {
@@ -89,8 +93,10 @@ class CategoriesPage extends App {
       return this._loadingPromise;
     }
 
-    this.loading = true;
-    this.updateView();
+    if (!this.loading) {
+      this.loading = true;
+      this.updateView();
+    }
     this._loadingPromise = (async () => {
       try {
         if (!categoriesFetchPromise || force) {
