@@ -90,7 +90,8 @@ class Middleware {
      */
     hasRole(requiredRole) {
         const user = this.getCurrentUser();
-        return user && user.role === requiredRole;
+        if (!user || !user.role || !requiredRole) return false;
+        return user.role.toLowerCase().trim() === requiredRole.toLowerCase().trim();
     }
 
     /**
@@ -100,7 +101,9 @@ class Middleware {
      */
     hasAnyRole(requiredRoles) {
         const user = this.getCurrentUser();
-        return user && requiredRoles.includes(user.role);
+        if (!user || !user.role || !Array.isArray(requiredRoles)) return false;
+        const userRole = user.role.toLowerCase().trim();
+        return requiredRoles.some(role => role.toLowerCase().trim() === userRole);
     }
 
     /**
@@ -132,7 +135,10 @@ class Middleware {
         // Check role requirement
         if (pageConfig.requireRole) {
             const user = this.getCurrentUser();
-            if (!user || user.role !== pageConfig.requireRole) {
+            const userRole = user?.role?.toLowerCase().trim();
+            const requiredRole = pageConfig.requireRole.toLowerCase().trim();
+            
+            if (!user || userRole !== requiredRole) {
                 // Handle dynamic redirect functions
                 let redirectPath = '/dashboard';
                 if (typeof pageConfig.redirectTo === 'function') {
@@ -184,12 +190,14 @@ class Middleware {
 
         // Check role restrictions (completely flexible)
         const user = this.getCurrentUser();
-        if (user && pageConfig.restrictRoles) {
-            const restrictedRoles = Array.isArray(pageConfig.restrictRoles) 
+        if (user && user.role && pageConfig.restrictRoles) {
+            const restrictedRoles = (Array.isArray(pageConfig.restrictRoles) 
                 ? pageConfig.restrictRoles 
-                : [pageConfig.restrictRoles];
+                : [pageConfig.restrictRoles]).map(r => r.toLowerCase().trim());
             
-            if (restrictedRoles.includes(user.role)) {
+            const userRole = user.role.toLowerCase().trim();
+            
+            if (restrictedRoles.includes(userRole)) {
                 // Handle dynamic redirect functions
                 let redirectPath = '/dashboard';
                 if (typeof pageConfig.redirectTo === 'function') {

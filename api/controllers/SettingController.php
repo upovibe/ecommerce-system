@@ -24,8 +24,8 @@ class SettingController {
      */
     public function index() {
         try {
-            // Require admin authentication
-            RoleMiddleware::requireAdmin($this->pdo);
+            // Require admin authentication - Removed to allow branding fetch on public pages
+            // RoleMiddleware::requireAdmin($this->pdo);
             
             $settings = $this->settingModel->findAll();
             

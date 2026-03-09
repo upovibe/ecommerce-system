@@ -27,6 +27,9 @@ class Router {
     this.currentComponent = null;
     this.outlet = null;
     this.isReady = false;
+    this.navigationHistory = [];
+    this.maxRedirects = 10;
+    this.redirectWindow = 2000; // 2 seconds
   }
 
   // Add a route (supports both static and dynamic)
@@ -109,6 +112,7 @@ class Router {
 
   // Navigate to a path
   navigate(path) {
+    if (window.location.pathname === path) return;
     history.pushState(null, null, path);
     this.render();
   }
@@ -281,14 +285,30 @@ class Router {
   async render() {
     if (!this.isReady) return; // Don't render until components are loaded
 
+    const path = window.location.pathname || "/";
+    const now = Date.now();
+
+    // Loop detection
+    this.navigationHistory = this.navigationHistory.filter(
+      (time) => now - time < this.redirectWindow,
+    );
+    this.navigationHistory.push(now);
+
+    if (this.navigationHistory.length > this.maxRedirects) {
+      console.error("⛔ Infinite redirect loop detected. Stopping navigation.");
+      this.renderComponentError(path, ["Redirect Loop Protection"], [
+        "The system detected too many rapid redirects. Please check your middleware configurations.",
+      ]);
+      return;
+    }
+
     // Dispatch an event to notify components of the route change
     window.dispatchEvent(
       new CustomEvent("route-changed", {
-        detail: { path: window.location.pathname },
+        detail: { path: path },
       }),
     );
 
-    const path = window.location.pathname || "/";
     const queryParams = this.parseQueryParams(window.location.search);
 
     // Execute middleware before rendering

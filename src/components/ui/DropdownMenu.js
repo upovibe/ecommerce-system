@@ -289,8 +289,10 @@ class DropdownMenu extends HTMLElement {
         
         // Handle menu item clicks
         this.contentContainer.addEventListener('click', (e) => {
+            console.log("🖱️ Dropdown Content Clicked:", e.target);
             const menuItem = e.target.closest('.upo-dropdown-menu-item');
             if (menuItem && !menuItem.classList.contains('disabled')) {
+                console.log("✨ Menu Item Found:", menuItem);
                 // Check if click was on a custom element with data-action
                 const customElement = e.target.closest('[data-action]');
                 if (customElement) {
@@ -305,14 +307,20 @@ class DropdownMenu extends HTMLElement {
                         color: this.getMenuItemColor(menuItem)
                     };
                     
-                    // Dispatch on the dropdown menu element
+                    console.log("🚀 Dispatching item-click event:", eventDetail);
+                    
+                    // Dispatch on the dropdown menu element with bubbling enabled
                     this.dispatchEvent(new CustomEvent('item-click', {
-                        detail: eventDetail
+                        detail: eventDetail,
+                        bubbles: true,
+                        composed: true
                     }));
                     
-                    // Also dispatch on document to ensure it bubbles up
+                    // Also dispatch on document for broad awareness
                     document.dispatchEvent(new CustomEvent('item-click', {
-                        detail: eventDetail
+                        detail: eventDetail,
+                        bubbles: true,
+                        composed: true
                     }));
                     return;
                 }

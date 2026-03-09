@@ -29,6 +29,7 @@ class LoginPage extends App {
   async loadSettings() {
     try {
       const resp = await api.get("/settings");
+      console.log("📥 Branding settings fetched:", resp.data);
       if (resp.data.success) {
         const settingsArr = resp.data.data;
         const nameSetting = settingsArr.find(
@@ -43,6 +44,7 @@ class LoginPage extends App {
       }
       this.render();
     } catch (e) {
+      console.error("❌ Branding fetch failed:", e.response?.data || e.message);
       console.warn("Could not load settings for branding, using defaults.");
     }
   }
@@ -210,7 +212,7 @@ class LoginPage extends App {
                 <ui-checkbox 
                   label="Remember me" 
                   color="indigo"
-                  onchange="this.closest('app-login-page').handleInputChange('remember', this.detail.checked)"
+                  onchange="this.closest('app-login-page').handleInputChange('remember', event.detail.checked)"
                   class="text-slate-500 font-medium"
                 ></ui-checkbox>
                 <style>

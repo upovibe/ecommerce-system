@@ -87,11 +87,13 @@ class AdminLayout extends App {
 
   setupEventListeners() {
     this.addEventListener("click", (e) => {
+      console.log("🖱️ Layout General Click:", e.target);
       if (e.target.closest("[data-sidebar-toggle]")) {
         e.preventDefault();
         this.toggleSidebar();
       }
       if (e.target.closest('[data-action="logout"]')) {
+        console.log("🚪 Sidebar Logout Clicked");
         e.preventDefault();
         this.handleLogout();
       }
@@ -99,6 +101,15 @@ class AdminLayout extends App {
       if (groupToggle) {
         e.preventDefault();
         this.toggleGroup(groupToggle.getAttribute("data-group-name"));
+      }
+    });
+
+    // Listen for dropdown menu item clicks (header)
+    this.addEventListener("item-click", (e) => {
+      console.log("🖱️ Header Dropdown Item Clicked (caught in Layout):", e.detail);
+      if (e.detail.action === "logout") {
+        console.log("🚪 Logout action confirmed in Layout");
+        this.handleLogout();
       }
     });
   }
@@ -137,6 +148,7 @@ class AdminLayout extends App {
   }
 
   handleLogout() {
+    console.log("🧼 Cleaning up session and logging out...");
     localStorage.removeItem("token");
     localStorage.removeItem("userData");
     window.location.href = "/auth/login";
