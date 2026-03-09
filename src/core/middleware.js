@@ -136,9 +136,11 @@ class Middleware {
         if (pageConfig.requireRole) {
             const user = this.getCurrentUser();
             const userRole = user?.role?.toLowerCase().trim();
-            const requiredRole = pageConfig.requireRole.toLowerCase().trim();
+            const requiredRoles = Array.isArray(pageConfig.requireRole) 
+                ? pageConfig.requireRole.map(r => r.toLowerCase().trim())
+                : [pageConfig.requireRole.toLowerCase().trim()];
             
-            if (!user || userRole !== requiredRole) {
+            if (!user || !requiredRoles.includes(userRole)) {
                 // Handle dynamic redirect functions
                 let redirectPath = '/dashboard';
                 if (typeof pageConfig.redirectTo === 'function') {
@@ -167,11 +169,37 @@ class Middleware {
                 redirectPath = pageConfig.redirectTo || '/';
             }
             
-            return {
-                success: false,
-                redirect: redirectPath,
-                reason: 'User already authenticated'
-            };
+            // LOOP PREVENTION: If redirectPath is the current path, don't redirect
+            if (path === redirectPath || (path === '/' && redirectPath === '/')) {
+                return { success: true };
+            }
+
+            // LOOP PREVENTION: Check if user has access to the destination
+            const cleanRedirectPath = redirectPath.replace(/^\//, '');
+            const destConfig = this.getSmartMiddlewareConfig(cleanRedirectPath);
+            
+            let hasAccess = true;
+            if (destConfig.requireRole) {
+                const userRole = user?.role?.toLowerCase().trim();
+                const requiredRoles = Array.isArray(destConfig.requireRole) 
+                    ? destConfig.requireRole.map(r => r.toLowerCase().trim())
+                    : [destConfig.requireRole.toLowerCase().trim()];
+                
+                if (!requiredRoles.includes(userRole)) {
+                    hasAccess = false;
+                }
+            }
+
+            if (hasAccess) {
+                return {
+                    success: false,
+                    redirect: redirectPath,
+                    reason: 'User already authenticated'
+                };
+            } else {
+                console.warn(`🛡️ Loop prevention: User authenticated but doesn't have access to ${redirectPath}. Staying on ${path}.`);
+                return { success: true };
+            }
         }
 
         // Check time restrictions

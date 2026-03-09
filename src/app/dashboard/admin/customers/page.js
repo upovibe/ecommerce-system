@@ -5,7 +5,9 @@ import "@/components/ui/Skeleton.js";
 import "@/components/ui/Toast.js";
 import "@/components/layout/adminLayout/CustomerViewModal.js";
 import "@/components/layout/adminLayout/CustomerEditModal.js";
+import "@/components/layout/adminLayout/CustomerDeleteDialog.js";
 import api from "@/services/api.js";
+import Toast from "@/components/ui/Toast.js";
 
 class CustomersPage extends App {
   constructor() {
@@ -20,7 +22,7 @@ class CustomersPage extends App {
       if (e?.detail?.row?.id != null) this.handleEdit(e.detail.row);
     };
     this._onTableDelete = (e) => {
-      if (e?.detail?.row?.id != null) this.handleDelete(e.detail.row.id);
+      if (e?.detail?.row?.id != null) this.handleDelete(e.detail.row);
     };
     this._onTableView = (e) => {
       if (e?.detail?.row?.id != null) this.handleView(e.detail.row);
@@ -46,6 +48,7 @@ class CustomersPage extends App {
     this.addEventListener("table-delete", this._onTableDelete);
     this.addEventListener("table-view", this._onTableView);
     this.addEventListener("customer-updated", this._onCustomerUpdated);
+    this.addEventListener("customer-deleted", this._onCustomerUpdated);
 
     await this.loadCustomers();
   }
@@ -86,29 +89,12 @@ class CustomersPage extends App {
     }
   }
 
-  async handleDelete(id) {
-    if (
-      !confirm(
-        "Are you sure you want to delete this customer? This action cannot be undone.",
-      )
-    )
-      return;
-
-    try {
-      const token = localStorage.getItem("token");
-      await api.withToken(token).delete(`/users/${id}`);
-      Toast.show({
-        title: "Deleted",
-        message: "Customer account removed",
-        variant: "success",
-      });
-      await this.loadCustomers(true);
-    } catch (e) {
-      Toast.show({
-        title: "Error",
-        message: "Failed to delete customer",
-        variant: "error",
-      });
+  handleDelete(row) {
+    const originalData = this.customers.find((c) => c.id === row.id);
+    const deleteDialog = this.querySelector("customer-delete-dialog");
+    if (deleteDialog) {
+      deleteDialog.setCustomerData(originalData || row);
+      deleteDialog.open();
     }
   }
 
@@ -266,6 +252,7 @@ class CustomersPage extends App {
       
       <customer-view-modal></customer-view-modal>
       <customer-edit-modal></customer-edit-modal>
+      <customer-delete-dialog></customer-delete-dialog>
     `;
   }
 }

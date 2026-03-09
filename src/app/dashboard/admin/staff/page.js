@@ -230,6 +230,8 @@ class StaffPage extends App {
       const rawRole = String(u.role || "").toLowerCase();
       const resolvedRole = roleLabelByValue[rawRole] || "Manager";
 
+      const isSuperAdmin = Number(u.is_super_admin) === 1;
+
       return {
         id: u.id,
         no: i + 1,
@@ -240,6 +242,7 @@ class StaffPage extends App {
         joined: u.created_at
           ? new Date(u.created_at).toLocaleDateString()
           : "-",
+        _hidden_actions: isSuperAdmin ? ["edit", "delete"] : [],
       };
     });
 

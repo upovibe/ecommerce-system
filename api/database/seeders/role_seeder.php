@@ -14,9 +14,9 @@ class RoleSeeder
     {
         echo "🌱 Seeding default roles...\n";
         $roles = [
-            ['admin', 'admin', 'System administrator with full access'],
-            ['staff', 'staff', 'Staff member with management access'],
-            ['customer', 'customer', 'Default role for registered customers']
+            ['Super Admin', 'super_admin', 'System administrator with full access'],
+            ['Manager', 'manager', 'Staff member with management access'],
+            ['Accountant', 'accountant', 'Staff member with financial access']
         ];
         foreach ($roles as $role) {
             $stmt = $this->pdo->prepare('SELECT id FROM roles WHERE slug = ?');

@@ -73,7 +73,7 @@ class AuthController
                 require_once __DIR__ . '/../models/RoleModel.php';
                 $roleModel = new RoleModel($this->adminModel->getPdo());
                 $role = $roleModel->findById($user['role_id']);
-                $user['role'] = $role ? $role['name'] : 'staff';
+                $user['role'] = $role ? $role['slug'] : 'staff';
             } else {
                 $user['role'] = 'customer';
             }

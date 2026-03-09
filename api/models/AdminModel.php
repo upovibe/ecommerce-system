@@ -9,6 +9,7 @@ class AdminModel extends BaseModel
 
     protected static $fillable = [
         'role_id',
+        'is_super_admin',
         'name',
         'email',
         'password',
@@ -25,6 +26,7 @@ class AdminModel extends BaseModel
     ];
 
     protected static $casts = [
+        'is_super_admin' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];

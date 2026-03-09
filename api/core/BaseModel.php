@@ -182,10 +182,15 @@ class BaseModel
                 $data['updated_at'] = date('Y-m-d H:i:s');
             }
 
-            // Filter out empty keys and null values
+            // Filter out empty keys and null values, AND ensure fields are fillable
             $filteredData = [];
             foreach ($data as $key => $value) {
                 if (!empty($key) && $key !== '' && $value !== null) {
+                    // Check if field is fillable
+                    if (!empty(static::$fillable) && !in_array($key, static::$fillable)) {
+                        continue;
+                    }
+
                     // Apply JSON casting if defined
                     if (isset(static::$casts[$key]) && static::$casts[$key] === 'json' && is_array($value)) {
                         $filteredData[$key] = json_encode($value);

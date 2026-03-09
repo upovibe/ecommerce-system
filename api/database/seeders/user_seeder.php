@@ -33,41 +33,50 @@ class UserSeeder
 
     private function seedAdminUser()
     {
-        echo "📝 Seeding admin user...\n";
+        echo "📝 Seeding admin users...\n";
 
-        $stmt = $this->pdo->prepare('SELECT id FROM roles WHERE slug = ?');
-        $stmt->execute(['admin']);
-        $adminRole = $stmt->fetch(PDO::FETCH_ASSOC);
+        $roles = ['super_admin', 'manager', 'accountant'];
+        foreach ($roles as $index => $roleSlug) {
+            $stmt = $this->pdo->prepare('SELECT id FROM roles WHERE slug = ?');
+            $stmt->execute([$roleSlug]);
+            $role = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$adminRole) {
-            echo "❌ Admin role not found.\n";
-            return;
+            if (!$role) {
+                echo "❌ Role '{$roleSlug}' not found.\n";
+                continue;
+            }
+
+            $email = $roleSlug === 'super_admin' ? 'admin@vastcommerce.com' : $roleSlug . '@vastcommerce.com';
+            
+            $stmt = $this->pdo->prepare('SELECT id FROM admins WHERE email = ?');
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                echo "⚠️  Admin user '{$email}' already exists\n";
+                continue;
+            }
+
+            $stmt = $this->pdo->prepare('
+                INSERT INTO admins (role_id, is_super_admin, name, email, password, profile_image, status, created_at, updated_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ');
+
+            $isSuperAdmin = ($roleSlug === 'super_admin') ? 1 : 0;
+            $name = ucwords(str_replace('_', ' ', $roleSlug));
+
+            $stmt->execute([
+                $role['id'],
+                $isSuperAdmin,
+                $name,
+                $email,
+                password_hash('admin123', PASSWORD_DEFAULT),
+                $this->adminAvatars[$index % count($this->adminAvatars)],
+                'active'
+            ]);
+
+            echo "✅ Seeded admin user: {$email} / admin123\n";
         }
-
-        $stmt = $this->pdo->prepare('SELECT id FROM admins WHERE email = ?');
-        $stmt->execute(['admin@vastcommerce.com']);
-        if ($stmt->fetch()) {
-            echo "⚠️  Admin user already exists in admins table\n";
-            return;
-        }
-
-        $stmt = $this->pdo->prepare('
-            INSERT INTO admins (role_id, name, email, password, profile_image, status, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-        ');
-
-        $stmt->execute([
-            $adminRole['id'],
-            'Vast Admin',
-            'admin@vastcommerce.com',
-            password_hash('admin123', PASSWORD_DEFAULT),
-            $this->adminAvatars[0],
-            'active'
-        ]);
-
-        echo "✅ Seeded admin user: admin@vastcommerce.com / admin123\n";
     }
-
+ 
     private function seedCustomerUsers()
     {
         echo "📝 Seeding customer users...\n";

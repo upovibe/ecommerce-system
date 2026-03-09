@@ -297,7 +297,7 @@ class Router {
     if (this.navigationHistory.length > this.maxRedirects) {
       console.error("⛔ Infinite redirect loop detected. Stopping navigation.");
       this.renderComponentError(path, ["Redirect Loop Protection"], [
-        "The system detected too many rapid redirects. Please check your middleware configurations.",
+        { path: "Middleware", error: "The system detected too many rapid redirects. Please check your middleware configurations." }
       ]);
       return;
     }

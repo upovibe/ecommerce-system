@@ -50,7 +50,8 @@ class UserController
             // Require authentication
             require_once __DIR__ . '/../middlewares/AuthMiddleware.php';
             global $pdo;
-            AuthMiddleware::requireAuth($pdo);
+            $currentUser = AuthMiddleware::requireAuth($pdo);
+            $currentUserId = $currentUser['id'];
 
             ob_clean();
 
@@ -59,14 +60,21 @@ class UserController
 
             if ($type === 'admin') {
                 $adminModel = new AdminModel($this->pdo);
-                $users = $adminModel->findAll();
-                foreach ($users as &$u) {
+                $admins = $adminModel->findAll();
+                
+                // Hide current user from admin list
+                $admins = array_filter($admins, function($a) use ($currentUserId) {
+                    return (int)$a['id'] !== (int)$currentUserId;
+                });
+
+                foreach ($admins as &$u) {
                     $u['user_type'] = 'admin';
                     if (isset($u['role_id'])) {
                         $role = $this->roleModel->findById($u['role_id']);
-                        $u['role'] = $role ? $role['name'] : 'Admin';
+                        $u['role'] = $role ? $role['slug'] : 'admin';
                     }
                 }
+                $users = array_values($admins);
             } elseif ($type === 'customer') {
                 $users = $this->userModel->findAll();
                 foreach ($users as &$u) {
@@ -83,15 +91,21 @@ class UserController
 
                 $adminModel = new AdminModel($this->pdo);
                 $admins = $adminModel->findAll();
+                
+                // Hide current user from admin list
+                $admins = array_filter($admins, function($a) use ($currentUserId) {
+                    return (int)$a['id'] !== (int)$currentUserId;
+                });
+
                 foreach ($admins as &$a) {
                     $a['user_type'] = 'admin';
                     if (isset($a['role_id'])) {
                         $role = $this->roleModel->findById($a['role_id']);
-                        $a['role'] = $role ? $role['name'] : 'Admin';
+                        $a['role'] = $role ? $role['slug'] : 'admin';
                     }
                 }
 
-                $users = array_merge($admins, $customers);
+                $users = array_merge(array_values($admins), $customers);
             }
 
             // Hide passwords
@@ -99,7 +113,7 @@ class UserController
                 unset($user['password']);
             }
 
-            echo json_encode(['data' => $users], JSON_PRETTY_PRINT);
+            echo json_encode(['data' => array_values($users)], JSON_PRETTY_PRINT);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()], JSON_PRETTY_PRINT);
@@ -265,6 +279,13 @@ class UserController
                 return;
             }
 
+            // Lock Super Admin from being edited
+            if (isset($existingUser['is_super_admin']) && (int)$existingUser['is_super_admin'] === 1) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Super admin accounts cannot be modified.'], JSON_PRETTY_PRINT);
+                return;
+            }
+
             // Check email uniqueness if email is being updated OR provided
             if (isset($data['email'])) {
                 $emailExists = $model->findByEmailExcept($data['email'], $id);
@@ -371,8 +392,21 @@ class UserController
             // Check if user exists
             $user = $this->userModel->findById($id);
             if (!$user) {
+                // Check if it's an admin
+                $adminModel = new AdminModel($this->pdo);
+                $user = $adminModel->findById($id);
+            }
+            
+            if (!$user) {
                 http_response_code(404);
                 echo json_encode(['error' => 'User not found'], JSON_PRETTY_PRINT);
+                return;
+            }
+
+            // Lock Super Admin from being deleted
+            if (isset($user['is_super_admin']) && (int)$user['is_super_admin'] === 1) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Super admin accounts cannot be deleted.'], JSON_PRETTY_PRINT);
                 return;
             }
 

@@ -13,7 +13,7 @@ export default {
   },
   "dashboard/admin": {
     requireAuth: true,
-    requireRole: "admin",
+    requireRole: ["super_admin", "manager", "accountant", "admin", "staff"],
     redirectTo: "/auth/login",
   },
   profile: {

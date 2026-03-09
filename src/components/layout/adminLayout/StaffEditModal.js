@@ -13,7 +13,7 @@ class StaffEditModal extends HTMLElement {
       name: "",
       email: "",
       password: "",
-      role: "manager",
+      role_id: "",
       status: "active",
     };
     this._listenersBound = false;
@@ -40,7 +40,7 @@ class StaffEditModal extends HTMLElement {
         name: this.staffData.name || "",
         email: this.staffData.email || "",
         password: "",
-        role: String(this.staffData.role || "manager"),
+        role_id: String(this.staffData.role_id || ""),
         status: (this.staffData.status || "active").toLowerCase(),
       };
     }
@@ -72,10 +72,9 @@ class StaffEditModal extends HTMLElement {
       const payload = {
         name: this.formData.name,
         email: this.formData.email,
-        role: this.formData.role,
+        role_id: this.formData.role_id,
         status: this.formData.status,
       };
-
       if ((this.formData.password || "").trim() !== "") {
         payload.password = this.formData.password;
       }
@@ -122,9 +121,9 @@ class StaffEditModal extends HTMLElement {
               id="staff-role-dropdown"
               placeholder="Select Role"
               class="w-full">
-              <ui-option value="super_admin">Super Admin</ui-option>
-              <ui-option value="manager">Manager</ui-option>
-              <ui-option value="accountant">Accountant</ui-option>
+              <ui-option value="1">Super Admin</ui-option>
+              <ui-option value="2">Manager</ui-option>
+              <ui-option value="3">Accountant</ui-option>
             </ui-dropdown>
           </div>
 
@@ -151,14 +150,14 @@ class StaffEditModal extends HTMLElement {
       this.formData.email = e.target.value;
     });
     this.querySelector("#staff-role-dropdown")?.addEventListener("change", (e) => {
-      this.formData.role = e.detail.value;
+      this.formData.role_id = e.detail.value;
     });
     this.querySelector("#staff-password-input")?.addEventListener("input", (e) => {
       this.formData.password = e.target.value;
     });
     setTimeout(() => {
       const roleDropdown = this.querySelector("#staff-role-dropdown");
-      if (roleDropdown) roleDropdown.value = String(this.formData.role || "manager");
+      if (roleDropdown) roleDropdown.value = String(this.formData.role_id || "");
     }, 0);
     this.querySelector("#staff-status-switch")?.addEventListener("change", (e) => {
       this.formData.status = e.detail.checked ? "active" : "inactive";

@@ -1471,7 +1471,7 @@ class Table extends HTMLElement {
                                     </svg>
                                 </button>
                                 ` : ''}
-                                ${(!this.actions.length || this.actions.includes('edit')) ? `
+                                ${(!this.actions.length || this.actions.includes('edit')) && (!row._hidden_actions || !row._hidden_actions.includes('edit')) ? `
                                 <button class="upo-table-action-button edit" onclick="this.closest('ui-table').editRow(${index})" aria-label="Edit item">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -1479,7 +1479,7 @@ class Table extends HTMLElement {
                                     </svg>
                                 </button>
                                 ` : ''}
-                                ${(!this.actions.length || this.actions.includes('delete')) ? `
+                                ${(!this.actions.length || this.actions.includes('delete')) && (!row._hidden_actions || !row._hidden_actions.includes('delete')) ? `
                                 <button class="upo-table-action-button delete" onclick="this.closest('ui-table').deleteRow(${index})" aria-label="Delete item">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="3,6 5,6 21,6"></polyline>
@@ -1840,7 +1840,7 @@ class Table extends HTMLElement {
                                         </svg>
                                     </button>
                                     ` : ''}
-                                    ${(!this.actions.length || this.actions.includes('edit')) ? `
+                                    ${(!this.actions.length || this.actions.includes('edit')) && (!row._hidden_actions || !row._hidden_actions.includes('edit')) ? `
                                     <button class="upo-table-action-button edit" onclick="this.closest('ui-table').editRow(${index})" aria-label="Edit item">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -1848,7 +1848,7 @@ class Table extends HTMLElement {
                                         </svg>
                                     </button>
                                     ` : ''}
-                                    ${(!this.actions.length || this.actions.includes('delete')) ? `
+                                    ${(!this.actions.length || this.actions.includes('delete')) && (!row._hidden_actions || !row._hidden_actions.includes('delete')) ? `
                                     <button class="upo-table-action-button delete" onclick="this.closest('ui-table').deleteRow(${index})" aria-label="Delete item">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="3,6 5,6 21,6"></polyline>

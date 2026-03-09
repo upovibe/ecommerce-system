@@ -1,17 +1,17 @@
 /**
- * StaffDeleteDialog Component
+ * CustomerDeleteDialog Component
  *
- * Confirmation dialog for deleting a staff member.
+ * Confirmation dialog for deleting a customer.
  */
 import "@/components/ui/Dialog.js";
 import "@/components/ui/Avatar.js";
 import Toast from "@/components/ui/Toast.js";
 import api from "@/services/api.js";
 
-class StaffDeleteDialog extends HTMLElement {
+class CustomerDeleteDialog extends HTMLElement {
   constructor() {
     super();
-    this.staff = null;
+    this.customer = null;
     this._listenersBound = false;
   }
 
@@ -29,8 +29,8 @@ class StaffDeleteDialog extends HTMLElement {
     this.setupEventListeners();
   }
 
-  setStaffData(staff) {
-    this.staff = staff || null;
+  setCustomerData(customer) {
+    this.customer = customer || null;
     this.render();
     this.setupEventListeners();
   }
@@ -72,47 +72,40 @@ class StaffDeleteDialog extends HTMLElement {
 
   onConfirm = async () => {
     try {
-      if (!this.staff?.id) return;
+      if (!this.customer?.id) return;
 
-      await api.delete(`/users/${this.staff.id}`);
+      await api.delete(`/users/${this.customer.id}`);
 
       Toast.show({
         title: "Deleted",
-        message: "Staff member removed.",
+        message: "Customer account removed.",
         variant: "success",
       });
 
-      this.dispatchEvent(new CustomEvent("staff-deleted", { bubbles: true }));
+      this.dispatchEvent(new CustomEvent("customer-deleted", { bubbles: true }));
       this.close();
     } catch (error) {
       console.error(error);
       Toast.show({
         title: "Error",
-        message: error.response?.data?.error || "Failed to delete staff member",
+        message: error.response?.data?.error || "Failed to delete customer",
         variant: "error",
       });
     }
   };
 
   render() {
-    const user = this.staff || {};
-    const roleLabelByValue = {
-      super_admin: "Super Admin",
-      manager: "Manager",
-      accountant: "Accountant",
-    };
-    const rawRole = String(user.role || "").toLowerCase();
-    const resolvedRole = roleLabelByValue[rawRole] || "Staff";
+    const user = this.customer || {};
 
     this.innerHTML = `
-            <ui-dialog ${this.hasAttribute("open") ? "open" : ""} title="Delete Staff Member" variant="danger" confirm-label="Delete">
+            <ui-dialog ${this.hasAttribute("open") ? "open" : ""} title="Delete Customer" variant="danger" confirm-label="Delete">
                 <div slot="content" class="space-y-6 py-2">
-                    <p class="text-sm text-slate-600 px-1">Are you sure you want to remove this staff member? This action <span class="font-bold text-red-600 underline underline-offset-2 decoration-2">cannot be undone</span>.</p>
+                    <p class="text-sm text-slate-600 px-1">Are you sure you want to delete this customer account? All order history will be <span class="font-bold text-red-600 underline underline-offset-2 decoration-2">permanently removed</span>.</p>
                     
                     <div class="flex items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100 ring-1 ring-slate-200/50 shadow-sm transition-all duration-300">
                         <div class="flex-shrink-0">
                             <ui-avatar 
-                                name="${user.name || "S"}" 
+                                name="${user.name || "C"}" 
                                 src="${user.profile_image ? this.getImageUrl(user.profile_image) : ""}" 
                                 size="xl" 
                                 class="shadow-md ring-4 ring-white">
@@ -120,24 +113,24 @@ class StaffDeleteDialog extends HTMLElement {
                         </div>
                         <div class="ml-5 min-w-0 flex-1">
                             <div class="flex items-center justify-between gap-3 overflow-hidden">
-                                <h3 class="text-lg font-bold text-slate-900 truncate tracking-tight leading-none mb-1">${user.name || "Unknown"}</h3>
-                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-red-100 text-red-700 border border-red-200 shadow-sm flex-shrink-0">
-                                    ${resolvedRole}
+                                <h3 class="text-lg font-bold text-slate-900 truncate tracking-tight leading-none mb-1">${user.name || "Unknown Customer"}</h3>
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-slate-100 text-slate-700 border border-slate-200 shadow-sm flex-shrink-0">
+                                    Customer
                                 </span>
                             </div>
-                            <p class="text-sm text-slate-500 truncate font-medium mb-1.5">${user.email || "No email provided"}</p>
+                            <p class="text-sm text-slate-500 truncate font-medium mb-1.5">${user.email || "No email available"}</p>
                             <div class="flex items-center text-[11px] text-slate-400 font-bold uppercase tracking-wide italic">
-                                <i class="fas fa-user-lock mr-1.5 text-red-400 animate-pulse"></i>
-                                REVOKING ALL ACCESS
+                                <i class="fas fa-user-slash mr-1.5 text-red-400 animate-pulse"></i>
+                                DEACTIVATING ACCOUNT
                             </div>
                         </div>
                     </div>
 
                     <div class="p-3 bg-red-50/50 rounded-xl border border-red-100 text-[12px] text-red-700 flex items-start gap-3 shadow-sm">
                         <div class="size-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <i class="fas fa-exclamation-triangle text-[10px]"></i>
+                          <i class="fas fa-info-circle text-[10px]"></i>
                         </div>
-                        <span class="leading-relaxed">Warning: All administrative capabilities, session history, and access keys will be purged immediately.</span>
+                        <span class="leading-relaxed">This user will immediately lose access to their shopping cart, wishlists, and order tracking.</span>
                     </div>
                 </div>
             </ui-dialog>
@@ -145,4 +138,4 @@ class StaffDeleteDialog extends HTMLElement {
   }
 }
 
-customElements.define("staff-delete-dialog", StaffDeleteDialog);
+customElements.define("customer-delete-dialog", CustomerDeleteDialog);
