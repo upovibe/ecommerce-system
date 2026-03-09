@@ -64,6 +64,13 @@ class StaffPage extends App {
     try {
       const res = await api.get("/users?type=admin");
       this.staff = res?.data?.data ?? [];
+      if (force) {
+        Toast.show({
+          title: "Refreshed",
+          message: "Staff list updated successfully.",
+          variant: "success",
+        });
+      }
     } catch (e) {
       Toast.show({
         title: "Error",

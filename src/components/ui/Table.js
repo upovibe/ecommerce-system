@@ -1618,14 +1618,7 @@ class Table extends HTMLElement {
     handleRefreshClick(event) {
         event.preventDefault();
         event.stopPropagation();
-        console.log('Refresh button clicked!'); // Debug log
-        console.log('this:', this); // Debug log
-        console.log('this.refresh:', this.refresh); // Debug log
-        if (typeof this.refresh === 'function') {
-            this.refresh();
-        } else {
-            console.error('this.refresh is not a function!');
-        }
+        this.resetTable();
     }
 
     /**

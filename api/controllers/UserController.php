@@ -253,7 +253,8 @@ class UserController
             // Add role information
             if (isset($user['role_id'])) {
                 $role = $this->roleModel->findById($user['role_id']);
-                $user['role'] = $role ? $role['name'] : null;
+                $user['role'] = $role ? $role['slug'] : 'staff';
+                $user['role_name'] = $role ? $role['name'] : 'Staff';
             }
 
             echo json_encode($user, JSON_PRETTY_PRINT);
@@ -445,7 +446,8 @@ class UserController
             // Add role information
             if (isset($user['role_id'])) {
                 $role = $this->roleModel->findById($user['role_id']);
-                $user['role'] = $role ? $role['name'] : null;
+                $user['role'] = $role ? $role['slug'] : 'staff';
+                $user['role_name'] = $role ? $role['name'] : 'Staff';
             }
 
             echo json_encode($user, JSON_PRETTY_PRINT);

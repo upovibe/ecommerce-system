@@ -15,7 +15,8 @@ class RoleMiddleware extends Middleware
         $middleware = new self($pdo);
         $user = $middleware->getCurrentUser();
 
-        if (!$user || $user['user_type'] !== 'admin' || $user['role'] !== 'admin') {
+        $adminRoles = ['admin', 'super_admin', 'manager', 'accountant'];
+        if (!$user || $user['user_type'] !== 'admin' || !in_array($user['role'], $adminRoles)) {
             $middleware->sendErrorResponse('Forbidden: Admin access only', 403);
         }
 

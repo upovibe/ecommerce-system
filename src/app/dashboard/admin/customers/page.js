@@ -59,6 +59,13 @@ class CustomersPage extends App {
     try {
       const res = await api.get("/users?type=customer");
       this.customers = res?.data?.data ?? [];
+      if (force) {
+        Toast.show({
+          title: "Refreshed",
+          message: "Customer list updated successfully.",
+          variant: "success",
+        });
+      }
     } catch (e) {
       Toast.show({
         title: "Error",

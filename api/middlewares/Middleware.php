@@ -71,9 +71,11 @@ abstract class Middleware
             require_once __DIR__ . '/../models/RoleModel.php';
             $roleModel = new RoleModel($this->pdo);
             $role = $roleModel->findById($user['role_id']);
-            $user['role'] = $role ? $role['name'] : 'staff';
+            $user['role'] = $role ? $role['slug'] : 'staff';
+            $user['role_name'] = $role ? $role['name'] : 'Staff';
         } else {
             $user['role'] = 'customer';
+            $user['role_name'] = 'Customer';
         }
 
         $user['user_type'] = $userType;

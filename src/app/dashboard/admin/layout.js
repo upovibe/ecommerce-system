@@ -407,7 +407,7 @@ class AdminLayout extends App {
                     <div class="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer">
                       <div class="text-right hidden sm:block">
                         <p class="text-xs font-black text-slate-900 leading-none">${userName}</p>
-                        <p class="text-[10px] text-indigo-600 font-semibold leading-none mt-0.5">Super Admin</p>
+                        <p class="text-[10px] text-indigo-600 font-semibold leading-none mt-0.5">${user.role_name || "Staff"}</p>
                       </div>
                       <ui-avatar
                         name="${userName}"
