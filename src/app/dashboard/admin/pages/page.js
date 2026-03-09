@@ -83,8 +83,7 @@ class CloudPagesPage extends App {
     const original = this.pages.find((p) => p.id === row.id);
     const modal = this.querySelector("page-update-modal");
     if (modal) {
-      modal.setPageData(original || row);
-      modal.open();
+      modal.open(original || row);
     }
   }
 
@@ -112,6 +111,16 @@ class CloudPagesPage extends App {
     const active = pages.filter((p) => Number(p.is_active) === 1).length;
     const draft = total - active;
     return { total, active, draft };
+  }
+
+  getContentPreview(content) {
+    if (!content) return "-";
+    const plain = String(content)
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!plain) return "-";
+    return plain.length > 90 ? `${plain.slice(0, 90)}...` : plain;
   }
 
   renderHeader() {
@@ -183,16 +192,20 @@ class CloudPagesPage extends App {
     const tableData = (this.pages || []).map((p, i) => ({
       id: p.id,
       no: i + 1,
+      name: p.name || "-",
       title: p.title || "Untitled",
       slug: `/${p.slug || ""}`,
+      content: this.getContentPreview(p.content),
       status: Number(p.is_active) === 1 ? "Live" : "Draft",
       updated: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "-",
     }));
 
     const columns = [
       { key: "no", label: "No.", html: false },
+      { key: "name", label: "Name", html: false },
       { key: "title", label: "Title", html: false },
       { key: "slug", label: "URL Path", html: false },
+      { key: "content", label: "Content", html: false },
       { key: "status", label: "Status", html: false },
       { key: "updated", label: "Updated", html: false },
     ];
@@ -210,7 +223,7 @@ class CloudPagesPage extends App {
             columns="${safeCols}"
             sortable
             searchable
-            search-placeholder="Search by title or path..."
+            search-placeholder="Search by name, title, or path..."
             pagination
             page-size="15"
             action

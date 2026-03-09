@@ -14,10 +14,13 @@ class Migration_20260302000006createpagestable
         $this->pdo->exec("
             CREATE TABLE IF NOT EXISTS pages (
                 id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 slug VARCHAR(255) UNIQUE NOT NULL,
                 content LONGTEXT NULL,
                 meta_info JSON NULL,
+                images JSON NULL,
+                banner_image JSON NULL,
                 is_active BOOLEAN DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

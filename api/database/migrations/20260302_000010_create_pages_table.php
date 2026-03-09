@@ -10,6 +10,7 @@ class Migration_20260302000010createpagestable
     {
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS pages (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
             title VARCHAR(255) NOT NULL,
             slug VARCHAR(255) UNIQUE NOT NULL,
             content LONGTEXT NULL,

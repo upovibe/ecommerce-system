@@ -8,6 +8,7 @@ class PageModel extends BaseModel
     protected static $table = 'pages';
 
     protected static $fillable = [
+        'name',
         'title',
         'slug',
         'content',

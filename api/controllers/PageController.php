@@ -92,43 +92,8 @@ class PageController
 
             // Handle banner upload if present
             $bannerPaths = [];
-            if (!empty($_FILES)) {
-                // Handle different banner file structures
-                $bannerFiles = [];
-
-                // Check for indexed banner files (banner[0], banner[1], etc.)
-                $indexedBanners = [];
-                foreach ($_FILES as $key => $file) {
-                    if (preg_match('/^banner\[(\d+)\]$/', $key, $matches)) {
-                        $index = $matches[1];
-                        $indexedBanners[$index] = $file;
-                    }
-                }
-
-                if (!empty($indexedBanners)) {
-                    // Reconstruct the array structure from indexed files
-                    $bannerFiles = [
-                        'name' => [],
-                        'type' => [],
-                        'tmp_name' => [],
-                        'error' => [],
-                        'size' => []
-                    ];
-
-                    ksort($indexedBanners); // Sort by index
-                    foreach ($indexedBanners as $index => $file) {
-                        $bannerFiles['name'][] = $file['name'];
-                        $bannerFiles['type'][] = $file['type'];
-                        $bannerFiles['tmp_name'][] = $file['tmp_name'];
-                        $bannerFiles['error'][] = $file['error'];
-                        $bannerFiles['size'][] = $file['size'];
-                    }
-                } else {
-                    // Handle standard banner files
-                    $bannerFiles = $_FILES['banner'] ?? $_FILES['banner[]'] ?? [];
-                }
-
-                // Use the uploadPageBanners function which handles multiple files properly
+            $bannerFiles = $this->normalizeUploadedFiles('banner');
+            if (!empty($bannerFiles)) {
                 $bannerPaths = uploadPageBanners($bannerFiles);
             }
 
@@ -138,8 +103,9 @@ class PageController
 
             // Handle gallery images upload if present
             $galleryPaths = [];
-            if (!empty($_FILES['images'])) {
-                $galleryPaths = uploadPageBanners($_FILES['images']);
+            $imageFiles = $this->normalizeUploadedFiles('images');
+            if (!empty($imageFiles)) {
+                $galleryPaths = uploadPageBanners($imageFiles);
             }
 
             if (!empty($galleryPaths)) {
@@ -348,44 +314,8 @@ class PageController
 
             // Check for new file uploads
             $newBannerPaths = [];
-            if (!empty($_FILES)) {
-
-                // Handle different banner file structures
-                $bannerFiles = [];
-
-                // Check for indexed banner files (banner[0], banner[1], etc.)
-                $indexedBanners = [];
-                foreach ($_FILES as $key => $file) {
-                    if (preg_match('/^banner\[(\d+)\]$/', $key, $matches)) {
-                        $index = $matches[1];
-                        $indexedBanners[$index] = $file;
-                    }
-                }
-
-                if (!empty($indexedBanners)) {
-                    // Reconstruct the array structure from indexed files
-                    $bannerFiles = [
-                        'name' => [],
-                        'type' => [],
-                        'tmp_name' => [],
-                        'error' => [],
-                        'size' => []
-                    ];
-
-                    ksort($indexedBanners); // Sort by index
-                    foreach ($indexedBanners as $index => $file) {
-                        $bannerFiles['name'][] = $file['name'];
-                        $bannerFiles['type'][] = $file['type'];
-                        $bannerFiles['tmp_name'][] = $file['tmp_name'];
-                        $bannerFiles['error'][] = $file['error'];
-                        $bannerFiles['size'][] = $file['size'];
-                    }
-                } else {
-                    // Handle standard banner files
-                    $bannerFiles = $_FILES['banner'] ?? $_FILES['banner[]'] ?? [];
-                }
-
-                // Use the uploadPageBanners function which handles multiple files properly
+            $bannerFiles = $this->normalizeUploadedFiles('banner');
+            if (!empty($bannerFiles)) {
                 $newBannerPaths = uploadPageBanners($bannerFiles);
             }
 
@@ -409,8 +339,9 @@ class PageController
             }
 
             $newGalleryPaths = [];
-            if (!empty($_FILES['images'])) {
-                $newGalleryPaths = uploadPageBanners($_FILES['images']);
+            $imageFiles = $this->normalizeUploadedFiles('images');
+            if (!empty($imageFiles)) {
+                $newGalleryPaths = uploadPageBanners($imageFiles);
             }
 
             if (!empty($newGalleryPaths)) {
@@ -548,6 +479,51 @@ class PageController
                 'message' => 'Error retrieving active pages: ' . $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Normalize file fields from multipart requests.
+     * Supports: field, field[], and indexed keys like field[0], field[1], ...
+     */
+    private function normalizeUploadedFiles($field)
+    {
+        if (isset($_FILES[$field])) {
+            return $_FILES[$field];
+        }
+
+        if (isset($_FILES[$field . '[]'])) {
+            return $_FILES[$field . '[]'];
+        }
+
+        $indexed = [];
+        foreach ($_FILES as $key => $file) {
+            if (preg_match('/^' . preg_quote($field, '/') . '\[(\d+)\]$/', $key, $matches)) {
+                $indexed[(int) $matches[1]] = $file;
+            }
+        }
+
+        if (empty($indexed)) {
+            return [];
+        }
+
+        ksort($indexed);
+        $normalized = [
+            'name' => [],
+            'type' => [],
+            'tmp_name' => [],
+            'error' => [],
+            'size' => []
+        ];
+
+        foreach ($indexed as $file) {
+            $normalized['name'][] = $file['name'] ?? null;
+            $normalized['type'][] = $file['type'] ?? null;
+            $normalized['tmp_name'][] = $file['tmp_name'] ?? null;
+            $normalized['error'][] = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+            $normalized['size'][] = $file['size'] ?? 0;
+        }
+
+        return $normalized;
     }
 
     /**
