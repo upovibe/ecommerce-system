@@ -15,6 +15,7 @@ class AdminLayout extends App {
     this.logoUrl = null;
     this.brandName = "VastCommerce";
     this.collapsedGroups = new Set();
+    this._listenersAttached = false;
 
     // Default colours while loading
     this.set("primary_color", "#4f46e5");
@@ -86,6 +87,9 @@ class AdminLayout extends App {
   }
 
   setupEventListeners() {
+    if (this._listenersAttached) return;
+    this._listenersAttached = true;
+
     this.addEventListener("click", (e) => {
       console.log("🖱️ Layout General Click:", e.target);
       if (e.target.closest("[data-sidebar-toggle]")) {
@@ -357,7 +361,7 @@ class AdminLayout extends App {
         @media (min-width: 1280px) { [data-sidebar-overlay] { display: none; } }
       </style>
 
-      <div data-layout-container>
+      <div data-layout-container class="${this.sidebarOpen ? "sidebar-open" : ""}">
         <!-- Overlay -->
         <div data-sidebar-overlay data-sidebar-toggle></div>
 

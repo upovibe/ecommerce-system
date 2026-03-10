@@ -227,8 +227,7 @@ class CloudPagesPage extends App {
             pagination
             page-size="15"
             action
-            actions="view,edit,delete"
-            addable
+            actions="view,edit"
             refresh
             print
             bordered

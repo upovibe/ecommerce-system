@@ -30,6 +30,20 @@ class Router {
 
     public static function dispatch($uri, $method, $pdo) {
         $method = strtoupper($method);
+
+        // Method override: support _method field in POST body (for multipart/form-data uploads)
+        if ($method === 'POST') {
+            $override = null;
+            if (!empty($_POST['_method'])) {
+                $override = strtoupper($_POST['_method']);
+            } elseif (!empty($_REQUEST['_method'])) {
+                $override = strtoupper($_REQUEST['_method']);
+            }
+            if ($override && in_array($override, ['PUT', 'PATCH', 'DELETE'])) {
+                $method = $override;
+            }
+        }
+
         foreach (self::$routes as $route) {
             if ($route['method'] === $method) {
                 $params = self::matchRoute($route['path'], $uri);

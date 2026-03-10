@@ -326,14 +326,16 @@ class UploadCore {
     }
 
     /**
-     * Create upload directory
+     * Create upload directory (always relative to api/ root)
      */
     private static function createUploadDirectory($path) {
-        $fullPath = rtrim($path, '/') . '/';
+        // Anchor to the api/ directory so path never depends on cwd
+        $apiRoot = rtrim(dirname(dirname(__FILE__)), DIRECTORY_SEPARATOR); // …/api
+        $fullPath = $apiRoot . DIRECTORY_SEPARATOR . rtrim($path, '/\\') . DIRECTORY_SEPARATOR;
         
         if (!is_dir($fullPath)) {
             if (!mkdir($fullPath, 0755, true)) {
-                throw new Exception('Failed to create upload directory');
+                throw new Exception('Failed to create upload directory: ' . $fullPath);
             }
         }
         
@@ -384,7 +386,7 @@ class UploadCore {
         $result = [
             'success' => true,
             'message' => 'Image uploaded successfully',
-            'filepath' => $filepath,
+            'filepath' => self::getRelativePath($filepath),
             'filename' => $filename,
             'url' => self::getFileUrl($filepath),
             'size' => $file['size'],
@@ -599,14 +601,23 @@ class UploadCore {
     }
 
     /**
-     * Get file URL
+     * Get relative file path (relative to api/ root) for storage in DB
+     */
+    private static function getRelativePath($absolutePath) {
+        $apiRoot = rtrim(dirname(dirname(__FILE__)), DIRECTORY_SEPARATOR);
+        $rel = str_replace($apiRoot . DIRECTORY_SEPARATOR, '', $absolutePath);
+        return str_replace('\\', '/', $rel);
+    }
+
+    /**
+     * Get file URL (served via /api/uploads/...)
      */
     private static function getFileUrl($filepath) {
-        $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-        $scriptDir = dirname($_SERVER['SCRIPT_NAME']);
-        $relativePath = str_replace($_SERVER['DOCUMENT_ROOT'], '', realpath($filepath));
-        
-        return $baseUrl . $relativePath;
+        // Convert absolute path or relative path to a clean URL
+        $rel = self::getRelativePath($filepath);
+        $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+            . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        return $baseUrl . '/api/' . ltrim($rel, '/');
     }
 
     /**
