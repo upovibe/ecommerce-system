@@ -119,9 +119,27 @@ class ProductsPage extends App {
       const cat = m.querySelector("#create-category");
       const brand = m.querySelector("#create-brand");
       const material = m.querySelector("#create-material");
+      const active = m.querySelector("#create-active");
+      const name = m.querySelector("#create-name");
+      const type = m.querySelector("#create-type");
+      const price = m.querySelector("#create-price");
+      const image = m.querySelector("#create-image");
+      const desc = m.querySelector("#create-description");
       if (cat) cat.value = "";
       if (brand) brand.value = "";
       if (material) material.value = "";
+      if (name) name.value = "";
+      if (type) type.value = "physical";
+      if (price) price.value = "";
+      if (image) image.value = "";
+      if (desc?.setValue) desc.setValue("");
+      else if (desc) desc.value = "";
+      if (active) {
+        active.checked = true;
+        active.setAttribute("checked", "");
+      }
+      const variants = m.querySelector("#variant-list");
+      if (variants) variants.innerHTML = "";
       m.open();
     }
   }
@@ -137,13 +155,15 @@ class ProductsPage extends App {
     const category_id = form.querySelector("#create-category")?.value;
     const type        = form.querySelector("#create-type")?.value || "physical";
     const base_price  = parseFloat(form.querySelector("#create-price")?.value) || 0;
-    const description = form.querySelector("#create-description")?.value;
+    const descEl      = form.querySelector("#create-description");
+    const description = descEl?.getValue ? descEl.getValue() : descEl?.value;
     const image       = form.querySelector("#create-image")?.value;
     const brand_id    = form.querySelector("#create-brand")?.value;
     const material_id = form.querySelector("#create-material")?.value;
     const is_active   = form.querySelector("#create-active")?.checked ? 1 : 0;
     const brandName   = this.getBrandById(brand_id)?.name || "";
     const materialName = this.getMaterialById(material_id)?.name || "";
+    const variants    = this.collectVariants(form.querySelector("#variant-list"));
     if (!name) { Toast.show({ title: "Required", message: "Product name is required", variant: "error" }); return; }
     if (!category_id) { Toast.show({ title: "Required", message: "Category is required", variant: "error" }); return; }
     if (saveBtn) saveBtn.textContent = "Saving...";
@@ -160,6 +180,7 @@ class ProductsPage extends App {
         material_id,
         material: materialName,
         is_active,
+        variants,
       };
       if (!brand_id) {
         delete payload.brand_id;
@@ -180,6 +201,57 @@ class ProductsPage extends App {
     }
   }
 
+  addVariantRow() {
+    const list = this.querySelector("#variant-list");
+    if (!list) return;
+    const row = document.createElement("div");
+    row.className = "grid grid-cols-1 sm:grid-cols-4 gap-3 items-end variant-row";
+    row.innerHTML = `
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">SKU</label>
+        <ui-input data-field="sku" placeholder="e.g. SKU-001" class="w-full"></ui-input>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Label</label>
+        <ui-input data-field="label" placeholder="e.g. Default" class="w-full"></ui-input>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Price Override</label>
+        <ui-input data-field="price_override" type="number" step="0.01" min="0" placeholder="0.00" class="w-full"></ui-input>
+      </div>
+      <div class="flex items-end gap-2">
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Stock</label>
+          <ui-input data-field="stock" type="number" step="1" min="0" placeholder="0" class="w-full"></ui-input>
+        </div>
+        <button type="button" onclick="this.closest('app-products-page').removeVariantRow(this)" class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition">Remove</button>
+      </div>
+    `;
+    list.appendChild(row);
+  }
+
+  removeVariantRow(button) {
+    const row = button?.closest(".variant-row");
+    if (row) row.remove();
+  }
+
+  collectVariants(list) {
+    if (!list) return [];
+    const rows = Array.from(list.querySelectorAll(".variant-row"));
+    const variants = rows.map((row) => {
+      const skuEl = row.querySelector('[data-field="sku"]');
+      const labelEl = row.querySelector('[data-field="label"]');
+      const priceEl = row.querySelector('[data-field="price_override"]');
+      const stockEl = row.querySelector('[data-field="stock"]');
+      const sku = skuEl?.value?.trim();
+      const label = labelEl?.value?.trim();
+      const price_override = priceEl?.value ? parseFloat(priceEl.value) : null;
+      const stock = stockEl?.value ? parseInt(stockEl.value, 10) : 0;
+      return { sku, label, price_override, stock };
+    });
+    return variants.filter((v) => v.sku || v.label || v.price_override || v.stock);
+  }
+
   // ── EDIT ────────────────────────────────────────────
   openEditModal(product) {
     this.selectedProduct = product;
@@ -189,14 +261,23 @@ class ProductsPage extends App {
     m.querySelector("#edit-category").value    = product.category_id || "";
     m.querySelector("#edit-type").value        = product.type || "physical";
     m.querySelector("#edit-price").value       = product.base_price || "";
-    m.querySelector("#edit-description").value = product.description || "";
+    const editDesc = m.querySelector("#edit-description");
+    if (editDesc?.setValue) {
+      editDesc.setValue(product.description || "");
+    } else if (editDesc) {
+      editDesc.value = product.description || "";
+    }
     m.querySelector("#edit-image").value       = product.metadata?.image || "";
     const brandId = product.metadata?.brand_id || this.findBrandIdByName(product.metadata?.brand);
     const materialId = product.metadata?.material_id || this.findMaterialIdByName(product.metadata?.material);
     m.querySelector("#edit-brand").value       = brandId || "";
     m.querySelector("#edit-material").value    = materialId || "";
     const sw = m.querySelector("#edit-active");
-    if (sw) sw.checked = !!product.is_active;
+    if (sw) {
+      sw.checked = !!product.is_active;
+      if (sw.checked) sw.setAttribute("checked", "");
+      else sw.removeAttribute("checked");
+    }
     m.open();
   }
   closeEditModal() {
@@ -211,7 +292,8 @@ class ProductsPage extends App {
     const category_id = m.querySelector("#edit-category")?.value;
     const type        = m.querySelector("#edit-type")?.value;
     const base_price  = parseFloat(m.querySelector("#edit-price")?.value) || 0;
-    const description = m.querySelector("#edit-description")?.value;
+    const descEl      = m.querySelector("#edit-description");
+    const description = descEl?.getValue ? descEl.getValue() : descEl?.value;
     const image       = m.querySelector("#edit-image")?.value;
     const brand_id    = m.querySelector("#edit-brand")?.value;
     const material_id = m.querySelector("#edit-material")?.value;
@@ -420,7 +502,7 @@ class ProductsPage extends App {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
-              <input id="create-name" name="name" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" placeholder="e.g. Classic White T-Shirt" required>
+              <ui-input id="create-name" placeholder="e.g. Classic White T-Shirt" class="w-full"></ui-input>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
@@ -430,15 +512,15 @@ class ProductsPage extends App {
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Type</label>
-              <select id="create-type" name="type" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="physical">Physical</option>
-                <option value="digital">Digital</option>
-                <option value="service">Service</option>
-              </select>
+              <ui-dropdown id="create-type" placeholder="Select type..." class="w-full">
+                <ui-option value="physical">Physical</ui-option>
+                <ui-option value="digital">Digital</ui-option>
+                <ui-option value="service">Service</ui-option>
+              </ui-dropdown>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Base Price (USD)</label>
-              <input id="create-price" name="base_price" type="number" min="0" step="0.01" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" placeholder="0.00">
+              <ui-input id="create-price" type="number" min="0" step="0.01" placeholder="0.00" class="w-full"></ui-input>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
@@ -454,15 +536,22 @@ class ProductsPage extends App {
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Image URL</label>
-              <input id="create-image" name="image" type="url" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" placeholder="https://...">
+              <ui-input id="create-image" type="url" placeholder="https://..." class="w-full"></ui-input>
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <textarea id="create-description" name="description" rows="3" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" placeholder="Product description..."></textarea>
+              <ui-textarea id="create-description" rows="3" placeholder="Product description..." class="w-full"></ui-textarea>
             </div>
-            <div class="sm:col-span-2 flex items-center gap-3 mt-2">
-              <input type="checkbox" id="create-active" class="w-4 h-4 rounded text-indigo-600" checked>
-              <label for="create-active" class="text-sm font-medium text-slate-700">Active (visible on store)</label>
+            <div class="sm:col-span-2">
+              <div class="flex items-center justify-between">
+                <label class="block text-sm font-medium text-slate-700">Variants</label>
+                <button type="button" onclick="this.closest('app-products-page').addVariantRow()" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition">Add Variant</button>
+              </div>
+              <div id="variant-list" class="mt-3 space-y-3"></div>
+              <p class="text-xs text-slate-400 mt-2">Leave empty to auto-create a default variant.</p>
+            </div>
+            <div class="sm:col-span-2 mt-2">
+              <ui-switch id="create-active" label="Active (visible on store)" checked></ui-switch>
             </div>
           </div>
         </form>
@@ -479,7 +568,7 @@ class ProductsPage extends App {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
-              <input id="edit-name" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <ui-input id="edit-name" class="w-full"></ui-input>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
@@ -489,15 +578,15 @@ class ProductsPage extends App {
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Type</label>
-              <select id="edit-type" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="physical">Physical</option>
-                <option value="digital">Digital</option>
-                <option value="service">Service</option>
-              </select>
+              <ui-dropdown id="edit-type" placeholder="Select type..." class="w-full">
+                <ui-option value="physical">Physical</ui-option>
+                <ui-option value="digital">Digital</ui-option>
+                <ui-option value="service">Service</ui-option>
+              </ui-dropdown>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Base Price (USD)</label>
-              <input id="edit-price" type="number" min="0" step="0.01" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <ui-input id="edit-price" type="number" min="0" step="0.01" class="w-full"></ui-input>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
@@ -513,15 +602,14 @@ class ProductsPage extends App {
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Image URL</label>
-              <input id="edit-image" type="url" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <ui-input id="edit-image" type="url" class="w-full"></ui-input>
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <textarea id="edit-description" rows="3" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"></textarea>
+              <ui-textarea id="edit-description" rows="3" class="w-full"></ui-textarea>
             </div>
-            <div class="sm:col-span-2 flex items-center gap-3 mt-2">
-              <input type="checkbox" id="edit-active" class="w-4 h-4 rounded text-indigo-600">
-              <label for="edit-active" class="text-sm font-medium text-slate-700">Active (visible on store)</label>
+            <div class="sm:col-span-2 mt-2">
+              <ui-switch id="edit-active" label="Active (visible on store)"></ui-switch>
             </div>
           </div>
         </div>
