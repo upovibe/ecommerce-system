@@ -188,9 +188,14 @@ class AdminLayout extends App {
         group: "Management",
         items: [
           {
-            label: "Inventory",
-            icon: "fas fa-shopping-basket",
+            label: "Products",
+            icon: "fas fa-box",
             href: "/dashboard/admin/products",
+          },
+          {
+            label: "Inventory",
+            icon: "fas fa-cubes",
+            href: "/dashboard/admin/inventory",
           },
           {
             label: "Orders",
@@ -201,6 +206,16 @@ class AdminLayout extends App {
             label: "Categories",
             icon: "fas fa-layer-group",
             href: "/dashboard/admin/categories",
+          },
+          {
+            label: "Brands",
+            icon: "fas fa-tags",
+            href: "/dashboard/admin/brands",
+          },
+          {
+            label: "Materials",
+            icon: "fas fa-feather",
+            href: "/dashboard/admin/materials",
           },
         ],
       },
@@ -251,9 +266,12 @@ class AdminLayout extends App {
     const map = {
       admin: "Overview",
       overview: "Overview",
-      products: "Inventory",
+      products: "Products",
+      inventory: "Inventory",
       orders: "Orders",
       categories: "Categories",
+      brands: "Brands",
+      materials: "Materials",
       users: "Users",
       staff: "Staff",
       customers: "Customers",

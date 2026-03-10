@@ -140,21 +140,25 @@ class CategoriesPage extends App {
     }
 
     const baseUrl = window.location.origin;
+    if (path.startsWith("/api/")) {
+      return baseUrl + path;
+    }
     if (path.startsWith("/")) {
       return baseUrl + path;
     }
 
-    // Uploaded files are served from the web root /uploads path.
+    // All stored uploads paths (uploads/categories/, uploads/profiles/ etc.)
+    // are served via the /api/ route
     if (path.startsWith("uploads/")) {
-      return `${baseUrl}/${path}`;
+      return `${baseUrl}/api/${path}`;
     }
 
     // Category uploads may occasionally store only filename.
     if (!path.includes("/")) {
-      return `${baseUrl}/uploads/categories/${path}`;
+      return `${baseUrl}/api/uploads/categories/${path}`;
     }
 
-    // Fallback for non-upload relative API paths.
+    // Generic fallback
     return `${baseUrl}/api/${path}`;
   }
 

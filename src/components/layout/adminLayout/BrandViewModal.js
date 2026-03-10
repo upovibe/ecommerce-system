@@ -1,9 +1,9 @@
 import "@/components/ui/Modal.js";
 
-class CategoryViewModal extends HTMLElement {
+class BrandViewModal extends HTMLElement {
   constructor() {
     super();
-    this.categoryData = null;
+    this.brandData = null;
     this._listenersBound = false;
   }
 
@@ -21,8 +21,8 @@ class CategoryViewModal extends HTMLElement {
     this.setupEventListeners();
   }
 
-  setCategoryData(category) {
-    this.categoryData = category || null;
+  setBrandData(brand) {
+    this.brandData = brand || null;
     this.render();
     this.setupEventListeners();
   }
@@ -60,54 +60,41 @@ class CategoryViewModal extends HTMLElement {
     }
 
     if (!path.includes("/")) {
-      return `${baseUrl}/api/uploads/categories/${path}`;
+      return `${baseUrl}/api/uploads/brands/${path}`;
     }
 
     return `${baseUrl}/api/${path}`;
   }
 
   render() {
-    const cat = this.categoryData || {};
-    const isMainCategory = !cat.parent_id;
-    const updatedDate = cat.updated_at
-      ? new Date(cat.updated_at).toLocaleString()
+    const brand = this.brandData || {};
+    const updatedDate = brand.updated_at
+      ? new Date(brand.updated_at).toLocaleString()
       : "-";
 
     this.innerHTML = `
       <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="md" close-button="true">
-        <div slot="title">Category Details</div>
+        <div slot="title">Brand Details</div>
         <div class="space-y-5 text-sm">
           <div class="w-full h-48 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl overflow-hidden flex items-center justify-center">
             ${
-              cat.image
-                ? `<img src="${this.getImageUrl(cat.image)}" class="w-full h-full object-cover" alt="${cat.name || "Category"}" />`
+              brand.image
+                ? `<img src="${this.getImageUrl(brand.image)}" class="w-full h-full object-cover" alt="${brand.name || "Brand"}" />`
                 : `<i class="fas fa-image text-slate-300 text-3xl"></i>`
             }
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Name</p>
-              <p class="mt-1 text-slate-900 font-semibold">${cat.name || "-"}</p>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Type</p>
-              <p class="mt-1 text-slate-900 font-semibold">${isMainCategory ? "Main Category" : "Subcategory"}</p>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Parent</p>
-              <p class="mt-1 text-slate-800">${cat.parent_name || "Main Category"}</p>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Subcategories</p>
-              <p class="mt-1 text-slate-900 font-semibold">${cat.sub_count || 0}</p>
+              <p class="mt-1 text-slate-900 font-semibold">${brand.name || "-"}</p>
             </div>
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Status</p>
               <p class="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                cat.is_active
+                brand.is_active
                   ? "bg-emerald-100 text-emerald-700"
                   : "bg-slate-200 text-slate-600"
-              }">${cat.is_active ? "Active" : "Hidden"}</p>
+              }">${brand.is_active ? "Active" : "Hidden"}</p>
             </div>
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Last Updated</p>
@@ -116,7 +103,7 @@ class CategoryViewModal extends HTMLElement {
           </div>
           <div class="rounded-xl border border-slate-200 bg-white p-4">
             <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-2">Description</p>
-            <p class="text-slate-700 leading-relaxed">${cat.description || "No description"}</p>
+            <p class="text-slate-700 leading-relaxed">${brand.description || "No description"}</p>
           </div>
         </div>
       </ui-modal>
@@ -124,5 +111,6 @@ class CategoryViewModal extends HTMLElement {
   }
 }
 
-customElements.define("category-view-modal", CategoryViewModal);
-export default CategoryViewModal;
+customElements.define("brand-view-modal", BrandViewModal);
+export default BrandViewModal;
+

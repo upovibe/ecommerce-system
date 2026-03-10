@@ -11,6 +11,7 @@ class PageUpdateModal extends HTMLElement {
   constructor() {
     super();
     this.page = null;
+    this._galleryImages = [];
     this.formData = {
       title: "",
       content: "",
@@ -29,6 +30,10 @@ class PageUpdateModal extends HTMLElement {
       content: page.content || "",
       is_active: Number(page.is_active) === 1,
     };
+    // Parse existing gallery images
+    let imgs = page.images;
+    if (typeof imgs === "string") { try { imgs = JSON.parse(imgs); } catch { imgs = []; } }
+    this._galleryImages = Array.isArray(imgs) ? [...imgs] : [];
     this.render();
     const modal = this.querySelector("ui-modal");
     if (modal) modal.open();
@@ -150,6 +155,7 @@ class PageUpdateModal extends HTMLElement {
           <!-- Gallery Images -->
           <div class="space-y-2">
             <label class="text-sm font-medium text-gray-900">Gallery Images</label>
+            ${this._renderExistingGallery()}
             <ui-file-upload
               id="page-images-uploader"
               accept="image/*"
@@ -173,6 +179,75 @@ class PageUpdateModal extends HTMLElement {
     });
     this.querySelector("#cancel-page-btn")?.addEventListener("click", () => this.close());
     this.querySelector("#save-page-btn")?.addEventListener("click", () => this.savePage());
+
+    // Wire up individual gallery remove buttons
+    this.querySelectorAll("[data-remove-gallery]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const idx = parseInt(e.currentTarget.dataset.removeGallery);
+        if (!isNaN(idx)) {
+          this._galleryImages.splice(idx, 1);
+          this._renderGalleryPreview();
+        }
+      });
+    });
+  }
+
+  _getImageUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://")) return path;
+    return `/api/${path.replace(/^\//, "")}`;
+  }
+
+  _renderExistingGallery() {
+    const images = this._galleryImages;
+    if (!images || images.length === 0) return "";
+
+    return `
+      <div id="gallery-preview-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+        ${images.map((img, i) => `
+          <div class="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-white shadow-sm">
+            <img
+              src="${this._getImageUrl(img)}"
+              class="w-full h-full object-cover"
+              alt="Gallery image ${i + 1}"
+              onerror="this.parentElement.style.opacity='0.3'">
+            <button
+              type="button"
+              data-remove-gallery="${i}"
+              class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow"
+              title="Remove">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        `).join("")}
+      </div>
+      <p class="text-xs text-slate-400">
+        <i class="fas fa-info-circle mr-1"></i>
+        ${images.length} current image${images.length !== 1 ? "s" : ""}. Upload new images to add more or replace.
+      </p>
+    `;
+  }
+
+  _renderGalleryPreview() {
+    const grid = this.querySelector("#gallery-preview-grid");
+    const parent = grid?.parentElement;
+    if (!parent) return;
+
+    // Re-render the whole gallery section
+    const section = this.querySelector("#gallery-section");
+    if (section) {
+      section.innerHTML = this._renderExistingGallery();
+      // Re-wire buttons
+      section.querySelectorAll("[data-remove-gallery]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          const idx = parseInt(e.currentTarget.dataset.removeGallery);
+          if (!isNaN(idx)) {
+            this._galleryImages.splice(idx, 1);
+            section.innerHTML = this._renderExistingGallery();
+          }
+        });
+      });
+    }
   }
 }
 

@@ -22,6 +22,24 @@ Router::delete('/categories/{id}', 'CategoryController@destroy');
 Router::post('/categories/{id}/upload-image', 'CategoryController@uploadImage');
 Router::put('/categories/{id}/toggle-active', 'CategoryController@toggleActive');
 
+// Brand routes (public GET, protected POST/PUT/DELETE)
+Router::get('/brands', 'BrandController@index');
+Router::post('/brands', 'BrandController@store');
+Router::get('/brands/{id}', 'BrandController@show');
+Router::put('/brands/{id}', 'BrandController@update');
+Router::delete('/brands/{id}', 'BrandController@destroy');
+Router::post('/brands/{id}/upload-image', 'BrandController@uploadImage');
+Router::put('/brands/{id}/toggle-active', 'BrandController@toggleActive');
+
+// Material routes (public GET, protected POST/PUT/DELETE)
+Router::get('/materials', 'MaterialController@index');
+Router::post('/materials', 'MaterialController@store');
+Router::get('/materials/{id}', 'MaterialController@show');
+Router::put('/materials/{id}', 'MaterialController@update');
+Router::delete('/materials/{id}', 'MaterialController@destroy');
+Router::post('/materials/{id}/upload-image', 'MaterialController@uploadImage');
+Router::put('/materials/{id}/toggle-active', 'MaterialController@toggleActive');
+
 // User management routes (protected - require authentication)
 // Note: Middleware will be called inside controllers using:
 // AuthMiddleware::requireAuth($pdo);
@@ -60,6 +78,20 @@ Router::get('/pages/slug/{slug}', 'PageController@showBySlug');
 Router::get('/pages/{id}', 'PageController@show');
 Router::put('/pages/{id}', 'PageController@update');
 Router::delete('/pages/{id}', 'PageController@destroy');
+
+// Inventory Management Routes (admin only)
+Router::get('/inventory', 'InventoryController@index');
+Router::get('/inventory/summary', 'InventoryController@summary');
+Router::get('/inventory/{id}/variants', 'InventoryController@getVariants');
+Router::put('/inventory/variants/{id}/stock', 'InventoryController@updateVariantStock');
+
+// Product Management Routes (admin only)
+Router::get('/products', 'ProductController@index');
+Router::post('/products', 'ProductController@store');
+Router::get('/products/{id}', 'ProductController@show');
+Router::put('/products/{id}', 'ProductController@update');
+Router::delete('/products/{id}', 'ProductController@destroy');
+Router::put('/products/{id}/toggle-active', 'ProductController@toggleActive');
 
 // Settings Management Routes (admin only for create/update/delete, public for view)
 Router::get('/settings', 'SettingController@index');

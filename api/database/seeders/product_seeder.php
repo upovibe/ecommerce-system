@@ -18,6 +18,22 @@ class ProductSeeder
         $stmt = $this->pdo->query('SELECT slug, id FROM categories');
         $categories = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
+        // Fetch brands/materials keyed by slug => id (optional)
+        $brandStmt = $this->pdo->query('SELECT slug, id, name FROM brands');
+        $brandsBySlug = [];
+        foreach ($brandStmt->fetchAll(PDO::FETCH_ASSOC) as $b) {
+            $brandsBySlug[$b['slug']] = ['id' => (int) $b['id'], 'name' => $b['name']];
+        }
+
+        $materialStmt = $this->pdo->query('SELECT slug, id, name FROM materials');
+        $materialsBySlug = [];
+        foreach ($materialStmt->fetchAll(PDO::FETCH_ASSOC) as $m) {
+            $materialsBySlug[$m['slug']] = ['id' => (int) $m['id'], 'name' => $m['name']];
+        }
+
+        $defaultBrandSlug = 'vastbrand';
+        $defaultMaterialSlug = 'synthetic';
+
         // Get admin user ID from admins table
         $stmt = $this->pdo->query('SELECT id FROM admins WHERE email = "admin@vastcommerce.com"');
         $admin = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -188,8 +204,29 @@ class ProductSeeder
             $stmt->execute([$p[1]]);
             if ($stmt->fetch()) {
                 // Update image in metadata for existing products
-                $stmt2 = $this->pdo->prepare("UPDATE products SET metadata = JSON_SET(COALESCE(metadata, '{}'), '$.image', ?, '$.brand', 'VastBrand', '$.warranty', '1 Year') WHERE slug = ?");
-                $stmt2->execute([$p[6], $p[1]]);
+                $brand = $brandsBySlug[$defaultBrandSlug] ?? null;
+                $material = $materialsBySlug[$defaultMaterialSlug] ?? null;
+                $stmt2 = $this->pdo->prepare("
+                    UPDATE products
+                    SET metadata = JSON_SET(
+                        COALESCE(metadata, '{}'),
+                        '$.image', ?,
+                        '$.brand', ?,
+                        '$.brand_id', ?,
+                        '$.material', ?,
+                        '$.material_id', ?,
+                        '$.warranty', '1 Year'
+                    )
+                    WHERE slug = ?
+                ");
+                $stmt2->execute([
+                    $p[6],
+                    $brand['name'] ?? 'VastBrand',
+                    $brand['id'] ?? null,
+                    $material['name'] ?? null,
+                    $material['id'] ?? null,
+                    $p[1],
+                ]);
                 echo "🔄 Updated product: {$p[0]}\n";
                 continue;
             }
@@ -199,6 +236,8 @@ class ProductSeeder
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             ');
 
+            $brand = $brandsBySlug[$defaultBrandSlug] ?? null;
+            $material = $materialsBySlug[$defaultMaterialSlug] ?? null;
             $stmt->execute([
                 $catId,
                 $adminId,
@@ -209,7 +248,10 @@ class ProductSeeder
                 $p[5],
                 json_encode([
                     'image'    => $p[6],
-                    'brand'    => 'VastBrand',
+                    'brand'    => $brand['name'] ?? 'VastBrand',
+                    'brand_id' => $brand['id'] ?? null,
+                    'material' => $material['name'] ?? null,
+                    'material_id' => $material['id'] ?? null,
                     'warranty' => '1 Year',
                 ]),
             ]);
