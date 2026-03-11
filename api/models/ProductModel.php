@@ -15,6 +15,8 @@ class ProductModel extends BaseModel
         'updated_by',
         'name',
         'slug',
+        'product_code',
+        'sku',
         'type',
         'status',
         'description',

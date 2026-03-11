@@ -85,6 +85,10 @@ Router::get('/inventory/summary', 'InventoryController@summary');
 Router::get('/inventory/{id}/variants', 'InventoryController@getVariants');
 Router::put('/inventory/variants/{id}/stock', 'InventoryController@updateVariantStock');
 
+// Attribute Management Routes (admin only)
+Router::get('/attributes', 'AttributeController@index');
+Router::post('/attributes', 'AttributeController@store');
+
 // Product Management Routes (admin only)
 Router::get('/products', 'ProductController@index');
 Router::post('/products', 'ProductController@store');

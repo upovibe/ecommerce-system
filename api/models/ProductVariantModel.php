@@ -9,9 +9,9 @@ class ProductVariantModel extends BaseModel
 
     protected static $fillable = [
         'product_id',
-        'sku',
         'price_override',
         'stock',
+        'variant_values',
         'variant_options',
         'is_active'
     ];
@@ -19,6 +19,7 @@ class ProductVariantModel extends BaseModel
     protected static $casts = [
         'price_override' => 'float',
         'stock' => 'integer',
+        'variant_values' => 'json',
         'variant_options' => 'json',
         'is_active' => 'boolean',
         'created_at' => 'datetime',

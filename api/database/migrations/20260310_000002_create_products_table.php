@@ -13,6 +13,8 @@ class Migration_20260310000002createproductstable {
 
             name          VARCHAR(255) NOT NULL,
             slug          VARCHAR(255) UNIQUE NOT NULL,
+            product_code  VARCHAR(100) UNIQUE NULL,
+            sku           VARCHAR(100) UNIQUE NULL,
             type          ENUM('physical', 'digital', 'service') DEFAULT 'physical',
             status        ENUM('active', 'draft', 'pending', 'archived') DEFAULT 'draft',
 

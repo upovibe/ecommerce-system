@@ -234,11 +234,11 @@ class ProductSeeder
         $insert = $this->pdo->prepare('
             INSERT INTO products
                 (category_id, brand_id, material_id, created_by, updated_by,
-                 name, slug, type, status, description,
+                 name, slug, product_code, sku, type, status, description,
                  main_image, images, base_price, is_active, created_at, updated_at)
             VALUES
                 (?, ?, ?, ?, ?,
-                 ?, ?, ?, ?, ?,
+                 ?, ?, ?, ?, ?, ?, ?,
                  ?, NULL, ?, 1, NOW(), NOW())
         ');
 
@@ -262,18 +262,26 @@ class ProductSeeder
             $brandId    = $brandSlug   ? ($brands[$brandSlug]     ?? null) : null;
             $materialId = $matSlug     ? ($materials[$matSlug]    ?? null) : null;
 
+            $productCode = 'PROD-' . strtoupper(substr(uniqid(), -6));
+            $sku = strtoupper($slug);
+
             $insert->execute([
                 $catId,    $brandId,  $materialId, $adminId, $adminId,
-                $name,     $slug,     $type,       $status,  $desc,
+                $name,     $slug,     $productCode, $sku,     $type,       $status,  $desc,
                 $img,      $price,
             ]);
 
             // Seed default variant
             $newId = (int) $this->pdo->lastInsertId();
             $this->pdo->prepare('
-                INSERT INTO product_variants (product_id, sku, stock, is_active, created_at, updated_at)
-                VALUES (?, ?, ?, 1, NOW(), NOW())
-            ')->execute([$newId, strtoupper($slug) . '-DEFAULT', rand(5, 100)]);
+                INSERT INTO product_variants (product_id, stock, variant_values, variant_options, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 1, NOW(), NOW())
+            ')->execute([
+                $newId, 
+                rand(5, 100),
+                json_encode([]),
+                json_encode(['label' => 'Default'])
+            ]);
 
             echo "✅ Seeded: {$name}\n";
         }

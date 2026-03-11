@@ -22,16 +22,21 @@ class VariantSeeder
             $productMap[$p['slug']] = $p;
         }
 
+        // Fetch attributes for lookups
+        $colorAttr = $this->pdo->query("SELECT id FROM product_attributes WHERE name = 'Color'")->fetchColumn();
+        $sizeAttr = $this->pdo->query("SELECT id FROM product_attributes WHERE name = 'Size'")->fetchColumn();
+
         // Variants for Fashion items
+        // [Label, AttrID, AttrValue, PriceDelta, Stock]
         $fashionVariants = [
-            'premium-cotton-t-shirt' => [
-                ['Small/Black', 'TSHIRT-S-B', 0, 50],
-                ['Medium/Black', 'TSHIRT-M-B', 0, 100],
-                ['Large/White', 'TSHIRT-L-W', 500, 30]
+            'premium-slim-fit-chinos' => [
+                ['Small/Navy',  $sizeAttr, 'Small', 0, 50],
+                ['Medium/Navy', $sizeAttr, 'Medium', 0, 100],
+                ['Large/Navy',  $sizeAttr, 'Large', 500, 30]
             ],
-            'designer-silk-dress' => [
-                ['Small/Red', 'DRESS-S-R', 0, 10],
-                ['Medium/Blue', 'DRESS-M-B', 2000, 5]
+            'designer-floral-midi-dress' => [
+                ['Small/Red',  $sizeAttr, 'Small', 0, 10],
+                ['Medium/Red', $sizeAttr, 'Medium', 2000, 5]
             ]
         ];
 
@@ -39,22 +44,23 @@ class VariantSeeder
             $product = $productMap[$slug] ?? null;
             if (!$product) continue;
 
+            // Clear existing variants for these products first (to avoid duplicates if re-running)
+            $this->pdo->prepare('DELETE FROM product_variants WHERE product_id = ?')->execute([$product['id']]);
+
             foreach ($variants as $v) {
-                $stmt = $this->pdo->prepare('SELECT id FROM product_variants WHERE sku = ?');
-                $stmt->execute([$v[1]]);
-                if ($stmt->fetch()) continue;
+                [$label, $attrId, $attrValue, $priceDelta, $stock] = $v;
 
                 $stmt = $this->pdo->prepare('
-                    INSERT INTO product_variants (product_id, sku, price_override, stock, variant_options, created_at, updated_at) 
+                    INSERT INTO product_variants (product_id, price_override, stock, variant_values, variant_options, created_at, updated_at) 
                     VALUES (?, ?, ?, ?, ?, NOW(), NOW())
                 ');
 
                 $stmt->execute([
                     $product['id'],
-                    $v[1],
-                    $v[2] > 0 ? $product['base_price'] + $v[2] : null,
-                    $v[3],
-                    json_encode(['label' => $v[0]])
+                    $priceDelta > 0 ? $product['base_price'] + $priceDelta : null,
+                    $stock,
+                    json_encode(['attribute_id' => $attrId, 'value' => $attrValue]),
+                    json_encode(['label' => $label])
                 ]);
             }
             echo "✅ Seeded variants for product: $slug\n";

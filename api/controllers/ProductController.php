@@ -155,6 +155,16 @@ class ProductController
             // Resolve updated_by from JWT if available
             $auth = $this->getAuthUserId();
 
+            $productCode = $data['product_code'] ?? null;
+            if (empty($productCode)) {
+                $productCode = 'PROD-' . strtoupper(substr(uniqid(), -6));
+            }
+
+            $productSku = $data['sku'] ?? null;
+            if (empty($productSku)) {
+                $productSku = strtoupper($slug);
+            }
+
             $id = $this->productModel->create([
                 'category_id'  => (int) $data['category_id'],
                 'brand_id'     => !empty($data['brand_id'])    ? (int) $data['brand_id']    : null,
@@ -163,6 +173,8 @@ class ProductController
                 'updated_by'   => $auth,
                 'name'         => trim($data['name']),
                 'slug'         => $slug,
+                'product_code' => $productCode,
+                'sku'          => $productSku,
                 'type'         => $data['type']   ?? 'physical',
                 'status'       => $data['status'] ?? 'draft',
                 'description'  => $data['description'] ?? null,
@@ -182,19 +194,19 @@ class ProductController
             // Seed variants
             if (empty($data['variants'])) {
                 $this->pdo->prepare("
-                    INSERT INTO product_variants (product_id, sku, stock, is_active, created_at, updated_at)
-                    VALUES (?, ?, 0, 1, NOW(), NOW())
-                ")->execute([$id, strtoupper($slug) . '-DEFAULT']);
+                    INSERT INTO product_variants (product_id, stock, is_active, created_at, updated_at)
+                    VALUES (?, 0, 1, NOW(), NOW())
+                ")->execute([$id]);
             } else {
                 foreach ($data['variants'] as $v) {
                     $this->pdo->prepare("
-                        INSERT INTO product_variants (product_id, sku, price_override, stock, variant_options, is_active, created_at, updated_at)
+                        INSERT INTO product_variants (product_id, price_override, stock, variant_values, variant_options, is_active, created_at, updated_at)
                         VALUES (?, ?, ?, ?, ?, 1, NOW(), NOW())
                     ")->execute([
                         $id,
-                        $v['sku'] ?? null,
                         !empty($v['price_override']) ? (float)$v['price_override'] : null,
                         (int)($v['stock'] ?? 0),
+                        isset($v['variant_values'])  ? json_encode($v['variant_values']) : null,
                         json_encode(['label' => $v['label'] ?? 'Default']),
                     ]);
                 }
@@ -232,6 +244,8 @@ class ProductController
             if (isset($data['category_id'])) $updateData['category_id'] = (int) $data['category_id'];
             if (isset($data['brand_id']))    $updateData['brand_id']    = $data['brand_id'] ? (int) $data['brand_id'] : null;
             if (isset($data['material_id'])) $updateData['material_id'] = $data['material_id'] ? (int) $data['material_id'] : null;
+            if (isset($data['product_code'])) $updateData['product_code'] = trim($data['product_code']);
+            if (isset($data['sku']))          $updateData['sku']          = trim($data['sku']);
             if (isset($data['type']))        $updateData['type']        = $data['type'];
             if (isset($data['status']))      $updateData['status']      = $data['status'];
             if (isset($data['description'])) $updateData['description'] = $data['description'];
@@ -253,6 +267,30 @@ class ProductController
             }
 
             $this->productModel->update($id, $updateData);
+
+            // Sync Variants: delete and re-insert for simplicity and data integrity
+            if (isset($data['variants'])) {
+                $this->pdo->prepare("DELETE FROM product_variants WHERE product_id = ?")->execute([$id]);
+                if (empty($data['variants'])) {
+                    $this->pdo->prepare("
+                        INSERT INTO product_variants (product_id, stock, is_active, created_at, updated_at)
+                        VALUES (?, 0, 1, NOW(), NOW())
+                    ")->execute([$id]);
+                } else {
+                    foreach ($data['variants'] as $v) {
+                        $this->pdo->prepare("
+                            INSERT INTO product_variants (product_id, price_override, stock, variant_values, variant_options, is_active, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, 1, NOW(), NOW())
+                        ")->execute([
+                            $id,
+                            !empty($v['price_override']) ? (float)$v['price_override'] : null,
+                            (int)($v['stock'] ?? 0),
+                            isset($v['variant_values'])  ? json_encode($v['variant_values']) : null,
+                            json_encode(['label' => $v['label'] ?? 'Default']),
+                        ]);
+                    }
+                }
+            }
 
             http_response_code(200);
             echo json_encode(['success' => true, 'message' => 'Product updated']);
@@ -371,6 +409,82 @@ class ProductController
         }
     }
 
+    public function uploadGallery($id)
+    {
+        ob_clean();
+        try {
+            RoleMiddleware::requireAdmin($this->pdo);
+
+            $product = $this->productModel->findById($id);
+            if (!$product) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Product not found']);
+                return;
+            }
+
+            if (!isset($_FILES['images']) || empty($_FILES['images']['name'][0])) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'No image files provided']);
+                return;
+            }
+
+            $config = [
+                'upload_path'   => 'uploads/products/gallery/',
+                'max_size'      => 5242880, // 5MB
+                'allowed_types' => ['images' => ['jpg', 'jpeg', 'png', 'gif', 'webp']],
+            ];
+
+            $uploadedPaths = [];
+            $files = $_FILES['images'];
+            $fileCount = is_array($files['name']) ? count($files['name']) : 1;
+
+            if ($fileCount === 1 && !is_array($files['name'])) {
+                $uploadResult = uploadImage($files, $config);
+                if ($uploadResult['success']) {
+                    $uploadedPaths[] = $uploadResult['filepath'];
+                }
+            } else {
+                for ($i = 0; $i < $fileCount; $i++) {
+                    if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
+
+                    $fileEntry = [
+                        'name'     => $files['name'][$i],
+                        'type'     => $files['type'][$i],
+                        'tmp_name' => $files['tmp_name'][$i],
+                        'error'    => $files['error'][$i],
+                        'size'     => $files['size'][$i],
+                    ];
+
+                    $uploadResult = uploadImage($fileEntry, $config);
+                    if ($uploadResult['success']) {
+                        $uploadedPaths[] = $uploadResult['filepath'];
+                    }
+                }
+            }
+
+            if (empty($uploadedPaths)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Failed to upload any images']);
+                return;
+            }
+
+            $this->productModel->update($id, [
+                'images'      => json_encode($uploadedPaths),
+                'updated_by' => $this->getAuthUserId(),
+            ]);
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'images'  => $uploadedPaths,
+                'message' => count($uploadedPaths) . ' images uploaded'
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
@@ -379,6 +493,8 @@ class ProductController
     {
         $p['base_price']    = (float) $p['base_price'];
         $p['is_active']     = (bool)  $p['is_active'];
+        $p['product_code']  = $p['product_code'] ?? null;
+        $p['sku']           = $p['sku'] ?? null;
         $p['variant_count'] = isset($p['variant_count']) ? (int) $p['variant_count'] : null;
         $p['total_stock']   = isset($p['total_stock'])   ? (int) $p['total_stock']   : null;
         foreach (['brand_id', 'material_id', 'category_id', 'created_by', 'updated_by'] as $col) {

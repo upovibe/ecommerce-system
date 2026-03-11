@@ -399,12 +399,28 @@ class Dropdown extends HTMLElement {
         if (this.initialized) return;
         this.initialized = true;
 
-        // Move all ui-option children to an internal array and remove from DOM
-        this._options = Array.from(this.querySelectorAll('ui-option'));
-        this._options.forEach(option => this.removeChild(option));
-
         // Force clear any initial selections - start completely empty
         this.selectedValues.clear();
+
+        // Initial sync of options
+        this.syncOptions();
+
+        // Set up MutationObserver to watch for dynamic option changes
+        this.observer = new MutationObserver((mutations) => {
+            let shouldSync = false;
+            mutations.forEach(mutation => {
+                if (mutation.type === 'childList') {
+                    const hasOption = Array.from(mutation.addedNodes).some(node => node.tagName === 'UI-OPTION') ||
+                                     Array.from(mutation.removedNodes).some(node => node.tagName === 'UI-OPTION');
+                    if (hasOption) shouldSync = true;
+                }
+            });
+            if (shouldSync) {
+                this.syncOptions();
+            }
+        });
+
+        this.observer.observe(this, { childList: true });
 
         // Set initial value if provided
         const initialValue = this.getAttribute('value');
@@ -416,6 +432,28 @@ class Dropdown extends HTMLElement {
             }
         }
 
+        this.updateSelection();
+        this.updateOptions();
+    }
+
+    /**
+     * Syncs light DOM ui-option elements with internal state
+     */
+    syncOptions() {
+        // Get all ui-option children
+        const options = Array.from(this.querySelectorAll('ui-option'));
+        
+        // Update internal options array
+        this._options = options;
+        
+        // Hide options from visual DOM but keep them for reference
+        options.forEach(option => {
+            option.style.display = 'none';
+        });
+
+        // If we have selected values that no longer exist in options, we should probably clear them
+        // But for "lazy" loading scenarios, we might want to keep them. 
+        // For now, let's just refresh the display.
         this.updateSelection();
         this.updateOptions();
     }

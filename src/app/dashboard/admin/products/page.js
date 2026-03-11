@@ -9,6 +9,7 @@ import "@/components/ui/Skeleton.js";
 import "@/components/ui/Dropdown.js";
 import "@/components/ui/Toast.js";
 import "@/components/ui/FileUpload.js";
+import "@/components/ui/Wysiwyg.js";
 import api from "@/services/api.js";
 import Toast from "@/components/ui/Toast.js";
 
@@ -19,6 +20,7 @@ class ProductsPage extends App {
     this.categories = [];
     this.brands = [];
     this.materials = [];
+    this.productAttributes = []; // Global attributes
     this.loading = true;
     this.selectedProduct = null;
     this._lastRendered = "";
@@ -59,16 +61,18 @@ class ProductsPage extends App {
     this.loading = true;
     this.updateView();
     try {
-      const [prodRes, catRes, brandRes, materialRes] = await Promise.all([
+      const [prodRes, catRes, brandRes, materialRes, attrRes] = await Promise.all([
         api.get("/products"),
         api.get("/categories"),
         api.get("/brands"),
         api.get("/materials"),
+        api.get("/attributes"),
       ]);
       this.products   = prodRes.data?.data || [];
       this.categories = catRes.data?.data  || [];
       this.brands     = brandRes.data?.data || [];
       this.materials  = materialRes.data?.data || [];
+      this.productAttributes = attrRes.data?.data || [];
     } catch (e) {
       Toast.show({ title: "Error", message: "Failed to load products", variant: "error" });
     } finally {
@@ -154,11 +158,12 @@ class ProductsPage extends App {
       if (material) material.value = "";
       if (name) name.value = "";
       if (type) type.value = "physical";
-      if (price) price.value = "";
       if (uploader) uploader.clear();
-      if (status) status.value = "draft";
-      if (desc?.setValue) desc.setValue("");
-      else if (desc) desc.value = "";
+      const gallery = m.querySelector("#create-gallery");
+      if (gallery) gallery.clear();
+      if (desc) desc.setValue("");
+      const details = m.querySelector("#create-details");
+      if (details) details.value = "";
       if (active) {
         active.checked = true;
         active.setAttribute("checked", "");
@@ -172,20 +177,22 @@ class ProductsPage extends App {
     const m = this.querySelector("#product-create-modal");
     if (m) m.close();
   }
-  async submitCreate() {
+  async submitCreate(targetStatus = "active") {
     const form    = this.querySelector("#product-create-form");
-    const saveBtn = this.querySelector("#create-save-btn");
+    const saveBtn = targetStatus === "active" ? this.querySelector("#create-publish-btn") : this.querySelector("#create-draft-btn");
     if (!form) return;
     const name           = form.querySelector("#create-name")?.value?.trim();
     const parent_cat_id  = form.querySelector("#create-category")?.value;
     const subcat_id      = form.querySelector("#create-subcategory")?.value;
     const category_id    = subcat_id || parent_cat_id;
     const type           = form.querySelector("#create-type")?.value || "physical";
-    const status         = form.querySelector("#create-status")?.value || "draft";
+    const status         = targetStatus;
     const base_price     = parseFloat(form.querySelector("#create-price")?.value) || 0;
     const descEl         = form.querySelector("#create-description");
     const description    = descEl?.getValue ? descEl.getValue() : descEl?.value;
+    const details        = form.querySelector("#create-details")?.value;
     const uploader       = form.querySelector("#create-uploader");
+    const gallery        = form.querySelector("#create-gallery");
     const brand_id       = form.querySelector("#create-brand")?.value;
     const material_id    = form.querySelector("#create-material")?.value;
     const is_active      = form.querySelector("#create-active")?.checked ? 1 : 0;
@@ -194,15 +201,19 @@ class ProductsPage extends App {
     if (!name) { Toast.show({ title: "Required", message: "Product name is required", variant: "error" }); return; }
     if (!category_id) { Toast.show({ title: "Required", message: "Category is required", variant: "error" }); return; }
 
+    const oldBtnText = saveBtn?.textContent;
     if (saveBtn) saveBtn.textContent = "Saving...";
     try {
       const payload = {
         name,
+        product_code: form.querySelector("#create-code")?.value?.trim(),
+        sku: form.querySelector("#create-sku")?.value?.trim(),
         category_id,
         type,
         status,
         base_price,
         description,
+        details: details ? { note: details } : null,
         brand_id,
         material_id,
         is_active,
@@ -212,56 +223,92 @@ class ProductsPage extends App {
       const res = await api.post("/products", payload);
       const newId = res.data?.data?.id;
 
-      // Handle image upload if a file was selected
-      if (newId && uploader) {
-        const files = uploader.getFiles();
-        const file = files.find(f => !f.isExisting);
-        if (file) {
-          const formData = new FormData();
-          formData.append("image", file);
-          await api.post(`/products/${newId}/upload-image`, formData, {
-            headers: { "Content-Type": "multipart/form-data" }
-          });
+      if (newId) {
+        // 1. Handle main image upload
+        if (uploader) {
+          const files = uploader.getFiles();
+          const file = files.find(f => !f.isExisting);
+          if (file) {
+            const formData = new FormData();
+            formData.append("image", file);
+            await api.post(`/products/${newId}/upload-image`, formData, {
+              headers: { "Content-Type": "multipart/form-data" }
+            });
+          }
+        }
+
+        // 2. Handle gallery uploads
+        if (gallery) {
+          const files = gallery.getFiles();
+          const newFiles = files.filter(f => !f.isExisting);
+          if (newFiles.length > 0) {
+            const formData = new FormData();
+            newFiles.forEach(f => formData.append("images[]", f));
+            await api.post(`/products/${newId}/upload-gallery`, formData, {
+              headers: { "Content-Type": "multipart/form-data" }
+            });
+          }
         }
       }
 
-      Toast.show({ title: "Created", message: "Product added successfully", variant: "success" });
+      Toast.show({ title: "Created", message: `Product ${status === 'active' ? 'published' : 'saved as draft'}`, variant: "success" });
       this.closeCreateModal();
       await this.fetchData(true);
     } catch (e) {
       Toast.show({ title: "Error", message: e.response?.data?.message || "Failed to create product", variant: "error" });
     } finally {
-      if (saveBtn) saveBtn.textContent = "Create Product";
+      if (saveBtn) saveBtn.textContent = oldBtnText;
     }
   }
 
-  addVariantRow() {
+  addVariantRow(data = null) {
     const list = this.querySelector("#variant-list");
     if (!list) return;
+    
     const row = document.createElement("div");
-    row.className = "grid grid-cols-1 sm:grid-cols-4 gap-3 items-end variant-row";
+    row.className = "p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3 variant-row";
+
+    // Attribute Options
+    const attrOptions = this.productAttributes.map(a => `<ui-option value="${a.id}">${a.name}</ui-option>`).join("");
+    
     row.innerHTML = `
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">SKU</label>
-        <ui-input data-field="sku" placeholder="e.g. SKU-001" class="w-full"></ui-input>
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Label</label>
-        <ui-input data-field="label" placeholder="e.g. Default" class="w-full"></ui-input>
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Price Override</label>
-        <ui-input data-field="price_override" type="number" step="0.01" min="0" placeholder="0.00" class="w-full"></ui-input>
-      </div>
-      <div class="flex items-end gap-2">
-        <div class="flex-1">
-          <label class="block text-xs font-medium text-slate-600 mb-1">Stock</label>
-          <ui-input data-field="stock" type="number" step="1" min="0" placeholder="0" class="w-full"></ui-input>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Attribute</label>
+          <ui-dropdown data-field="attribute_id" placeholder="Select attribute..." class="w-full bg-white">
+            <ui-option value="">Select...</ui-option>
+            ${attrOptions}
+          </ui-dropdown>
         </div>
-        <button type="button" onclick="this.closest('app-products-page').removeVariantRow(this)" class="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition">Remove</button>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Label / Value</label>
+          <ui-input data-field="label" placeholder="e.g. Red, XL" class="w-full bg-white"></ui-input>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end pt-2 border-t border-slate-200/50">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Price Override</label>
+          <ui-input data-field="price_override" type="number" step="0.01" min="0" placeholder="0.00" class="w-full bg-white"></ui-input>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Stock</label>
+          <ui-input data-field="stock" type="number" step="1" min="0" placeholder="0" class="w-full bg-white"></ui-input>
+        </div>
+        <div class="flex justify-end">
+          <button type="button" onclick="this.closest('app-products-page').removeVariantRow(this)" class="px-3 py-2 rounded-lg text-rose-600 hover:bg-rose-50 transition text-xs font-bold uppercase tracking-wider">
+            <i class="fas fa-trash-alt mr-1"></i> Remove
+          </button>
+        </div>
       </div>
     `;
     list.appendChild(row);
+
+    if (data) {
+      row.querySelector('[data-field="attribute_id"]').value   = data.attribute_id || "";
+      row.querySelector('[data-field="label"]').value          = data.label || "";
+      row.querySelector('[data-field="price_override"]').value = data.price_override || "";
+      row.querySelector('[data-field="stock"]').value          = data.stock || 0;
+    }
   }
 
   removeVariantRow(button) {
@@ -273,17 +320,19 @@ class ProductsPage extends App {
     if (!list) return [];
     const rows = Array.from(list.querySelectorAll(".variant-row"));
     const variants = rows.map((row) => {
-      const skuEl = row.querySelector('[data-field="sku"]');
+      const attrIdEl = row.querySelector('[data-field="attribute_id"]');
       const labelEl = row.querySelector('[data-field="label"]');
       const priceEl = row.querySelector('[data-field="price_override"]');
       const stockEl = row.querySelector('[data-field="stock"]');
-      const sku = skuEl?.value?.trim();
+      
+      const attribute_id = attrIdEl?.value || "";
       const label = labelEl?.value?.trim();
       const price_override = priceEl?.value ? parseFloat(priceEl.value) : null;
       const stock = stockEl?.value ? parseInt(stockEl.value, 10) : 0;
-      return { sku, label, price_override, stock };
+      
+      return { attribute_id, label, price_override, stock };
     });
-    return variants.filter((v) => v.sku || v.label || v.price_override || v.stock);
+    return variants.filter((v) => v.attribute_id || v.label || v.price_override || v.stock);
   }
 
   // ── EDIT ────────────────────────────────────────────
@@ -293,8 +342,9 @@ class ProductsPage extends App {
     if (!m) return;
     
     m.querySelector("#edit-name").value        = product.name || "";
+    m.querySelector("#edit-code").value        = product.product_code || "";
+    m.querySelector("#edit-sku").value         = product.sku || "";
     m.querySelector("#edit-type").value        = product.type || "physical";
-    m.querySelector("#edit-status").value      = product.status || "active";
     m.querySelector("#edit-price").value       = product.base_price || "";
     
     // Category mapping
@@ -310,15 +360,42 @@ class ProductsPage extends App {
       m.querySelector("#edit-subcategory").value = "";
     }
 
+    const vList = m.querySelector("#variant-list");
+    if (vList) {
+      vList.innerHTML = "";
+      if (product.variants && Array.isArray(product.variants)) {
+        product.variants.forEach(v => {
+          const vData = typeof v.variant_values === 'string' ? JSON.parse(v.variant_values) : v.variant_values;
+          const label = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options)?.label : v.variant_options?.label;
+          this.addVariantRow({
+            attribute_id: vData?.attribute_id,
+            label: label || "",
+            price_override: v.price_override,
+            stock: v.stock
+          });
+        });
+      }
+    }
+
     const editDesc = m.querySelector("#edit-description");
     if (editDesc?.setValue) {
       editDesc.setValue(product.description || "");
-    } else if (editDesc) {
-      editDesc.value = product.description || "";
+    }
+
+    const editDetails = m.querySelector("#edit-details");
+    if (editDetails) {
+        const d = typeof product.details === 'string' ? JSON.parse(product.details) : product.details;
+        editDetails.value = d?.note || "";
     }
 
     const uploader = m.querySelector("#edit-uploader");
     if (uploader) uploader.setValue(product.main_image || "");
+
+    const gallery = m.querySelector("#edit-gallery");
+    if (gallery && product.images) {
+        const imgs = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
+        gallery.setValue(imgs || []);
+    }
 
     m.querySelector("#edit-brand").value       = product.brand_id || "";
     m.querySelector("#edit-material").value    = product.material_id || "";
@@ -335,25 +412,28 @@ class ProductsPage extends App {
     const m = this.querySelector("#product-edit-modal");
     if (m) m.close();
   }
-  async submitEdit() {
+  async submitEdit(targetStatus = null) {
     const m       = this.querySelector("#product-edit-modal");
-    const saveBtn = this.querySelector("#edit-save-btn");
+    const saveBtn = targetStatus === "active" ? m.querySelector("#edit-publish-btn") : (targetStatus === "draft" ? m.querySelector("#edit-draft-btn") : m.querySelector("#edit-save-btn"));
     if (!m || !this.selectedProduct) return;
     const name           = m.querySelector("#edit-name")?.value?.trim();
     const parent_cat_id  = m.querySelector("#edit-category")?.value;
     const subcat_id      = m.querySelector("#edit-subcategory")?.value;
     const category_id    = subcat_id || parent_cat_id;
     const type           = m.querySelector("#edit-type")?.value;
-    const status         = m.querySelector("#edit-status")?.value;
+    const status         = targetStatus || this.selectedProduct.status;
     const base_price     = parseFloat(m.querySelector("#edit-price")?.value) || 0;
     const descEl         = m.querySelector("#edit-description");
     const description    = descEl?.getValue ? descEl.getValue() : descEl?.value;
+    const details        = m.querySelector("#edit-details")?.value;
     const uploader       = m.querySelector("#edit-uploader");
+    const gallery        = m.querySelector("#edit-gallery");
     const brand_id       = m.querySelector("#edit-brand")?.value;
     const material_id    = m.querySelector("#edit-material")?.value;
     const is_active      = m.querySelector("#edit-active")?.checked ? 1 : 0;
 
     if (!name) { Toast.show({ title: "Required", message: "Name is required", variant: "error" }); return; }
+    const oldBtnText = saveBtn?.textContent;
     if (saveBtn) saveBtn.textContent = "Saving...";
 
     try {
@@ -370,17 +450,34 @@ class ProductsPage extends App {
         }
       }
 
-      // 2. Update product details
+      // 2. Handle gallery uploads
+      if (gallery) {
+        const files = gallery.getFiles();
+        const newFiles = files.filter(f => !f.isExisting);
+        if (newFiles.length > 0) {
+          const formData = new FormData();
+          newFiles.forEach(f => formData.append("images[]", f));
+          await api.post(`/products/${this.selectedProduct.id}/upload-gallery`, formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+          });
+        }
+      }
+
+      // 3. Update product details
       const payload = {
         name,
+        product_code: m.querySelector("#edit-code")?.value?.trim(),
+        sku: m.querySelector("#edit-sku")?.value?.trim(),
         category_id,
         type,
         status,
         base_price,
         description,
+        details: details ? { note: details } : null,
         brand_id,
         material_id,
         is_active,
+        variants: this.collectVariants(m.querySelector("#variant-list")),
       };
 
       await api.put(`/products/${this.selectedProduct.id}`, payload);
@@ -390,7 +487,7 @@ class ProductsPage extends App {
     } catch (e) {
       Toast.show({ title: "Error", message: e.response?.data?.message || "Failed to update product", variant: "error" });
     } finally {
-      if (saveBtn) saveBtn.textContent = "Save Changes";
+      if (saveBtn) saveBtn.textContent = oldBtnText;
     }
   }
 
@@ -559,156 +656,248 @@ class ProductsPage extends App {
       <!-- ── CREATE MODAL ───────────────────────────────── -->
       <ui-modal id="product-create-modal" position="right" size="lg" close-on-backdrop-click="false">
         <span slot="title">Add New Product</span>
-        <form id="product-create-form" class="space-y-4 px-2" onsubmit="return false;">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
-              <ui-input id="create-name" placeholder="e.g. Classic White T-Shirt" class="w-full"></ui-input>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-              <ui-dropdown id="create-category" placeholder="Select category..." searchable class="w-full" onchange="this.closest('app-products-page')._onCategoryChange(event)">
-                <ui-option value="">Select category...</ui-option>
-                ${parentCatOptions}
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Subcategory</label>
-              <ui-dropdown id="create-subcategory" placeholder="Select subcategory..." searchable class="w-full">
-                <ui-option value="">Select subcategory...</ui-option>
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Type</label>
-              <ui-dropdown id="create-type" placeholder="Select type..." class="w-full">
-                <ui-option value="physical">Physical</ui-option>
-                <ui-option value="digital">Digital</ui-option>
-                <ui-option value="service">Service</ui-option>
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
-              <ui-dropdown id="create-status" class="w-full">
-                <ui-option value="active">Active</ui-option>
-                <ui-option value="draft">Draft</ui-option>
-                <ui-option value="pending">Pending</ui-option>
-                <ui-option value="archived">Archived</ui-option>
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Base Price (USD)</label>
-              <ui-input id="create-price" type="number" min="0" step="0.01" placeholder="0.00" class="w-full"></ui-input>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
-              <ui-dropdown id="create-brand" placeholder="Select brand..." searchable class="w-full">
-                ${brandOptions}
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
-              <ui-dropdown id="create-material" placeholder="Select material..." searchable class="w-full">
-                ${materialOptions}
-              </ui-dropdown>
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">Product Image</label>
-              <ui-file-upload id="create-uploader" accept="image/*" max-size="5242880"></ui-file-upload>
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <ui-textarea id="create-description" rows="3" placeholder="Product description..." class="w-full"></ui-textarea>
-            </div>
-            <div class="sm:col-span-2">
-              <div class="flex items-center justify-between">
-                <label class="block text-sm font-medium text-slate-700">Variants</label>
-                <button type="button" onclick="this.closest('app-products-page').addVariantRow()" class="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition">Add Variant</button>
+        <form id="product-create-form" class="space-y-4" onsubmit="return false;">
+          
+          <div class="space-y-4">
+            <!-- 1. Product Name -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- 1. Product Name -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
+                <ui-input id="create-name" placeholder="e.g. Classic White T-Shirt" class="w-full"></ui-input>
               </div>
-              <div id="variant-list" class="mt-3 space-y-3"></div>
-              <p class="text-xs text-slate-400 mt-2">Leave empty to auto-create a default variant.</p>
+              <!-- 1a. Product Code & SKU -->
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Product Code</label>
+                  <ui-input id="create-code" placeholder="Auto-gen" class="w-full"></ui-input>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">SKU</label>
+                  <ui-input id="create-sku" placeholder="Auto-gen" class="w-full"></ui-input>
+                </div>
+              </div>
             </div>
-            <div class="sm:col-span-2 mt-2">
-              <ui-switch id="create-active" label="Active (visible on store)" checked></ui-switch>
+
+            <!-- 2. Description (WYSIWYG) -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+              <ui-wysiwyg id="create-description" placeholder="Product description..." height="200px" toolbar="basic"></ui-wysiwyg>
+            </div>
+
+            <!-- 3. Details (Content Area) -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-2">More Information (Optional)</label>
+              <ui-textarea id="create-details" rows="3" placeholder="Additional details, features, etc..." class="w-full"></ui-textarea>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- 4. Price & Type -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Base Price (USD)</label>
+                <ui-input id="create-price" type="number" min="0" step="0.01" placeholder="0.00" class="w-full"></ui-input>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Type</label>
+                <ui-dropdown id="create-type" placeholder="Select type..." class="w-full">
+                  <ui-option value="physical">Physical</ui-option>
+                  <ui-option value="digital">Digital</ui-option>
+                  <ui-option value="service">Service</ui-option>
+                </ui-dropdown>
+              </div>
+
+              <!-- 5. Category & Subcategory -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
+                <ui-dropdown id="create-category" placeholder="Select category..." searchable class="w-full" onchange="this.closest('app-products-page').handleCategoryChange(event)">
+                  <ui-option value="">Select category...</ui-option>
+                  ${parentCatOptions}
+                </ui-dropdown>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Subcategory</label>
+                <ui-dropdown id="create-subcategory" placeholder="Select subcategory..." searchable class="w-full">
+                  <ui-option value="">Select subcategory...</ui-option>
+                </ui-dropdown>
+              </div>
+
+              <!-- 6. Brand & Material -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
+                <ui-dropdown id="create-brand" placeholder="Select brand..." searchable class="w-full">
+                  ${brandOptions}
+                </ui-dropdown>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
+                <ui-dropdown id="create-material" placeholder="Select material..." searchable class="w-full">
+                  ${materialOptions}
+                </ui-dropdown>
+              </div>
+            </div>
+
+            <!-- 7. Variations -->
+            <div class="pt-2 border-t border-slate-100">
+              <div class="flex items-center justify-between mb-3">
+                <label class="block text-sm font-medium text-slate-700">Product Variations</label>
+                <button type="button" onclick="this.closest('app-products-page').addVariantRow()" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition">
+                  <i class="fas fa-plus mr-1"></i> Add Variant
+                </button>
+              </div>
+              <div id="variant-list" class="space-y-3"></div>
+              <p class="text-[10px] text-slate-400 mt-2 italic">Add sizes, colors, or direct stock entries. Leave empty for single item.</p>
+            </div>
+
+            <!-- Images Section -->
+            <div class="space-y-4 pt-2 border-t border-slate-100">
+                <!-- 8. Main Image -->
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Product Main Image</label>
+                  <ui-file-upload id="create-uploader" accept="image/*" max-size="5242880"></ui-file-upload>
+                </div>
+                <!-- 9. Other Images -->
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Other Images (Gallery)</label>
+                  <ui-file-upload id="create-gallery" accept="image/*" multiple max-files="10" max-size="5242880"></ui-file-upload>
+                </div>
+            </div>
+
+            <!-- 10. Active Toggle -->
+            <div class="pt-4 border-t border-slate-100">
+              <ui-switch id="create-active" checked>
+                <span slot="label">Available for sale (Active)</span>
+              </ui-switch>
             </div>
           </div>
         </form>
-        <div slot="footer" class="w-full flex gap-3 justify-end">
-          <button modal-action="cancel" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition text-sm">Cancel</button>
-          <button id="create-save-btn" onclick="this.closest('app-products-page').submitCreate()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition text-sm">Create Product</button>
+        <div slot="footer" class="w-full flex gap-3 justify-end items-center">
+          <button modal-action="cancel" class="px-4 py-2 rounded-md text-slate-500 font-medium hover:bg-slate-50 transition text-sm">Cancel</button>
+          <div class="flex items-center gap-2">
+            <button id="create-draft-btn" onclick="this.closest('app-products-page').submitCreate('draft')" class="px-4 py-2 rounded-md border border-slate-300 text-slate-600 font-medium hover:bg-slate-50 transition text-sm flex items-center gap-2">
+              <i class="fas fa-save text-xs"></i> Save as Draft
+            </button>
+            <button id="create-publish-btn" onclick="this.closest('app-products-page').submitCreate('active')" class="px-4 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm flex items-center gap-2 shadow-sm">
+              <i class="fas fa-paper-plane text-xs"></i> Publish Product
+            </button>
+          </div>
         </div>
       </ui-modal>
 
       <!-- ── EDIT MODAL ─────────────────────────────────── -->
       <ui-modal id="product-edit-modal" position="right" size="lg" close-on-backdrop-click="false">
         <span slot="title">Edit Product</span>
-        <div class="space-y-4 px-2">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
-              <ui-input id="edit-name" class="w-full"></ui-input>
+        <div class="space-y-4">
+          
+          <div class="space-y-4">
+            <!-- 1. Product Name -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- 1. Product Name -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
+                <ui-input id="edit-name" placeholder="e.g. Classic White T-Shirt" class="w-full"></ui-input>
+              </div>
+              <!-- 1a. Product Code & SKU -->
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Product Code</label>
+                  <ui-input id="edit-code" placeholder="Auto-gen" class="w-full"></ui-input>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">SKU</label>
+                  <ui-input id="edit-sku" placeholder="Auto-gen" class="w-full"></ui-input>
+                </div>
+              </div>
             </div>
+
+            <!-- 2. Description (WYSIWYG) -->
             <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-              <ui-dropdown id="edit-category" placeholder="Select category..." searchable class="w-full" onchange="this.closest('app-products-page')._onCategoryChange(event)">
-                <ui-option value="">Select category...</ui-option>
-                ${parentCatOptions}
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Subcategory</label>
-              <ui-dropdown id="edit-subcategory" placeholder="Select subcategory..." searchable class="w-full">
-                <ui-option value="">Select subcategory...</ui-option>
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Type</label>
-              <ui-dropdown id="edit-type" placeholder="Select type..." class="w-full">
-                <ui-option value="physical">Physical</ui-option>
-                <ui-option value="digital">Digital</ui-option>
-                <ui-option value="service">Service</ui-option>
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
-              <ui-dropdown id="edit-status" class="w-full">
-                <ui-option value="active">Active</ui-option>
-                <ui-option value="draft">Draft</ui-option>
-                <ui-option value="pending">Pending</ui-option>
-                <ui-option value="archived">Archived</ui-option>
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Base Price (USD)</label>
-              <ui-input id="edit-price" type="number" min="0" step="0.01" class="w-full"></ui-input>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
-              <ui-dropdown id="edit-brand" placeholder="Select brand..." searchable class="w-full">
-                ${brandOptions}
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
-              <ui-dropdown id="edit-material" placeholder="Select material..." searchable class="w-full">
-                ${materialOptions}
-              </ui-dropdown>
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">Product Image</label>
-              <ui-file-upload id="edit-uploader" accept="image/*" max-size="5242880"></ui-file-upload>
-            </div>
-            <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <ui-textarea id="edit-description" rows="3" class="w-full"></ui-textarea>
+              <ui-wysiwyg id="edit-description" placeholder="Product description..." height="200px" toolbar="basic"></ui-wysiwyg>
             </div>
-            <div class="sm:col-span-2 mt-2">
-              <ui-switch id="edit-active" label="Active (visible on store)"></ui-switch>
+
+            <!-- 3. Details (Content Area) -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-2">More Information (Optional)</label>
+              <ui-textarea id="edit-details" rows="3" placeholder="Additional details, features, etc..." class="w-full"></ui-textarea>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- 4. Price & Type -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Base Price (USD)</label>
+                <ui-input id="edit-price" type="number" min="0" step="0.01" placeholder="0.00" class="w-full"></ui-input>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Type</label>
+                <ui-dropdown id="edit-type" placeholder="Select type..." class="w-full">
+                  <ui-option value="physical">Physical</ui-option>
+                  <ui-option value="digital">Digital</ui-option>
+                  <ui-option value="service">Service</ui-option>
+                </ui-dropdown>
+              </div>
+
+              <!-- 5. Category & Subcategory -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
+                <ui-dropdown id="edit-category" placeholder="Select category..." searchable class="w-full" onchange="this.closest('app-products-page').handleCategoryChange(event)">
+                  <ui-option value="">Select category...</ui-option>
+                  ${parentCatOptions}
+                </ui-dropdown>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Subcategory</label>
+                <ui-dropdown id="edit-subcategory" placeholder="Select subcategory..." searchable class="w-full">
+                  <ui-option value="">Select subcategory...</ui-option>
+                </ui-dropdown>
+              </div>
+
+              <!-- 6. Brand & Material -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
+                <ui-dropdown id="edit-brand" placeholder="Select brand..." searchable class="w-full">
+                  ${brandOptions}
+                </ui-dropdown>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
+                <ui-dropdown id="edit-material" placeholder="Select material..." searchable class="w-full">
+                  ${materialOptions}
+                </ui-dropdown>
+              </div>
+            </div>
+
+            <!-- Images Section -->
+            <div class="space-y-4 pt-2 border-t border-slate-100">
+                <!-- 8. Main Image -->
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Product Main Image</label>
+                  <ui-file-upload id="edit-uploader" accept="image/*" max-size="5242880"></ui-file-upload>
+                </div>
+                <!-- 9. Other Images -->
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Other Images (Gallery)</label>
+                  <ui-file-upload id="edit-gallery" accept="image/*" multiple max-files="10" max-size="5242880"></ui-file-upload>
+                </div>
+            </div>
+
+            <!-- 10. Active Toggle -->
+            <div class="pt-4 border-t border-slate-100">
+              <ui-switch id="edit-active">
+                <span slot="label">Available for sale (Active)</span>
+              </ui-switch>
             </div>
           </div>
         </div>
-        <div slot="footer" class="w-full flex gap-3 justify-end">
-          <button modal-action="cancel" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition text-sm">Cancel</button>
-          <button id="edit-save-btn" onclick="this.closest('app-products-page').submitEdit()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition text-sm">Save Changes</button>
+        <div slot="footer" class="w-full flex gap-3 justify-end items-center">
+          <button modal-action="cancel" class="px-4 py-2 rounded-md text-slate-500 font-medium hover:bg-slate-50 transition text-sm">Cancel</button>
+          <div class="flex items-center gap-2">
+            <button id="edit-save-btn" onclick="this.closest('app-products-page').submitEdit()" class="px-4 py-2 rounded-md border border-slate-300 text-slate-600 font-medium hover:bg-slate-50 transition text-sm">
+                <i class="fas fa-save mr-1 text-xs"></i> Save Changes
+            </button>
+            <button id="edit-publish-btn" onclick="this.closest('app-products-page').submitEdit('active')" class="px-4 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm flex items-center gap-2 shadow-sm">
+              <i class="fas fa-paper-plane mr-1 text-xs"></i> ${this.selectedProduct?.status === 'active' ? 'Update Product' : 'Publish Product'}
+            </button>
+          </div>
         </div>
       </ui-modal>
 
