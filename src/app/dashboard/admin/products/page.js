@@ -8,6 +8,7 @@ import "@/components/ui/Switch.js";
 import "@/components/ui/Skeleton.js";
 import "@/components/ui/Dropdown.js";
 import "@/components/ui/Toast.js";
+import "@/components/ui/FileUpload.js";
 import api from "@/services/api.js";
 import Toast from "@/components/ui/Toast.js";
 
@@ -27,6 +28,7 @@ class ProductsPage extends App {
     this._onTableDelete = (e) => { const p = this._findRow(e); if (p) this.openDeleteDialog(p); };
     this._onTableAdd   = () => this.openCreateModal();
     this._onTableRefresh = () => this.fetchData(true);
+    this._onCategoryChange = (e) => this.handleCategoryChange(e);
   }
 
   _findRow(e) {
@@ -80,8 +82,7 @@ class ProductsPage extends App {
   }
 
   imgUrl(p) {
-    const meta = p.metadata || {};
-    const img = meta.image || "";
+    const img = p.main_image || p.metadata?.image || "";
     if (!img) return "";
     if (img.startsWith("http")) return img;
     return `/api/${img.replace(/^\//, "")}`;
@@ -111,27 +112,51 @@ class ProductsPage extends App {
     return match ? String(match.id) : "";
   }
 
+  handleCategoryChange(e) {
+    const dropdown = e.target;
+    const value = e.detail?.value || dropdown?.value;
+    const isEdit = dropdown.id.includes("edit");
+    const subId = isEdit ? "edit-subcategory" : "create-subcategory";
+    const subDropdown = this.querySelector(`#${subId}`);
+    if (!subDropdown) return;
+
+    // Filter categories that have this value as parent_id
+    const filtered = (this.categories || []).filter(c => String(c.parent_id) === String(value));
+    
+    subDropdown.innerHTML = '<ui-option value="">Select subcategory...</ui-option>' + 
+      filtered.map(c => `<ui-option value="${c.id}">${c.name}</ui-option>`).join("");
+    
+    subDropdown.value = "";
+  }
+
   // ── CREATE ──────────────────────────────────────────
   openCreateModal() {
     const m = this.querySelector("#product-create-modal");
     if (m) {
       m.querySelector("form")?.reset();
       const cat = m.querySelector("#create-category");
+      const subcat = m.querySelector("#create-subcategory");
       const brand = m.querySelector("#create-brand");
       const material = m.querySelector("#create-material");
       const active = m.querySelector("#create-active");
+      const status = m.querySelector("#create-status");
       const name = m.querySelector("#create-name");
       const type = m.querySelector("#create-type");
       const price = m.querySelector("#create-price");
-      const image = m.querySelector("#create-image");
+      const uploader = m.querySelector("#create-uploader");
       const desc = m.querySelector("#create-description");
       if (cat) cat.value = "";
+      if (subcat) {
+        subcat.innerHTML = '<ui-option value="">Select subcategory...</ui-option>';
+        subcat.value = "";
+      }
       if (brand) brand.value = "";
       if (material) material.value = "";
       if (name) name.value = "";
       if (type) type.value = "physical";
       if (price) price.value = "";
-      if (image) image.value = "";
+      if (uploader) uploader.clear();
+      if (status) status.value = "draft";
       if (desc?.setValue) desc.setValue("");
       else if (desc) desc.value = "";
       if (active) {
@@ -151,46 +176,55 @@ class ProductsPage extends App {
     const form    = this.querySelector("#product-create-form");
     const saveBtn = this.querySelector("#create-save-btn");
     if (!form) return;
-    const name        = form.querySelector("#create-name")?.value?.trim();
-    const category_id = form.querySelector("#create-category")?.value;
-    const type        = form.querySelector("#create-type")?.value || "physical";
-    const base_price  = parseFloat(form.querySelector("#create-price")?.value) || 0;
-    const descEl      = form.querySelector("#create-description");
-    const description = descEl?.getValue ? descEl.getValue() : descEl?.value;
-    const image       = form.querySelector("#create-image")?.value;
-    const brand_id    = form.querySelector("#create-brand")?.value;
-    const material_id = form.querySelector("#create-material")?.value;
-    const is_active   = form.querySelector("#create-active")?.checked ? 1 : 0;
-    const brandName   = this.getBrandById(brand_id)?.name || "";
-    const materialName = this.getMaterialById(material_id)?.name || "";
-    const variants    = this.collectVariants(form.querySelector("#variant-list"));
+    const name           = form.querySelector("#create-name")?.value?.trim();
+    const parent_cat_id  = form.querySelector("#create-category")?.value;
+    const subcat_id      = form.querySelector("#create-subcategory")?.value;
+    const category_id    = subcat_id || parent_cat_id;
+    const type           = form.querySelector("#create-type")?.value || "physical";
+    const status         = form.querySelector("#create-status")?.value || "draft";
+    const base_price     = parseFloat(form.querySelector("#create-price")?.value) || 0;
+    const descEl         = form.querySelector("#create-description");
+    const description    = descEl?.getValue ? descEl.getValue() : descEl?.value;
+    const uploader       = form.querySelector("#create-uploader");
+    const brand_id       = form.querySelector("#create-brand")?.value;
+    const material_id    = form.querySelector("#create-material")?.value;
+    const is_active      = form.querySelector("#create-active")?.checked ? 1 : 0;
+    const variants       = this.collectVariants(form.querySelector("#variant-list"));
+
     if (!name) { Toast.show({ title: "Required", message: "Product name is required", variant: "error" }); return; }
     if (!category_id) { Toast.show({ title: "Required", message: "Category is required", variant: "error" }); return; }
+
     if (saveBtn) saveBtn.textContent = "Saving...";
     try {
       const payload = {
         name,
         category_id,
         type,
+        status,
         base_price,
         description,
-        image,
         brand_id,
-        brand: brandName,
         material_id,
-        material: materialName,
         is_active,
         variants,
       };
-      if (!brand_id) {
-        delete payload.brand_id;
-        delete payload.brand;
+
+      const res = await api.post("/products", payload);
+      const newId = res.data?.data?.id;
+
+      // Handle image upload if a file was selected
+      if (newId && uploader) {
+        const files = uploader.getFiles();
+        const file = files.find(f => !f.isExisting);
+        if (file) {
+          const formData = new FormData();
+          formData.append("image", file);
+          await api.post(`/products/${newId}/upload-image`, formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+          });
+        }
       }
-      if (!material_id) {
-        delete payload.material_id;
-        delete payload.material;
-      }
-      await api.post("/products", payload);
+
       Toast.show({ title: "Created", message: "Product added successfully", variant: "success" });
       this.closeCreateModal();
       await this.fetchData(true);
@@ -257,21 +291,38 @@ class ProductsPage extends App {
     this.selectedProduct = product;
     const m = this.querySelector("#product-edit-modal");
     if (!m) return;
+    
     m.querySelector("#edit-name").value        = product.name || "";
-    m.querySelector("#edit-category").value    = product.category_id || "";
     m.querySelector("#edit-type").value        = product.type || "physical";
+    m.querySelector("#edit-status").value      = product.status || "active";
     m.querySelector("#edit-price").value       = product.base_price || "";
+    
+    // Category mapping
+    const cat = this.categories.find(c => String(c.id) === String(product.category_id));
+    if (cat && cat.parent_id) {
+      m.querySelector("#edit-category").value = String(cat.parent_id);
+      // Trigger update for subcategory
+      this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: cat.parent_id } });
+      m.querySelector("#edit-subcategory").value = String(product.category_id);
+    } else {
+      m.querySelector("#edit-category").value = String(product.category_id || "");
+      this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: product.category_id } });
+      m.querySelector("#edit-subcategory").value = "";
+    }
+
     const editDesc = m.querySelector("#edit-description");
     if (editDesc?.setValue) {
       editDesc.setValue(product.description || "");
     } else if (editDesc) {
       editDesc.value = product.description || "";
     }
-    m.querySelector("#edit-image").value       = product.metadata?.image || "";
-    const brandId = product.metadata?.brand_id || this.findBrandIdByName(product.metadata?.brand);
-    const materialId = product.metadata?.material_id || this.findMaterialIdByName(product.metadata?.material);
-    m.querySelector("#edit-brand").value       = brandId || "";
-    m.querySelector("#edit-material").value    = materialId || "";
+
+    const uploader = m.querySelector("#edit-uploader");
+    if (uploader) uploader.setValue(product.main_image || "");
+
+    m.querySelector("#edit-brand").value       = product.brand_id || "";
+    m.querySelector("#edit-material").value    = product.material_id || "";
+    
     const sw = m.querySelector("#edit-active");
     if (sw) {
       sw.checked = !!product.is_active;
@@ -288,42 +339,50 @@ class ProductsPage extends App {
     const m       = this.querySelector("#product-edit-modal");
     const saveBtn = this.querySelector("#edit-save-btn");
     if (!m || !this.selectedProduct) return;
-    const name        = m.querySelector("#edit-name")?.value?.trim();
-    const category_id = m.querySelector("#edit-category")?.value;
-    const type        = m.querySelector("#edit-type")?.value;
-    const base_price  = parseFloat(m.querySelector("#edit-price")?.value) || 0;
-    const descEl      = m.querySelector("#edit-description");
-    const description = descEl?.getValue ? descEl.getValue() : descEl?.value;
-    const image       = m.querySelector("#edit-image")?.value;
-    const brand_id    = m.querySelector("#edit-brand")?.value;
-    const material_id = m.querySelector("#edit-material")?.value;
-    const brand       = this.getBrandById(brand_id)?.name || "";
-    const material    = this.getMaterialById(material_id)?.name || "";
-    const is_active   = m.querySelector("#edit-active")?.checked ? 1 : 0;
+    const name           = m.querySelector("#edit-name")?.value?.trim();
+    const parent_cat_id  = m.querySelector("#edit-category")?.value;
+    const subcat_id      = m.querySelector("#edit-subcategory")?.value;
+    const category_id    = subcat_id || parent_cat_id;
+    const type           = m.querySelector("#edit-type")?.value;
+    const status         = m.querySelector("#edit-status")?.value;
+    const base_price     = parseFloat(m.querySelector("#edit-price")?.value) || 0;
+    const descEl         = m.querySelector("#edit-description");
+    const description    = descEl?.getValue ? descEl.getValue() : descEl?.value;
+    const uploader       = m.querySelector("#edit-uploader");
+    const brand_id       = m.querySelector("#edit-brand")?.value;
+    const material_id    = m.querySelector("#edit-material")?.value;
+    const is_active      = m.querySelector("#edit-active")?.checked ? 1 : 0;
+
     if (!name) { Toast.show({ title: "Required", message: "Name is required", variant: "error" }); return; }
     if (saveBtn) saveBtn.textContent = "Saving...";
+
     try {
+      // 1. Handle image upload first if a NEW file was selected
+      if (uploader) {
+        const files = uploader.getFiles();
+        const file = files.find(f => !f.isExisting);
+        if (file) {
+          const formData = new FormData();
+          formData.append("image", file);
+          await api.post(`/products/${this.selectedProduct.id}/upload-image`, formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+          });
+        }
+      }
+
+      // 2. Update product details
       const payload = {
         name,
         category_id,
         type,
+        status,
         base_price,
         description,
-        image,
         brand_id,
-        brand,
         material_id,
-        material,
         is_active,
       };
-      if (!brand_id) {
-        delete payload.brand_id;
-        delete payload.brand;
-      }
-      if (!material_id) {
-        delete payload.material_id;
-        delete payload.material;
-      }
+
       await api.put(`/products/${this.selectedProduct.id}`, payload);
       Toast.show({ title: "Updated", message: "Product updated successfully", variant: "success" });
       this.closeEditModal();
@@ -350,12 +409,8 @@ class ProductsPage extends App {
     m.querySelector("#view-price").textContent    = this.fmt(product.base_price);
     m.querySelector("#view-stock").textContent    = product.total_stock ?? "—";
     m.querySelector("#view-variants").textContent = product.variant_count ?? "—";
-    const viewBrand = product.metadata?.brand_id
-      ? this.getBrandById(product.metadata.brand_id)?.name
-      : product.metadata?.brand;
-    const viewMaterial = product.metadata?.material_id
-      ? this.getMaterialById(product.metadata.material_id)?.name
-      : product.metadata?.material;
+    const viewBrand = product.brand_name || (product.brand_id ? this.getBrandById(product.brand_id)?.name : "—");
+    const viewMaterial = product.material_name || (product.material_id ? this.getMaterialById(product.material_id)?.name : "—");
     m.querySelector("#view-brand").textContent    = viewBrand || "—";
     m.querySelector("#view-material").textContent = viewMaterial || "—";
     m.querySelector("#view-desc").innerHTML       = product.description || "<span class='text-slate-400 italic'>No description</span>";
@@ -439,7 +494,13 @@ class ProductsPage extends App {
 
     const safeData = JSON.stringify(rows).replace(/"/g, "&quot;");
     const safeCols = JSON.stringify(columns).replace(/"/g, "&quot;");
-    const catOptions = this.categories.map((c) => `<ui-option value="${c.id}">${c.name}</ui-option>`).join("");
+    
+    // Only top level categories for the first dropdown
+    const parentCatOptions = this.categories
+      .filter(c => !c.parent_id)
+      .map((c) => `<ui-option value="${c.id}">${c.name}</ui-option>`)
+      .join("");
+      
     const brandOptions = this.brands.map((b) => `<ui-option value="${b.id}">${b.name}</ui-option>`).join("");
     const materialOptions = this.materials.map((m) => `<ui-option value="${m.id}">${m.name}</ui-option>`).join("");
 
@@ -506,8 +567,15 @@ class ProductsPage extends App {
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-              <ui-dropdown id="create-category" placeholder="Select category..." searchable class="w-full">
-                ${catOptions}
+              <ui-dropdown id="create-category" placeholder="Select category..." searchable class="w-full" onchange="this.closest('app-products-page')._onCategoryChange(event)">
+                <ui-option value="">Select category...</ui-option>
+                ${parentCatOptions}
+              </ui-dropdown>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Subcategory</label>
+              <ui-dropdown id="create-subcategory" placeholder="Select subcategory..." searchable class="w-full">
+                <ui-option value="">Select subcategory...</ui-option>
               </ui-dropdown>
             </div>
             <div>
@@ -516,6 +584,15 @@ class ProductsPage extends App {
                 <ui-option value="physical">Physical</ui-option>
                 <ui-option value="digital">Digital</ui-option>
                 <ui-option value="service">Service</ui-option>
+              </ui-dropdown>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <ui-dropdown id="create-status" class="w-full">
+                <ui-option value="active">Active</ui-option>
+                <ui-option value="draft">Draft</ui-option>
+                <ui-option value="pending">Pending</ui-option>
+                <ui-option value="archived">Archived</ui-option>
               </ui-dropdown>
             </div>
             <div>
@@ -535,8 +612,8 @@ class ProductsPage extends App {
               </ui-dropdown>
             </div>
             <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">Image URL</label>
-              <ui-input id="create-image" type="url" placeholder="https://..." class="w-full"></ui-input>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Product Image</label>
+              <ui-file-upload id="create-uploader" accept="image/*" max-size="5242880"></ui-file-upload>
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
@@ -572,8 +649,15 @@ class ProductsPage extends App {
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-              <ui-dropdown id="edit-category" placeholder="Select category..." searchable class="w-full">
-                ${catOptions}
+              <ui-dropdown id="edit-category" placeholder="Select category..." searchable class="w-full" onchange="this.closest('app-products-page')._onCategoryChange(event)">
+                <ui-option value="">Select category...</ui-option>
+                ${parentCatOptions}
+              </ui-dropdown>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Subcategory</label>
+              <ui-dropdown id="edit-subcategory" placeholder="Select subcategory..." searchable class="w-full">
+                <ui-option value="">Select subcategory...</ui-option>
               </ui-dropdown>
             </div>
             <div>
@@ -582,6 +666,15 @@ class ProductsPage extends App {
                 <ui-option value="physical">Physical</ui-option>
                 <ui-option value="digital">Digital</ui-option>
                 <ui-option value="service">Service</ui-option>
+              </ui-dropdown>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <ui-dropdown id="edit-status" class="w-full">
+                <ui-option value="active">Active</ui-option>
+                <ui-option value="draft">Draft</ui-option>
+                <ui-option value="pending">Pending</ui-option>
+                <ui-option value="archived">Archived</ui-option>
               </ui-dropdown>
             </div>
             <div>
@@ -601,8 +694,8 @@ class ProductsPage extends App {
               </ui-dropdown>
             </div>
             <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-slate-700 mb-1">Image URL</label>
-              <ui-input id="edit-image" type="url" class="w-full"></ui-input>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Product Image</label>
+              <ui-file-upload id="edit-uploader" accept="image/*" max-size="5242880"></ui-file-upload>
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
