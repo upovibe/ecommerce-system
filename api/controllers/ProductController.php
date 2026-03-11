@@ -6,6 +6,7 @@ require_once __DIR__ . '/../middlewares/RoleMiddleware.php';
 require_once __DIR__ . '/../models/ProductModel.php';
 require_once __DIR__ . '/../models/ProductVariantModel.php';
 require_once __DIR__ . '/../helpers/SlugHelper.php';
+require_once __DIR__ . '/../core/UploadCore.php';
 
 class ProductController
 {
@@ -20,20 +21,42 @@ class ProductController
         $this->variantModel = new ProductVariantModel($pdo);
     }
 
-    /**
-     * GET /products  — list all products with category and variant count
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /products — list all products with joins
+    // ─────────────────────────────────────────────────────────────────────────
     public function index()
     {
         try {
             RoleMiddleware::requireAdmin($this->pdo);
 
             $stmt = $this->pdo->query("
-                SELECT p.*, c.name AS category_name,
-                       COUNT(v.id) AS variant_count,
-                       COALESCE(SUM(v.stock), 0) AS total_stock
+                SELECT
+                    p.id,
+                    p.name,
+                    p.slug,
+                    p.type,
+                    p.status,
+                    p.description,
+                    p.main_image,
+                    p.images,
+                    p.base_price,
+                    p.is_active,
+                    p.created_at,
+                    p.updated_at,
+                    p.category_id,
+                    c.name  AS category_name,
+                    p.brand_id,
+                    b.name  AS brand_name,
+                    p.material_id,
+                    m.name  AS material_name,
+                    p.created_by,
+                    p.updated_by,
+                    COUNT(v.id)          AS variant_count,
+                    COALESCE(SUM(v.stock), 0) AS total_stock
                 FROM products p
-                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN categories c   ON c.id = p.category_id
+                LEFT JOIN brands b       ON b.id = p.brand_id
+                LEFT JOIN materials m    ON m.id = p.material_id
                 LEFT JOIN product_variants v ON v.product_id = p.id
                 GROUP BY p.id
                 ORDER BY p.created_at DESC
@@ -41,13 +64,7 @@ class ProductController
             $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($products as &$p) {
-                $p['base_price']    = (float) $p['base_price'];
-                $p['is_active']     = (bool)  $p['is_active'];
-                $p['variant_count'] = (int)   $p['variant_count'];
-                $p['total_stock']   = (int)   $p['total_stock'];
-                if (is_string($p['metadata'])) {
-                    $p['metadata'] = json_decode($p['metadata'], true) ?: [];
-                }
+                $p = $this->castProduct($p);
             }
 
             http_response_code(200);
@@ -58,18 +75,24 @@ class ProductController
         }
     }
 
-    /**
-     * GET /products/{id}
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /products/{id}
+    // ─────────────────────────────────────────────────────────────────────────
     public function show($id)
     {
         try {
             RoleMiddleware::requireAdmin($this->pdo);
 
             $stmt = $this->pdo->prepare("
-                SELECT p.*, c.name AS category_name
+                SELECT
+                    p.*,
+                    c.name  AS category_name,
+                    b.name  AS brand_name,
+                    m.name  AS material_name
                 FROM products p
                 LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN brands b     ON b.id = p.brand_id
+                LEFT JOIN materials m  ON m.id = p.material_id
                 WHERE p.id = ?
             ");
             $stmt->execute([$id]);
@@ -81,11 +104,7 @@ class ProductController
                 return;
             }
 
-            $product['base_price'] = (float) $product['base_price'];
-            $product['is_active']  = (bool)  $product['is_active'];
-            if (is_string($product['metadata'])) {
-                $product['metadata'] = json_decode($product['metadata'], true) ?: [];
-            }
+            $product = $this->castProduct($product);
 
             // Get variants
             $stmt = $this->pdo->prepare("SELECT * FROM product_variants WHERE product_id = ? ORDER BY id");
@@ -109,9 +128,9 @@ class ProductController
         }
     }
 
-    /**
-     * POST /products
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /products
+    // ─────────────────────────────────────────────────────────────────────────
     public function store()
     {
         try {
@@ -130,30 +149,37 @@ class ProductController
                 return;
             }
 
-            // Generate unique slug
             $slug = generateSlug($data['name']);
             $slug = ensureUniqueSlug($this->pdo, $slug, 'products', 'slug');
 
-            $metadata = [];
-            if (!empty($data['image']))        $metadata['image']        = $data['image'];
-            if (!empty($data['brand']))        $metadata['brand']        = $data['brand'];
-            if (!empty($data['brand_id']))     $metadata['brand_id']     = (int) $data['brand_id'];
-            if (!empty($data['material']))     $metadata['material']     = $data['material'];
-            if (!empty($data['material_id']))  $metadata['material_id']  = (int) $data['material_id'];
-            if (!empty($data['warranty']))     $metadata['warranty']     = $data['warranty'];
+            // Resolve updated_by from JWT if available
+            $auth = $this->getAuthUserId();
 
             $id = $this->productModel->create([
-                'category_id' => (int) $data['category_id'],
-                'name'        => trim($data['name']),
-                'slug'        => $slug,
-                'type'        => $data['type'] ?? 'physical',
-                'description' => $data['description'] ?? null,
-                'base_price'  => (float) ($data['base_price'] ?? 0),
-                'metadata'    => json_encode($metadata),
-                'is_active'   => isset($data['is_active']) ? (int)(bool)$data['is_active'] : 1,
+                'category_id'  => (int) $data['category_id'],
+                'brand_id'     => !empty($data['brand_id'])    ? (int) $data['brand_id']    : null,
+                'material_id'  => !empty($data['material_id']) ? (int) $data['material_id'] : null,
+                'created_by'   => $auth,
+                'updated_by'   => $auth,
+                'name'         => trim($data['name']),
+                'slug'         => $slug,
+                'type'         => $data['type']   ?? 'physical',
+                'status'       => $data['status'] ?? 'draft',
+                'description'  => $data['description'] ?? null,
+                'details'      => isset($data['details']) ? json_encode($data['details']) : null,
+                'main_image'   => $data['main_image'] ?? null,
+                'images'       => isset($data['images']) ? json_encode($data['images']) : null,
+                'base_price'   => (float) ($data['base_price'] ?? 0),
+                'is_active'    => isset($data['is_active']) ? (int)(bool)$data['is_active'] : 1,
             ]);
 
-            // Seed default variant if none
+            if (!$id) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Failed to create product']);
+                return;
+            }
+
+            // Seed variants
             if (empty($data['variants'])) {
                 $this->pdo->prepare("
                     INSERT INTO product_variants (product_id, sku, stock, is_active, created_at, updated_at)
@@ -182,9 +208,9 @@ class ProductController
         }
     }
 
-    /**
-     * PUT /products/{id}
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // PUT /products/{id}
+    // ─────────────────────────────────────────────────────────────────────────
     public function update($id)
     {
         try {
@@ -199,25 +225,32 @@ class ProductController
                 return;
             }
 
-            $updateData = [];
+            $auth = $this->getAuthUserId();
+            $updateData = ['updated_by' => $auth];
+
             if (isset($data['name']))        $updateData['name']        = trim($data['name']);
             if (isset($data['category_id'])) $updateData['category_id'] = (int) $data['category_id'];
+            if (isset($data['brand_id']))    $updateData['brand_id']    = $data['brand_id'] ? (int) $data['brand_id'] : null;
+            if (isset($data['material_id'])) $updateData['material_id'] = $data['material_id'] ? (int) $data['material_id'] : null;
             if (isset($data['type']))        $updateData['type']        = $data['type'];
+            if (isset($data['status']))      $updateData['status']      = $data['status'];
             if (isset($data['description'])) $updateData['description'] = $data['description'];
+            if (isset($data['details']))     $updateData['details']     = json_encode($data['details']);
+            if (isset($data['main_image']))  $updateData['main_image']  = $data['main_image'];
+            if (isset($data['images']))      $updateData['images']      = json_encode($data['images']);
             if (isset($data['base_price']))  $updateData['base_price']  = (float) $data['base_price'];
             if (isset($data['is_active']))   $updateData['is_active']   = (int)(bool)$data['is_active'];
 
-            // Merge metadata
-            $meta = is_string($existing['metadata'])
-                ? (json_decode($existing['metadata'], true) ?: [])
-                : ($existing['metadata'] ?: []);
-            if (isset($data['image']))       $meta['image']       = $data['image'];
-            if (isset($data['brand']))       $meta['brand']       = $data['brand'];
-            if (isset($data['brand_id']))    $meta['brand_id']    = (int) $data['brand_id'];
-            if (isset($data['material']))    $meta['material']    = $data['material'];
-            if (isset($data['material_id'])) $meta['material_id'] = (int) $data['material_id'];
-            if (isset($data['warranty']))    $meta['warranty']    = $data['warranty'];
-            $updateData['metadata'] = json_encode($meta);
+            // Regenerate slug only if name changed
+            if (!empty($data['name'])) {
+                $updateData['slug'] = ensureUniqueSlug(
+                    $this->pdo,
+                    generateSlug($data['name']),
+                    'products',
+                    'slug',
+                    $id
+                );
+            }
 
             $this->productModel->update($id, $updateData);
 
@@ -229,9 +262,9 @@ class ProductController
         }
     }
 
-    /**
-     * DELETE /products/{id}
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // DELETE /products/{id}
+    // ─────────────────────────────────────────────────────────────────────────
     public function destroy($id)
     {
         try {
@@ -244,7 +277,13 @@ class ProductController
                 return;
             }
 
-            // Cascade deletes variants via DB FK, but we delete explicitly for clarity
+            // Delete local images
+            $this->deleteLocalImage($existing['main_image'] ?? null);
+            if (!empty($existing['images'])) {
+                $imgs = is_string($existing['images']) ? json_decode($existing['images'], true) : $existing['images'];
+                foreach ((array)$imgs as $img) { $this->deleteLocalImage($img); }
+            }
+
             $this->pdo->prepare("DELETE FROM product_variants WHERE product_id = ?")->execute([$id]);
             $this->productModel->delete($id);
 
@@ -256,9 +295,9 @@ class ProductController
         }
     }
 
-    /**
-     * PUT /products/{id}/toggle-active
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // PUT /products/{id}/toggle-active
+    // ─────────────────────────────────────────────────────────────────────────
     public function toggleActive($id)
     {
         try {
@@ -266,7 +305,7 @@ class ProductController
             $p = $this->productModel->findById($id);
             if (!$p) { http_response_code(404); echo json_encode(['success' => false]); return; }
             $new = !$p['is_active'];
-            $this->productModel->update($id, ['is_active' => (int)$new]);
+            $this->productModel->update($id, ['is_active' => (int)$new, 'updated_by' => $this->getAuthUserId()]);
             http_response_code(200);
             echo json_encode(['success' => true, 'is_active' => $new]);
         } catch (Exception $e) {
@@ -274,4 +313,105 @@ class ProductController
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /products/{id}/upload-image
+    // ─────────────────────────────────────────────────────────────────────────
+    public function uploadImage($id)
+    {
+        ob_clean();
+        try {
+            RoleMiddleware::requireAdmin($this->pdo);
+
+            $product = $this->productModel->findById($id);
+            if (!$product) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Product not found']);
+                return;
+            }
+
+            if (!isset($_FILES['image']) || $_FILES['image']['error'] === UPLOAD_ERR_NO_FILE) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'No image file provided']);
+                return;
+            }
+
+            $config = [
+                'upload_path'   => 'uploads/products/',
+                'max_size'      => 5242880, // 5MB
+                'allowed_types' => ['images' => ['jpg', 'jpeg', 'png', 'gif', 'webp']],
+            ];
+
+            $result = uploadImage($_FILES['image'], $config);
+
+            if (!$result['success']) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => $result['message']]);
+                return;
+            }
+
+            // Delete old main image if stored locally
+            $this->deleteLocalImage($product['main_image'] ?? null);
+
+            $auth = $this->getAuthUserId();
+            $this->productModel->update($id, [
+                'main_image' => $result['filepath'],
+                'updated_by' => $auth,
+            ]);
+
+            http_response_code(200);
+            echo json_encode([
+                'success'   => true,
+                'image_url' => '/' . $result['filepath'],
+                'filepath'  => $result['filepath'],
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Private helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function castProduct(array $p): array
+    {
+        $p['base_price']    = (float) $p['base_price'];
+        $p['is_active']     = (bool)  $p['is_active'];
+        $p['variant_count'] = isset($p['variant_count']) ? (int) $p['variant_count'] : null;
+        $p['total_stock']   = isset($p['total_stock'])   ? (int) $p['total_stock']   : null;
+        foreach (['brand_id', 'material_id', 'category_id', 'created_by', 'updated_by'] as $col) {
+            if (isset($p[$col])) $p[$col] = $p[$col] ? (int)$p[$col] : null;
+        }
+        foreach (['details', 'images'] as $col) {
+            if (isset($p[$col]) && is_string($p[$col])) {
+                $p[$col] = json_decode($p[$col], true);
+            }
+        }
+        return $p;
+    }
+
+    private function getAuthUserId(): ?int
+    {
+        try {
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            if (!$authHeader) return null;
+            $token = str_replace('Bearer ', '', $authHeader);
+            $parts = explode('.', $token);
+            if (count($parts) !== 3) return null;
+            $payload = json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $parts[1])), true);
+            return isset($payload['id']) ? (int)$payload['id'] : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function deleteLocalImage(?string $path): void
+    {
+        if (!$path || str_starts_with($path, 'http')) return;
+        $full = __DIR__ . '/../../' . ltrim($path, '/');
+        if (file_exists($full)) @unlink($full);
+    }
 }
+?>

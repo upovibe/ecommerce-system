@@ -9,22 +9,34 @@ class ProductModel extends BaseModel
 
     protected static $fillable = [
         'category_id',
+        'brand_id',
+        'material_id',
         'created_by',
+        'updated_by',
         'name',
         'slug',
         'type',
+        'status',
         'description',
+        'details',
+        'main_image',
+        'images',
         'base_price',
-        'metadata',
-        'is_active'
+        'is_active',
     ];
 
     protected static $casts = [
-        'base_price' => 'float',
-        'metadata' => 'json',
-        'is_active' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'base_price'  => 'float',
+        'details'     => 'json',
+        'images'      => 'json',
+        'is_active'   => 'boolean',
+        'brand_id'    => 'integer',
+        'material_id' => 'integer',
+        'category_id' => 'integer',
+        'created_by'  => 'integer',
+        'updated_by'  => 'integer',
+        'created_at'  => 'datetime',
+        'updated_at'  => 'datetime',
     ];
 
     protected static $timestamps = true;
@@ -34,3 +46,4 @@ class ProductModel extends BaseModel
         parent::__construct($pdo);
     }
 }
+?>
