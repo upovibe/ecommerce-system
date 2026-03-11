@@ -126,9 +126,23 @@ class ProductsPage extends App {
 
     // Filter categories that have this value as parent_id
     const filtered = (this.categories || []).filter(c => String(c.parent_id) === String(value));
+
+    // Clear existing options
+    Array.from(subDropdown.querySelectorAll('ui-option')).forEach(opt => opt.remove());
     
-    subDropdown.innerHTML = '<ui-option value="">Select subcategory...</ui-option>' + 
-      filtered.map(c => `<ui-option value="${c.id}">${c.name}</ui-option>`).join("");
+    // Add default option
+    const defaultOpt = document.createElement('ui-option');
+    defaultOpt.setAttribute('value', '');
+    defaultOpt.textContent = 'Select subcategory...';
+    subDropdown.appendChild(defaultOpt);
+
+    // Add filtered subcategories
+    filtered.forEach(c => {
+      const opt = document.createElement('ui-option');
+      opt.setAttribute('value', String(c.id));
+      opt.textContent = c.name;
+      subDropdown.appendChild(opt);
+    });
     
     subDropdown.value = "";
   }
@@ -151,7 +165,11 @@ class ProductsPage extends App {
       const desc = m.querySelector("#create-description");
       if (cat) cat.value = "";
       if (subcat) {
-        subcat.innerHTML = '<ui-option value="">Select subcategory...</ui-option>';
+        Array.from(subcat.querySelectorAll('ui-option')).forEach(opt => opt.remove());
+        const defaultOpt = document.createElement('ui-option');
+        defaultOpt.setAttribute('value', '');
+        defaultOpt.textContent = 'Select subcategory...';
+        subcat.appendChild(defaultOpt);
         subcat.value = "";
       }
       if (brand) brand.value = "";
@@ -352,11 +370,11 @@ class ProductsPage extends App {
     if (cat && cat.parent_id) {
       m.querySelector("#edit-category").value = String(cat.parent_id);
       // Trigger update for subcategory
-      this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: cat.parent_id } });
+      this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: String(cat.parent_id) } });
       m.querySelector("#edit-subcategory").value = String(product.category_id);
     } else {
       m.querySelector("#edit-category").value = String(product.category_id || "");
-      this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: product.category_id } });
+      this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: String(product.category_id || "") } });
       m.querySelector("#edit-subcategory").value = "";
     }
 
@@ -397,8 +415,8 @@ class ProductsPage extends App {
         gallery.setValue(imgs || []);
     }
 
-    m.querySelector("#edit-brand").value       = product.brand_id || "";
-    m.querySelector("#edit-material").value    = product.material_id || "";
+    m.querySelector("#edit-brand").value       = String(product.brand_id || "");
+    m.querySelector("#edit-material").value    = String(product.material_id || "");
     
     const sw = m.querySelector("#edit-active");
     if (sw) {
@@ -567,7 +585,16 @@ class ProductsPage extends App {
         image: imgSrc
           ? `<img src="${imgSrc}" class="w-10 h-10 rounded-lg object-cover border border-slate-200" alt="${p.name}" onerror="this.style.display='none'">`
           : `<div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300"><i class="fas fa-box text-sm"></i></div>`,
-        name: `<div><p class="font-semibold text-slate-900 text-sm">${p.name}</p><p class="text-xs text-slate-400">${p.category_name || "—"}</p></div>`,
+        name: `
+          <div>
+            <p class="font-semibold text-slate-900 text-sm leading-tight">${p.name}</p>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded font-mono">${p.product_code || "N/A"}</span>
+              <span class="text-[10px] text-slate-400 font-mono">${p.sku || "—"}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5 font-medium">${p.category_name || "—"}</p>
+          </div>
+        `,
         type: `<span class="capitalize text-xs px-2 py-0.5 rounded-full font-medium ${p.type === "physical" ? "bg-blue-50 text-blue-600" : p.type === "digital" ? "bg-purple-50 text-purple-600" : "bg-teal-50 text-teal-600"}">${p.type}</span>`,
         price: this.fmt(p.base_price),
         variants: p.variant_count,

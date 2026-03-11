@@ -142,6 +142,7 @@ class PageSettingsModal extends HTMLElement {
                     </div>
 
                     <div class="pt-2">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
                         <ui-switch 
                             id="page-status-switch" 
                             ${this.pageData.is_active ? "checked" : ""}

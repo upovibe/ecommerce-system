@@ -593,7 +593,10 @@ class Dropdown extends HTMLElement {
             // Multi-select mode
             const tags = Array.from(this.selectedValues).map(value => {
                 // Find the option in this._options
-                const option = (this._options || []).find(opt => opt.getAttribute('value') === value);
+                const option = (this._options || []).find(opt => {
+                    const optVal = opt.getAttribute('value');
+                    return optVal == value || String(optVal) === String(value);
+                });
                 const text = option ? option.textContent.trim() : value;
                 return `
                     <span class="upo-dropdown-tag">
@@ -618,7 +621,10 @@ class Dropdown extends HTMLElement {
             // Single-select mode
             const value = Array.from(this.selectedValues)[0];
             // Find the option in this._options
-            const option = (this._options || []).find(opt => opt.getAttribute('value') === value);
+            const option = (this._options || []).find(opt => {
+                const optVal = opt.getAttribute('value');
+                return optVal == value || String(optVal) === String(value);
+            });
             const text = option ? option.textContent.trim() : value;
             this.selection.innerHTML = `<span>${text}</span>`;
     }
@@ -648,7 +654,7 @@ class Dropdown extends HTMLElement {
             const value = option.getAttribute('value');
             const text = option.textContent.trim();
             const disabled = option.hasAttribute('disabled');
-            const selected = this.selectedValues.has(value);
+            const selected = Array.from(this.selectedValues).some(v => v == value || String(v) === String(value));
             const focused = index === this.focusedIndex;
             
             let optionHtml = `<div class="upo-dropdown-option`;

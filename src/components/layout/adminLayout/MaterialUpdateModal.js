@@ -168,6 +168,7 @@ class MaterialUpdateModal extends HTMLElement {
             <ui-file-upload data-field="image" accept="image/*" max-size="5242880" max-files="1" ${imageValue ? `value="${imageValue}"` : ""} class="w-full"></ui-file-upload>
           </div>
           <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
             <ui-switch name="is_active" ${material.is_active !== false ? "checked" : ""}>
               <span slot="label">Active</span>
             </ui-switch>

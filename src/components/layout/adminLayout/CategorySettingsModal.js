@@ -156,6 +156,7 @@ class CategorySettingsModal extends HTMLElement {
             <ui-file-upload data-field="image" accept="image/*" max-size="5242880" max-files="1" class="w-full"></ui-file-upload>
           </div>
           <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
             <ui-switch name="is_active" checked>
               <span slot="label">Active</span>
             </ui-switch>

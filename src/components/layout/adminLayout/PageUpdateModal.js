@@ -164,6 +164,16 @@ class PageUpdateModal extends HTMLElement {
             </ui-file-upload>
           </div>
 
+          <!-- Status -->
+          <div class="pt-4 border-t border-slate-100">
+            <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+            <ui-switch 
+              id="page-status-switch" 
+              ${this.formData.is_active ? "checked" : ""}
+              label="Published">
+            </ui-switch>
+          </div>
+
         </div>
 
         <div slot="footer" class="flex justify-end gap-3">
@@ -179,6 +189,10 @@ class PageUpdateModal extends HTMLElement {
     });
     this.querySelector("#cancel-page-btn")?.addEventListener("click", () => this.close());
     this.querySelector("#save-page-btn")?.addEventListener("click", () => this.savePage());
+
+    this.querySelector("#page-status-switch")?.addEventListener("change", (e) => {
+      this.formData.is_active = e.detail.checked;
+    });
 
     // Wire up individual gallery remove buttons
     this.querySelectorAll("[data-remove-gallery]").forEach((btn) => {
