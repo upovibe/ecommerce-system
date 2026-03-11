@@ -354,77 +354,88 @@ class ProductsPage extends App {
   }
 
   // ── EDIT ────────────────────────────────────────────
-  openEditModal(product) {
+  async openEditModal(product) {
+    if (!product?.id) return;
     this.selectedProduct = product;
     const m = this.querySelector("#product-edit-modal");
     if (!m) return;
-    
-    m.querySelector("#edit-name").value        = product.name || "";
-    m.querySelector("#edit-code").value        = product.product_code || "";
-    m.querySelector("#edit-sku").value         = product.sku || "";
-    m.querySelector("#edit-type").value        = product.type || "physical";
-    m.querySelector("#edit-price").value       = product.base_price || "";
-    
-    // Category mapping
-    const cat = this.categories.find(c => String(c.id) === String(product.category_id));
-    if (cat && cat.parent_id) {
-      m.querySelector("#edit-category").value = String(cat.parent_id);
-      // Trigger update for subcategory
-      this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: String(cat.parent_id) } });
-      m.querySelector("#edit-subcategory").value = String(product.category_id);
-    } else {
-      m.querySelector("#edit-category").value = String(product.category_id || "");
-      this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: String(product.category_id || "") } });
-      m.querySelector("#edit-subcategory").value = "";
-    }
-
-    const vList = m.querySelector("#variant-list");
-    if (vList) {
-      vList.innerHTML = "";
-      if (product.variants && Array.isArray(product.variants)) {
-        product.variants.forEach(v => {
-          const vData = typeof v.variant_values === 'string' ? JSON.parse(v.variant_values) : v.variant_values;
-          const label = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options)?.label : v.variant_options?.label;
-          this.addVariantRow({
-            attribute_id: vData?.attribute_id,
-            label: label || "",
-            price_override: v.price_override,
-            stock: v.stock
-          });
-        });
-      }
-    }
-
-    const editDesc = m.querySelector("#edit-description");
-    if (editDesc?.setValue) {
-      editDesc.setValue(product.description || "");
-    }
-
-    const editDetails = m.querySelector("#edit-details");
-    if (editDetails) {
-        const d = typeof product.details === 'string' ? JSON.parse(product.details) : product.details;
-        editDetails.value = d?.note || "";
-    }
-
-    const uploader = m.querySelector("#edit-uploader");
-    if (uploader) uploader.setValue(product.main_image || "");
-
-    const gallery = m.querySelector("#edit-gallery");
-    if (gallery && product.images) {
-        const imgs = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
-        gallery.setValue(imgs || []);
-    }
-
-    m.querySelector("#edit-brand").value       = String(product.brand_id || "");
-    m.querySelector("#edit-material").value    = String(product.material_id || "");
-    
-    const sw = m.querySelector("#edit-active");
-    if (sw) {
-      sw.checked = !!product.is_active;
-      if (sw.checked) sw.setAttribute("checked", "");
-      else sw.removeAttribute("checked");
-    }
     m.open();
+
+    try {
+      const res = await api.get(`/products/${product.id}`);
+      const fullProduct = res.data?.data;
+      if (!fullProduct) throw new Error("Product data not found");
+      this.selectedProduct = fullProduct;
+      const p = fullProduct;
+      
+      m.querySelector("#edit-name").value        = p.name || "";
+      m.querySelector("#edit-code").value        = p.product_code || "";
+      m.querySelector("#edit-sku").value         = p.sku || "";
+      m.querySelector("#edit-type").value        = p.type || "physical";
+      m.querySelector("#edit-price").value       = p.base_price || "";
+      
+      // Category mapping
+      const cat = this.categories.find(c => String(c.id) === String(p.category_id));
+      if (cat && cat.parent_id) {
+        m.querySelector("#edit-category").value = String(cat.parent_id);
+        this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: String(cat.parent_id) } });
+        m.querySelector("#edit-subcategory").value = String(p.category_id);
+      } else {
+        m.querySelector("#edit-category").value = String(p.category_id || "");
+        this.handleCategoryChange({ target: m.querySelector("#edit-category"), detail: { value: String(p.category_id || "") } });
+        m.querySelector("#edit-subcategory").value = "";
+      }
+
+      const vList = m.querySelector("#variant-list");
+      if (vList) {
+        vList.innerHTML = "";
+        if (p.variants && Array.isArray(p.variants)) {
+          p.variants.forEach(v => {
+            const label = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options)?.label : v.variant_options?.label;
+            const vData = typeof v.variant_values === 'string' ? JSON.parse(v.variant_values) : v.variant_values;
+            this.addVariantRow({
+              attribute_id: v.attribute_id || vData?.attribute_id,
+              label: label || "",
+              price_override: v.price_override,
+              stock: v.stock
+            });
+          });
+        }
+      }
+
+      const editDesc = m.querySelector("#edit-description");
+      if (editDesc?.setValue) {
+        editDesc.setValue(p.description || "");
+      }
+
+      const editDetails = m.querySelector("#edit-details");
+      if (editDetails) {
+          const d = typeof p.details === 'string' ? JSON.parse(p.details) : p.details;
+          editDetails.value = d?.note || "";
+      }
+
+      const uploader = m.querySelector("#edit-uploader");
+      if (uploader) uploader.setValue(p.main_image || "");
+
+      const gallery = m.querySelector("#edit-gallery");
+      if (gallery && p.images) {
+          const imgs = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+          gallery.setValue(imgs || []);
+      }
+
+      m.querySelector("#edit-brand").value       = String(p.brand_id || "");
+      m.querySelector("#edit-material").value    = String(p.material_id || "");
+      
+      const sw = m.querySelector("#edit-active");
+      if (sw) {
+        sw.checked = !!p.is_active;
+        if (sw.checked) sw.setAttribute("checked", "");
+        else sw.removeAttribute("checked");
+      }
+    } catch (e) {
+      console.error(e);
+      Toast.show({ title: "Error", message: "Failed to load product details", variant: "error" });
+    }
   }
   closeEditModal() {
     const m = this.querySelector("#product-edit-modal");
@@ -510,29 +521,98 @@ class ProductsPage extends App {
   }
 
   // ── VIEW ────────────────────────────────────────────
-  openViewModal(product) {
+  async openViewModal(product) {
+    if (!product?.id) return;
     this.selectedProduct = product;
+    
     const m = this.querySelector("#product-view-modal");
     if (!m) return;
-    const imgSrc = this.imgUrl(product);
-    m.querySelector("#view-banner").innerHTML = imgSrc
-      ? `<img src="${imgSrc}" class="w-full h-full object-cover" alt="${product.name}" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-box text-slate-300 text-3xl\\'></i>'">`
-      : `<i class="fas fa-box text-slate-300 text-3xl"></i>`;
-    m.querySelector("#view-name").textContent     = product.name;
-    m.querySelector("#view-category").textContent = product.category_name || "—";
-    m.querySelector("#view-type").textContent     = product.type || "—";
-    m.querySelector("#view-price").textContent    = this.fmt(product.base_price);
-    m.querySelector("#view-stock").textContent    = product.total_stock ?? "—";
-    m.querySelector("#view-variants").textContent = product.variant_count ?? "—";
-    const viewBrand = product.brand_name || (product.brand_id ? this.getBrandById(product.brand_id)?.name : "—");
-    const viewMaterial = product.material_name || (product.material_id ? this.getMaterialById(product.material_id)?.name : "—");
-    m.querySelector("#view-brand").textContent    = viewBrand || "—";
-    m.querySelector("#view-material").textContent = viewMaterial || "—";
-    m.querySelector("#view-desc").innerHTML       = product.description || "<span class='text-slate-400 italic'>No description</span>";
-    m.querySelector("#view-status").innerHTML     = product.is_active
-      ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">Active</span>`
-      : `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-bold">Inactive</span>`;
+    
     m.open();
+
+    try {
+      const res = await api.get(`/products/${product.id}`);
+      const fullProduct = res.data?.data;
+      if (!fullProduct) throw new Error("Product details not found");
+      this.selectedProduct = fullProduct;
+      const p = fullProduct;
+
+      const imgSrc = this.imgUrl(p);
+      m.querySelector("#view-banner").innerHTML = imgSrc
+        ? `<img src="${imgSrc}" class="w-full h-full object-cover rounded-2xl shadow-inner" alt="${p.name}">`
+        : `<div class="bg-indigo-50 size-20 rounded-3xl flex items-center justify-center text-indigo-300 shadow-sm"><i class="fas fa-box text-4xl"></i></div>`;
+        
+      m.querySelector("#view-name").textContent = p.name;
+      m.querySelector("#view-code").textContent = p.product_code || "—";
+      m.querySelector("#view-sku").textContent  = p.sku || "—";
+      
+      // Header Badges
+      m.querySelector("#view-category-badge").textContent = p.category_name || "Uncategorized";
+      m.querySelector("#view-type-badge").textContent     = (p.type || "physical").toUpperCase();
+      
+      // Status Badge
+      m.querySelector("#view-status-badge").innerHTML = p.is_active
+        ? `<span class="px-3 py-1.5 rounded-xl bg-emerald-500/20 backdrop-blur-md text-emerald-400 text-xs font-bold border border-emerald-500/30 flex items-center gap-2"><span class="size-1.5 rounded-full bg-emerald-400 animate-pulse"></span>ACTIVE</span>`
+        : `<span class="px-3 py-1.5 rounded-xl bg-slate-500/20 backdrop-blur-md text-slate-400 text-xs font-bold border border-slate-500/30">INACTIVE</span>`;
+        
+      // Stats
+      m.querySelector("#view-price").textContent     = this.fmt(p.base_price);
+      m.querySelector("#view-stock").textContent     = p.total_stock ?? "0";
+      m.querySelector("#view-variants").textContent  = p.variant_count ?? "0";
+      m.querySelector("#view-type-stat").textContent = p.type || "Physical";
+      
+      // Meta
+      const viewBrand = p.brand_name || (p.brand_id ? this.getBrandById(p.brand_id)?.name : "—");
+      const viewMaterial = p.material_name || (p.material_id ? this.getMaterialById(p.material_id)?.name : "—");
+      m.querySelector("#view-brand").textContent    = viewBrand || "—";
+      m.querySelector("#view-material").textContent = viewMaterial || "—";
+      
+      // Description
+      m.querySelector("#view-desc").innerHTML = p.description || "<span class='text-slate-400 italic'>No description provided</span>";
+
+      // Render variations in view modal
+      const vContainer = m.querySelector("#view-variants-list");
+      if (vContainer) {
+        const variants = p.variants || [];
+        if (variants.length === 0) {
+          vContainer.innerHTML = `<div class="p-6 text-center text-slate-400 italic bg-white rounded-2xl border border-dashed border-slate-200">No variations configured</div>`;
+        } else {
+          vContainer.innerHTML = `
+            <div class="overflow-hidden bg-white rounded-2xl border border-slate-100 shadow-sm">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th class="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Variation</th>
+                    <th class="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Price</th>
+                    <th class="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Stock</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                  ${variants.map(v => {
+                    const label = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options)?.label : v.variant_options?.label;
+                    const isLowStock = v.stock <= 5;
+                    return `
+                      <tr class="hover:bg-slate-50 transition">
+                        <td class="px-4 py-3 font-semibold text-slate-700">${label || 'Default'}</td>
+                        <td class="px-4 py-3 text-slate-600">${v.price_override ? this.fmt(v.price_override) : '<span class="text-slate-400 italic">Base</span>'}</td>
+                        <td class="px-4 py-3">
+                          <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${isLowStock ? 'bg-orange-100 text-orange-600' : 'bg-emerald-100 text-emerald-600'}">
+                            ${v.stock} pcs
+                          </span>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      Toast.show({ title: "Error", message: "Failed to load product details", variant: "error" });
+    }
   }
   closeViewModal() {
     const m = this.querySelector("#product-view-modal");
@@ -586,13 +666,19 @@ class ProductsPage extends App {
           ? `<img src="${imgSrc}" class="w-10 h-10 rounded-lg object-cover border border-slate-200" alt="${p.name}" onerror="this.style.display='none'">`
           : `<div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300"><i class="fas fa-box text-sm"></i></div>`,
         name: `
-          <div>
-            <p class="font-semibold text-slate-900 text-sm leading-tight">${p.name}</p>
-            <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded font-mono">${p.product_code || "N/A"}</span>
-              <span class="text-[10px] text-slate-400 font-mono">${p.sku || "—"}</span>
+          <div class="py-1">
+            <p class="font-bold text-slate-900 text-sm mb-1.5">${p.name}</p>
+            <div class="space-y-1">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight w-7">Code:</span>
+                <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono border border-slate-200/50">${p.product_code || "—"}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight w-7">SKU:</span>
+                <span class="text-[10px] text-slate-500 font-mono italic">${p.sku || "—"}</span>
+              </div>
             </div>
-            <p class="text-[11px] text-slate-400 mt-0.5 font-medium">${p.category_name || "—"}</p>
+            <p class="text-[10px] text-indigo-500 mt-2 font-semibold uppercase tracking-wider">${p.category_name || "—"}</p>
           </div>
         `,
         type: `<span class="capitalize text-xs px-2 py-0.5 rounded-full font-medium ${p.type === "physical" ? "bg-blue-50 text-blue-600" : p.type === "digital" ? "bg-purple-50 text-purple-600" : "bg-teal-50 text-teal-600"}">${p.type}</span>`,
@@ -608,7 +694,7 @@ class ProductsPage extends App {
     const columns = [
       { key: "no", label: "#", html: false },
       { key: "image", label: "Image" },
-      { key: "name", label: "Product" },
+      { key: "name", label: "Product & Identifiers" },
       { key: "type", label: "Type" },
       { key: "price", label: "Price", html: false },
       { key: "variants", label: "Variants", html: false },
@@ -687,22 +773,20 @@ class ProductsPage extends App {
           
           <div class="space-y-4">
             <!-- 1. Product Name -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <!-- 1. Product Name -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
+              <ui-input id="create-name" placeholder="e.g. Classic White T-Shirt" class="w-full"></ui-input>
+            </div>
+
+            <!-- 1a. Product Identifiers -->
+            <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
-                <ui-input id="create-name" placeholder="e.g. Classic White T-Shirt" class="w-full"></ui-input>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Product Code</label>
+                <ui-input id="create-code" placeholder="Auto-gen" class="w-full"></ui-input>
               </div>
-              <!-- 1a. Product Code & SKU -->
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block text-sm font-medium text-slate-700 mb-1">Product Code</label>
-                  <ui-input id="create-code" placeholder="Auto-gen" class="w-full"></ui-input>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-slate-700 mb-1">SKU</label>
-                  <ui-input id="create-sku" placeholder="Auto-gen" class="w-full"></ui-input>
-                </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">SKU</label>
+                <ui-input id="create-sku" placeholder="Auto-gen" class="w-full"></ui-input>
               </div>
             </div>
 
@@ -789,8 +873,9 @@ class ProductsPage extends App {
                 </div>
             </div>
 
-            <!-- 10. Active Toggle -->
+            <!-- 10. Status -->
             <div class="pt-4 border-t border-slate-100">
+              <label class="block text-sm font-medium text-slate-700 mb-2">Product Status</label>
               <ui-switch id="create-active" checked>
                 <span slot="label">Available for sale (Active)</span>
               </ui-switch>
@@ -817,22 +902,20 @@ class ProductsPage extends App {
           
           <div class="space-y-4">
             <!-- 1. Product Name -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <!-- 1. Product Name -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
+              <ui-input id="edit-name" placeholder="e.g. Classic White T-Shirt" class="w-full"></ui-input>
+            </div>
+
+            <!-- 1a. Product Identifiers -->
+            <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Product Name *</label>
-                <ui-input id="edit-name" placeholder="e.g. Classic White T-Shirt" class="w-full"></ui-input>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Product Code</label>
+                <ui-input id="edit-code" placeholder="Auto-gen" class="w-full"></ui-input>
               </div>
-              <!-- 1a. Product Code & SKU -->
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block text-sm font-medium text-slate-700 mb-1">Product Code</label>
-                  <ui-input id="edit-code" placeholder="Auto-gen" class="w-full"></ui-input>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-slate-700 mb-1">SKU</label>
-                  <ui-input id="edit-sku" placeholder="Auto-gen" class="w-full"></ui-input>
-                </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">SKU</label>
+                <ui-input id="edit-sku" placeholder="Auto-gen" class="w-full"></ui-input>
               </div>
             </div>
 
@@ -907,8 +990,9 @@ class ProductsPage extends App {
                 </div>
             </div>
 
-            <!-- 10. Active Toggle -->
+            <!-- 10. Status -->
             <div class="pt-4 border-t border-slate-100">
+              <label class="block text-sm font-medium text-slate-700 mb-2">Product Status</label>
               <ui-switch id="edit-active">
                 <span slot="label">Available for sale (Active)</span>
               </ui-switch>
@@ -929,39 +1013,116 @@ class ProductsPage extends App {
       </ui-modal>
 
       <!-- ── VIEW MODAL ─────────────────────────────────── -->
-      <ui-modal id="product-view-modal" position="right" size="md">
-        <span slot="title">Product Details</span>
-        <div class="space-y-4 px-2">
-          <div id="view-banner" class="w-full h-48 bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center"></div>
-          <div>
-            <h2 id="view-name" class="text-xl font-bold text-slate-900"></h2>
-            <div id="view-status" class="mt-1"></div>
+      <ui-modal id="product-view-modal" position="right" size="lg">
+        <span slot="title">Product Overview</span>
+        <div class="space-y-6">
+          <!-- Banner & Primary Info -->
+          <div class="relative h-64 bg-slate-900 rounded-2xl overflow-hidden group">
+            <div id="view-banner" class="w-full h-full opacity-60 group-hover:opacity-100 transition duration-500 flex items-center justify-center"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
+            <div class="absolute bottom-6 left-6 right-6">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="view-name" class="text-3xl font-extrabold text-white tracking-tight"></h2>
+                  <div class="flex items-center gap-2 mt-2">
+                    <span id="view-category-badge" class="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/20"></span>
+                    <span id="view-type-badge" class="px-2.5 py-1 rounded-lg bg-indigo-500/20 backdrop-blur-md text-indigo-300 text-xs font-semibold border border-indigo-500/30"></span>
+                  </div>
+                </div>
+                <div id="view-status-badge"></div>
+              </div>
+            </div>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+
+          <!-- Stats Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             ${[
-              ["Category",  "view-category"],
-              ["Type",      "view-type"],
-              ["Price",     "view-price"],
-              ["Total Stock","view-stock"],
-              ["Variants",  "view-variants"],
-              ["Brand",     "view-brand"],
-              ["Material",  "view-material"],
-            ].map(([label, id]) => `
-              <div class="bg-slate-50 rounded-xl p-3">
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">${label}</p>
-                <p id="${id}" class="mt-1 text-sm font-semibold text-slate-900"></p>
+              { label: "Price", id: "view-price", icon: "fa-tag", color: "text-emerald-500" },
+              { label: "Total Stock", id: "view-stock", icon: "fa-cubes", color: "text-blue-500" },
+              { label: "Variants", id: "view-variants", icon: "fa-layer-group", color: "text-purple-500" },
+              { label: "Product Type", id: "view-type-stat", icon: "fa-shapes", color: "text-indigo-500" },
+            ].map(s => `
+              <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center gap-3 mb-3">
+                  <div class="size-10 rounded-xl bg-slate-50 flex items-center justify-center">
+                    <i class="fas ${s.icon} ${s.color} text-base"></i>
+                  </div>
+                  <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">${s.label}</span>
+                </div>
+                <p id="${s.id}" class="text-2xl font-black text-slate-900 tracking-tight"></p>
               </div>
             `).join("")}
           </div>
-          <div class="bg-slate-50 rounded-xl p-4">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Description</p>
-            <div id="view-desc" class="text-sm text-slate-700 leading-relaxed"></div>
+
+          <!-- Description -->
+          <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="size-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <i class="fas fa-align-left text-lg"></i>
+              </div>
+              <h3 class="font-bold text-slate-900 text-lg">Description</h3>
+            </div>
+            <div id="view-desc" class="text-slate-600 text-sm leading-relaxed prose prose-sm max-w-none"></div>
+          </div>
+
+          <!-- Product Identifiers & Meta -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="size-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500">
+                  <i class="fas fa-barcode text-sm"></i>
+                </div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Identifiers</h3>
+              </div>
+              <div class="space-y-4">
+                <div class="flex flex-col gap-1">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase">Product Code</span>
+                  <span id="view-code" class="text-base font-bold text-slate-900 font-mono tracking-wider"></span>
+                </div>
+                <div class="flex flex-col gap-1 pt-3 border-t border-slate-50">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase">SKU</span>
+                  <span id="view-sku" class="text-base font-bold text-slate-900 font-mono tracking-wider italic"></span>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="size-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-500">
+                  <i class="fas fa-info-circle text-sm"></i>
+                </div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Properties</h3>
+              </div>
+              <div class="space-y-4">
+                <div class="flex flex-col gap-1">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase">Brand</span>
+                  <span id="view-brand" class="text-base font-bold text-slate-900"></span>
+                </div>
+                <div class="flex flex-col gap-1 pt-3 border-t border-slate-50">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase">Material</span>
+                  <span id="view-material" class="text-base font-bold text-slate-900"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Product Variations -->
+          <div class="space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="size-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
+                <i class="fas fa-layer-group text-lg"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-lg leading-tight">Product Variations</h3>
+                <p class="text-xs text-slate-500 font-medium mt-0.5">Inventory and price overrides for variants</p>
+              </div>
+            </div>
+            <div id="view-variants-list"></div>
           </div>
         </div>
-        <div slot="footer" class="w-full flex gap-3 justify-end">
+        <div slot="footer" class="w-full flex gap-3 justify-end items-center">
           <button modal-action="cancel" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition text-sm">Close</button>
-          <button onclick="this.closest('ui-modal').close(); this.closest('app-products-page').openEditModal(this.closest('app-products-page').selectedProduct)" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition text-sm">
-            <i class="fas fa-pencil-alt mr-1"></i> Edit
+          <button onclick="this.closest('ui-modal').close(); this.closest('app-products-page').openEditModal(this.closest('app-products-page').selectedProduct)" class="px-8 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition text-sm shadow-lg shadow-indigo-200 flex items-center gap-2">
+            <i class="fas fa-pencil-alt text-xs"></i> Edit Product
           </button>
         </div>
       </ui-modal>

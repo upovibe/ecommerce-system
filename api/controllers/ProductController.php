@@ -34,6 +34,8 @@ class ProductController
                     p.id,
                     p.name,
                     p.slug,
+                    p.product_code,
+                    p.sku,
                     p.type,
                     p.status,
                     p.description,
