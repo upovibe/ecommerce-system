@@ -92,7 +92,6 @@ class InventoryController
 
             foreach ($variants as &$v) {
                 $v['stock'] = (int) $v['stock'];
-                $v['price_override'] = $v['price_override'] ? (float) $v['price_override'] : null;
                 $v['is_active'] = (bool) $v['is_active'];
                 if (is_string($v['variant_options'])) {
                     $v['variant_options'] = json_decode($v['variant_options'], true) ?: [];

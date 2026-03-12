@@ -114,7 +114,6 @@ class ProductController
             $variants = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($variants as &$v) {
                 $v['stock']          = (int) $v['stock'];
-                $v['price_override'] = $v['price_override'] ? (float) $v['price_override'] : null;
                 $v['is_active']      = (bool) $v['is_active'];
                 if (is_string($v['variant_options'])) {
                     $v['variant_options'] = json_decode($v['variant_options'], true) ?: [];
@@ -202,14 +201,15 @@ class ProductController
             } else {
                 foreach ($data['variants'] as $v) {
                     $this->pdo->prepare("
-                        INSERT INTO product_variants (product_id, price_override, stock, variant_values, variant_options, is_active, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, 1, NOW(), NOW())
+                        INSERT INTO product_variants (product_id, stock, variant_options, is_active, created_at, updated_at)
+                        VALUES (?, ?, ?, 1, NOW(), NOW())
                     ")->execute([
                         $id,
-                        !empty($v['price_override']) ? (float)$v['price_override'] : null,
                         (int)($v['stock'] ?? 0),
-                        isset($v['variant_values'])  ? json_encode($v['variant_values']) : null,
-                        json_encode(['label' => $v['label'] ?? 'Default']),
+                        json_encode([
+                            'type' => $v['type'] ?? 'Default',
+                            'value' => $v['value'] ?? ($v['label'] ?? '')
+                        ]),
                     ]);
                 }
             }
@@ -281,14 +281,15 @@ class ProductController
                 } else {
                     foreach ($data['variants'] as $v) {
                         $this->pdo->prepare("
-                            INSERT INTO product_variants (product_id, price_override, stock, variant_values, variant_options, is_active, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, 1, NOW(), NOW())
+                            INSERT INTO product_variants (product_id, stock, variant_options, is_active, created_at, updated_at)
+                            VALUES (?, ?, ?, 1, NOW(), NOW())
                         ")->execute([
                             $id,
-                            !empty($v['price_override']) ? (float)$v['price_override'] : null,
                             (int)($v['stock'] ?? 0),
-                            isset($v['variant_values'])  ? json_encode($v['variant_values']) : null,
-                            json_encode(['label' => $v['label'] ?? 'Default']),
+                            json_encode([
+                                'type' => $v['type'] ?? 'Default',
+                                'value' => $v['value'] ?? ($v['label'] ?? '')
+                            ]),
                         ]);
                     }
                 }

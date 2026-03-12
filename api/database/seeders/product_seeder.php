@@ -274,13 +274,12 @@ class ProductSeeder
             // Seed default variant
             $newId = (int) $this->pdo->lastInsertId();
             $this->pdo->prepare('
-                INSERT INTO product_variants (product_id, stock, variant_values, variant_options, is_active, created_at, updated_at)
-                VALUES (?, ?, ?, ?, 1, NOW(), NOW())
+                INSERT INTO product_variants (product_id, stock, variant_options, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, 1, NOW(), NOW())
             ')->execute([
                 $newId, 
                 rand(5, 100),
-                json_encode([]),
-                json_encode(['label' => 'Default'])
+                json_encode(['type' => 'Size', 'value' => 'Default'])
             ]);
 
             echo "✅ Seeded: {$name}\n";

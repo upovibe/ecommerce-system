@@ -51,16 +51,14 @@ class VariantSeeder
                 [$label, $attrId, $attrValue, $priceDelta, $stock] = $v;
 
                 $stmt = $this->pdo->prepare('
-                    INSERT INTO product_variants (product_id, price_override, stock, variant_values, variant_options, created_at, updated_at) 
-                    VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+                    INSERT INTO product_variants (product_id, stock, variant_options, is_active, created_at, updated_at) 
+                    VALUES (?, ?, ?, 1, NOW(), NOW())
                 ');
 
                 $stmt->execute([
                     $product['id'],
-                    $priceDelta > 0 ? $product['base_price'] + $priceDelta : null,
                     $stock,
-                    json_encode(['attribute_id' => $attrId, 'value' => $attrValue]),
-                    json_encode(['label' => $label])
+                    json_encode(['type' => 'Size', 'value' => $attrValue])
                 ]);
             }
             echo "✅ Seeded variants for product: $slug\n";

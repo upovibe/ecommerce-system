@@ -286,35 +286,33 @@ class ProductsPage extends App {
     const row = document.createElement("div");
     row.className = "p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3 variant-row";
 
-    // Attribute Options
-    const attrOptions = this.productAttributes.map(a => `<ui-option value="${a.id}">${a.name}</ui-option>`).join("");
-    
     row.innerHTML = `
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Attribute</label>
-          <ui-dropdown data-field="attribute_id" placeholder="Select attribute..." class="w-full bg-white">
-            <ui-option value="">Select...</ui-option>
-            ${attrOptions}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="space-y-2">
+          <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Variation Type</label>
+          <ui-dropdown data-field="type" placeholder="Select type..." class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleVariantTypeChange(event)">
+            <ui-option value="Size">Size</ui-option>
+            <ui-option value="Color">Color</ui-option>
+            <ui-option value="Weight">Weight</ui-option>
+            <ui-option value="Other">Other (Custom)</ui-option>
           </ui-dropdown>
+          <div class="mt-2 hidden custom-type-container animate-in fade-in slide-in-from-top-1 duration-200">
+            <ui-input data-field="custom_type" placeholder="Type name (e.g. Resolution)" class="w-full bg-white border-slate-200"></ui-input>
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Label / Value</label>
-          <ui-input data-field="label" placeholder="e.g. Red, XL" class="w-full bg-white"></ui-input>
+        <div class="space-y-2">
+          <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Value</label>
+          <ui-input data-field="value" placeholder="e.g. XL, Red, 4K" class="w-full bg-white border-slate-200"></ui-input>
         </div>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end pt-2 border-t border-slate-200/50">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Price Override</label>
-          <ui-input data-field="price_override" type="number" step="0.01" min="0" placeholder="0.00" class="w-full bg-white"></ui-input>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Stock</label>
-          <ui-input data-field="stock" type="number" step="1" min="0" placeholder="0" class="w-full bg-white"></ui-input>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end pt-3 border-t border-slate-200/60">
+        <div class="space-y-2">
+          <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stock Quantity</label>
+          <ui-input data-field="stock" type="number" step="1" min="0" placeholder="0" class="w-full bg-white border-slate-200" oninput="this.closest('app-products-page').updateTotalStock()"></ui-input>
         </div>
         <div class="flex justify-end">
-          <button type="button" onclick="this.closest('app-products-page').removeVariantRow(this)" class="px-3 py-2 rounded-lg text-rose-600 hover:bg-rose-50 transition text-xs font-bold uppercase tracking-wider">
-            <i class="fas fa-trash-alt mr-1"></i> Remove
+          <button type="button" onclick="this.closest('app-products-page').removeVariantRow(this)" class="px-4 py-2 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+            <i class="fas fa-trash-alt text-[10px]"></i> Remove variant
           </button>
         </div>
       </div>
@@ -322,35 +320,112 @@ class ProductsPage extends App {
     list.appendChild(row);
 
     if (data) {
-      row.querySelector('[data-field="attribute_id"]').value   = data.attribute_id || "";
-      row.querySelector('[data-field="label"]').value          = data.label || "";
-      row.querySelector('[data-field="price_override"]').value = data.price_override || "";
-      row.querySelector('[data-field="stock"]').value          = data.stock || 0;
+      const type = data.type || "Size";
+      const isOther = !["Size", "Color", "Weight"].includes(type);
+      
+      const typeDrop = row.querySelector('[data-field="type"]');
+      if (isOther) {
+        typeDrop.value = "Other";
+        const container = row.querySelector(".custom-type-container");
+        if (container) container.classList.remove("hidden");
+        row.querySelector('[data-field="custom_type"]').value = type;
+      } else {
+        typeDrop.value = type;
+      }
+      
+      row.querySelector('[data-field="value"]').value = data.value || data.label || "";
+      row.querySelector('[data-field="stock"]').value = data.stock || 0;
+    }
+    this.updateTotalStock();
+  }
+
+  handleVariantTypeChange(e) {
+    const dropdown = e.target;
+    const value = e.detail?.value || dropdown?.value;
+    const row = dropdown.closest(".variant-row");
+    if (!row) return;
+    const container = row.querySelector(".custom-type-container");
+    if (value === "Other") {
+      container?.classList.remove("hidden");
+    } else {
+      container?.classList.add("hidden");
+    }
+  }
+
+  updateTotalStock() {
+    const isCreate = this.querySelector("#product-create-modal").hasAttribute("open");
+    const m = isCreate ? this.querySelector("#product-create-modal") : this.querySelector("#product-edit-modal");
+    
+    if (!m) return;
+    
+    const rows = Array.from(m.querySelectorAll(".variant-row"));
+    const stockField = m.querySelector("#create-stock-total") || m.querySelector("#edit-stock-total");
+    
+    if (rows.length === 0) {
+      if (stockField) {
+        stockField.removeAttribute("readonly");
+        stockField.classList.remove("bg-slate-50");
+        stockField.classList.add("bg-white");
+        stockField.placeholder = "Enter direct stock";
+      }
+      return;
+    }
+
+    if (stockField) {
+      stockField.setAttribute("readonly", "");
+      stockField.classList.add("bg-slate-50");
+      stockField.classList.remove("bg-white");
+      stockField.placeholder = "Sum of variants";
+    }
+
+    const total = rows.reduce((sum, row) => {
+      const val = parseInt(row.querySelector('[data-field="stock"]')?.value || 0, 10);
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
+
+    if (stockField) {
+      stockField.value = total;
     }
   }
 
   removeVariantRow(button) {
     const row = button?.closest(".variant-row");
-    if (row) row.remove();
+    if (row) {
+      row.remove();
+      this.updateTotalStock();
+    }
   }
 
   collectVariants(list) {
     if (!list) return [];
+    
     const rows = Array.from(list.querySelectorAll(".variant-row"));
+    
+    // If no variants, check the total stock field and return a default variant
+    if (rows.length === 0) {
+      const m = list.closest("ui-modal");
+      const stockField = m?.querySelector("#create-stock-total") || m?.querySelector("#edit-stock-total");
+      const stock = stockField?.value ? parseInt(stockField.value, 10) : 0;
+      return [{ type: "Size", value: "Default", stock }];
+    }
+
     const variants = rows.map((row) => {
-      const attrIdEl = row.querySelector('[data-field="attribute_id"]');
-      const labelEl = row.querySelector('[data-field="label"]');
-      const priceEl = row.querySelector('[data-field="price_override"]');
+      const typeDrop = row.querySelector('[data-field="type"]');
+      const customTypeEl = row.querySelector('[data-field="custom_type"]');
+      const valueEl = row.querySelector('[data-field="value"]');
       const stockEl = row.querySelector('[data-field="stock"]');
       
-      const attribute_id = attrIdEl?.value || "";
-      const label = labelEl?.value?.trim();
-      const price_override = priceEl?.value ? parseFloat(priceEl.value) : null;
+      let type = typeDrop?.value || "Other";
+      if (type === "Other") {
+        type = customTypeEl?.value?.trim() || "Other";
+      }
+
+      const value = valueEl?.value?.trim() || "";
       const stock = stockEl?.value ? parseInt(stockEl.value, 10) : 0;
       
-      return { attribute_id, label, price_override, stock };
+      return { type, value, stock };
     });
-    return variants.filter((v) => v.attribute_id || v.label || v.price_override || v.stock);
+    return variants.filter((v) => v.value || v.stock);
   }
 
   // ── EDIT ────────────────────────────────────────────
@@ -391,17 +466,16 @@ class ProductsPage extends App {
         vList.innerHTML = "";
         if (p.variants && Array.isArray(p.variants)) {
           p.variants.forEach(v => {
-            const label = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options)?.label : v.variant_options?.label;
-            const vData = typeof v.variant_values === 'string' ? JSON.parse(v.variant_values) : v.variant_values;
+            const opt = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options) : v.variant_options;
             this.addVariantRow({
-              attribute_id: v.attribute_id || vData?.attribute_id,
-              label: label || "",
-              price_override: v.price_override,
+              type: opt?.type || "Size",
+              value: opt?.value || opt?.label || "",
               stock: v.stock
             });
           });
         }
       }
+      this.updateTotalStock();
 
       const editDesc = m.querySelector("#edit-description");
       if (editDesc?.setValue) {
@@ -589,12 +663,16 @@ class ProductsPage extends App {
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                   ${variants.map(v => {
-                    const label = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options)?.label : v.variant_options?.label;
+                    const opt = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options) : v.variant_options;
+                    const type = opt?.type || "Size";
+                    const value = opt?.value || opt?.label || "Default";
                     const isLowStock = v.stock <= 5;
                     return `
                       <tr class="hover:bg-slate-50 transition">
-                        <td class="px-4 py-3 font-semibold text-slate-700">${label || 'Default'}</td>
-                        <td class="px-4 py-3 text-slate-600">${v.price_override ? this.fmt(v.price_override) : '<span class="text-slate-400 italic">Base</span>'}</td>
+                        <td class="px-4 py-3">
+                          <div class="text-[10px] text-slate-400 font-bold uppercase">${type}</div>
+                          <div class="font-semibold text-slate-700">${value}</div>
+                        </td>
                         <td class="px-4 py-3">
                           <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${isLowStock ? 'bg-orange-100 text-orange-600' : 'bg-emerald-100 text-emerald-600'}">
                             ${v.stock} pcs
@@ -816,6 +894,10 @@ class ProductsPage extends App {
                   <ui-option value="service">Service</ui-option>
                 </ui-dropdown>
               </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Total Stock (Calculated)</label>
+                <ui-input id="create-stock-total" readonly placeholder="Sum of variants" class="w-full bg-slate-50"></ui-input>
+              </div>
 
               <!-- 5. Category & Subcategory -->
               <div>
@@ -944,6 +1026,10 @@ class ProductsPage extends App {
                   <ui-option value="digital">Digital</ui-option>
                   <ui-option value="service">Service</ui-option>
                 </ui-dropdown>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Total Stock (Calculated)</label>
+                <ui-input id="edit-stock-total" readonly placeholder="Sum of variants" class="w-full bg-slate-50"></ui-input>
               </div>
 
               <!-- 5. Category & Subcategory -->
