@@ -44,6 +44,15 @@ class AttributeSeeder
                     ['value' => 'Polyester', 'label' => 'Polyester'],
                     ['value' => 'Leather', 'label' => 'Leather'],
                 ]
+            ],
+            [
+                'name' => 'Weight',
+                'label' => 'Product Weight',
+                'values' => [
+                    ['value' => 'Light', 'label' => 'Light'],
+                    ['value' => 'Medium', 'label' => 'Medium'],
+                    ['value' => 'Heavy', 'label' => 'Heavy'],
+                ]
             ]
         ];
 

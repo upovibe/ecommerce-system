@@ -9,7 +9,8 @@ class Migration_20260311000000createattributestable {
             label VARCHAR(100) NULL,
             is_active BOOLEAN DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_product_attributes_name (name)
         )");
     }
     public function down() { $this->pdo->exec("DROP TABLE IF EXISTS product_attributes"); }

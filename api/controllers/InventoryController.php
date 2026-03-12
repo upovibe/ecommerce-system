@@ -89,12 +89,37 @@ class InventoryController
             ");
             $stmt->execute([$id]);
             $variants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $variantIds = array_column($variants, 'id');
+            $optionsMap = $this->getVariantOptionsMap($variantIds);
 
             foreach ($variants as &$v) {
                 $v['stock'] = (int) $v['stock'];
                 $v['is_active'] = (bool) $v['is_active'];
-                if (is_string($v['variant_options'])) {
-                    $v['variant_options'] = json_decode($v['variant_options'], true) ?: [];
+                $jsonOpts = is_string($v['variant_options'])
+                    ? (json_decode($v['variant_options'], true) ?: [])
+                    : (is_array($v['variant_options']) ? $v['variant_options'] : []);
+                $type  = $jsonOpts['type'] ?? null;
+                $value = $jsonOpts['value'] ?? null;
+                $price = $jsonOpts['price'] ?? null;
+
+                if (!empty($optionsMap[$v['id']])) {
+                    $opt = $optionsMap[$v['id']][0];
+                    $type = $opt['type'] ?? $type;
+                    $value = $opt['value'] ?? $value;
+                }
+
+                if (!$type && !$value) {
+                    $type = 'Default';
+                    $value = 'Default';
+                }
+                $label = ($type && $value) ? ($type . ': ' . $value) : ($value ?? $type ?? 'Default');
+                $v['variant_options'] = [
+                    'type'  => $type,
+                    'value' => $value,
+                    'label' => $label,
+                ];
+                if ($price !== null) {
+                    $v['variant_options']['price'] = (float) $price;
                 }
             }
 
@@ -179,5 +204,36 @@ class InventoryController
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+    }
+
+    private function getVariantOptionsMap(array $variantIds): array
+    {
+        if (empty($variantIds)) return [];
+        $placeholders = implode(',', array_fill(0, count($variantIds), '?'));
+        $stmt = $this->pdo->prepare("
+            SELECT
+                pva.variant_id,
+                pa.name AS attribute_name,
+                pav.value AS value_value,
+                pav.label AS value_label
+            FROM product_variant_attributes pva
+            INNER JOIN product_attributes pa ON pa.id = pva.attribute_id
+            INNER JOIN product_attribute_values pav ON pav.id = pva.value_id
+            WHERE pva.variant_id IN ($placeholders)
+            ORDER BY pa.name ASC, pav.value ASC
+        ");
+        $stmt->execute($variantIds);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $labelValue = $row['value_label'] ?: $row['value_value'];
+            $map[$row['variant_id']][] = [
+                'type' => $row['attribute_name'],
+                'value' => $row['value_value'],
+                'label' => $row['attribute_name'] . ': ' . $labelValue,
+            ];
+        }
+        return $map;
     }
 }

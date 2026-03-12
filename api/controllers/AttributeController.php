@@ -46,18 +46,37 @@ class AttributeController
                 throw new Exception("Attribute name is required");
             }
 
-            $stmt = $this->pdo->prepare("INSERT INTO product_attributes (name, label) VALUES (?, ?)");
-            $stmt->execute([$data['name'], $data['label'] ?? null]);
-            $id = $this->pdo->lastInsertId();
+            $name = trim($data['name']);
+            $label = $data['label'] ?? $name;
+
+            $stmt = $this->pdo->prepare("SELECT id FROM product_attributes WHERE LOWER(name) = LOWER(?) LIMIT 1");
+            $stmt->execute([$name]);
+            $id = $stmt->fetchColumn();
+
+            if (!$id) {
+                $stmt = $this->pdo->prepare("INSERT INTO product_attributes (name, label) VALUES (?, ?)");
+                $stmt->execute([$name, $label]);
+                $id = $this->pdo->lastInsertId();
+            }
 
             if (!empty($data['values']) && is_array($data['values'])) {
                 foreach ($data['values'] as $val) {
-                    $vStmt = $this->pdo->prepare("INSERT INTO product_attribute_values (attribute_id, value, label) VALUES (?, ?, ?)");
-                    $vStmt->execute([$id, $val['value'], $val['label'] ?? null]);
+                    $value = trim((string)($val['value'] ?? ''));
+                    if ($value === '') continue;
+                    $vStmt = $this->pdo->prepare("
+                        SELECT id FROM product_attribute_values
+                        WHERE attribute_id = ? AND LOWER(value) = LOWER(?) LIMIT 1
+                    ");
+                    $vStmt->execute([$id, $value]);
+                    $valueId = $vStmt->fetchColumn();
+                    if (!$valueId) {
+                        $iStmt = $this->pdo->prepare("INSERT INTO product_attribute_values (attribute_id, value, label) VALUES (?, ?, ?)");
+                        $iStmt->execute([$id, $value, $val['label'] ?? $value]);
+                    }
                 }
             }
 
-            echo json_encode(['success' => true, 'message' => 'Attribute created', 'data' => ['id' => $id]]);
+            echo json_encode(['success' => true, 'message' => 'Attribute saved', 'data' => ['id' => (int)$id]]);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);

@@ -11,6 +11,7 @@ class Migration_20260311000001createattributevaluestable {
             is_active BOOLEAN DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_attribute_value (attribute_id, value),
             FOREIGN KEY (attribute_id) REFERENCES product_attributes(id) ON DELETE CASCADE
         )");
     }

@@ -112,11 +112,36 @@ class ProductController
             $stmt = $this->pdo->prepare("SELECT * FROM product_variants WHERE product_id = ? ORDER BY id");
             $stmt->execute([$id]);
             $variants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $variantIds = array_column($variants, 'id');
+            $optionsMap = $this->getVariantOptionsMap($variantIds);
             foreach ($variants as &$v) {
                 $v['stock']          = (int) $v['stock'];
                 $v['is_active']      = (bool) $v['is_active'];
-                if (is_string($v['variant_options'])) {
-                    $v['variant_options'] = json_decode($v['variant_options'], true) ?: [];
+                $jsonOpts = is_string($v['variant_options'])
+                    ? (json_decode($v['variant_options'], true) ?: [])
+                    : (is_array($v['variant_options']) ? $v['variant_options'] : []);
+                $type  = $jsonOpts['type'] ?? null;
+                $value = $jsonOpts['value'] ?? null;
+                $price = $jsonOpts['price'] ?? null;
+
+                if (!empty($optionsMap[$v['id']])) {
+                    $opt = $optionsMap[$v['id']][0];
+                    $type = $opt['type'] ?? $type;
+                    $value = $opt['value'] ?? $value;
+                }
+
+                if (!$type && !$value) {
+                    $type = 'Default';
+                    $value = 'Default';
+                }
+                $label = ($type && $value) ? ($type . ': ' . $value) : ($value ?? $type ?? 'Default');
+                $v['variant_options'] = [
+                    'type'  => $type,
+                    'value' => $value,
+                    'label' => $label,
+                ];
+                if ($price !== null) {
+                    $v['variant_options']['price'] = (float) $price;
                 }
             }
             $product['variants'] = $variants;
@@ -160,10 +185,22 @@ class ProductController
             if (empty($productCode)) {
                 $productCode = 'PROD-' . strtoupper(substr(uniqid(), -6));
             }
+            $productCode = trim((string) $productCode);
+            if ($productCode !== '') {
+                $productCode = ensureUniqueSlug($this->pdo, $productCode, 'products', 'product_code');
+            } else {
+                $productCode = null;
+            }
 
             $productSku = $data['sku'] ?? null;
             if (empty($productSku)) {
                 $productSku = strtoupper($slug);
+            }
+            $productSku = trim((string) $productSku);
+            if ($productSku !== '') {
+                $productSku = ensureUniqueSlug($this->pdo, $productSku, 'products', 'sku');
+            } else {
+                $productSku = null;
             }
 
             $id = $this->productModel->create([
@@ -200,17 +237,22 @@ class ProductController
                 ")->execute([$id]);
             } else {
                 foreach ($data['variants'] as $v) {
-                    $this->pdo->prepare("
+                    [$type, $value] = $this->normalizeVariantTypeValue($v);
+                    $stmt = $this->pdo->prepare("
                         INSERT INTO product_variants (product_id, stock, variant_options, is_active, created_at, updated_at)
                         VALUES (?, ?, ?, 1, NOW(), NOW())
-                    ")->execute([
+                    ");
+                    $stmt->execute([
                         $id,
                         (int)($v['stock'] ?? 0),
                         json_encode([
-                            'type' => $v['type'] ?? 'Default',
-                            'value' => $v['value'] ?? ($v['label'] ?? '')
+                            'type' => $type,
+                            'value' => $value,
+                            'price' => isset($v['price']) ? (float)$v['price'] : null
                         ]),
                     ]);
+                    $variantId = (int) $this->pdo->lastInsertId();
+                    $this->attachVariantAttributes($variantId, $v, $type, $value);
                 }
             }
 
@@ -246,8 +288,18 @@ class ProductController
             if (isset($data['category_id'])) $updateData['category_id'] = (int) $data['category_id'];
             if (isset($data['brand_id']))    $updateData['brand_id']    = $data['brand_id'] ? (int) $data['brand_id'] : null;
             if (isset($data['material_id'])) $updateData['material_id'] = $data['material_id'] ? (int) $data['material_id'] : null;
-            if (isset($data['product_code'])) $updateData['product_code'] = trim($data['product_code']);
-            if (isset($data['sku']))          $updateData['sku']          = trim($data['sku']);
+            if (isset($data['product_code'])) {
+                $code = trim((string) $data['product_code']);
+                $updateData['product_code'] = $code === ''
+                    ? null
+                    : ensureUniqueSlug($this->pdo, $code, 'products', 'product_code', $id);
+            }
+            if (isset($data['sku'])) {
+                $sku = trim((string) $data['sku']);
+                $updateData['sku'] = $sku === ''
+                    ? null
+                    : ensureUniqueSlug($this->pdo, $sku, 'products', 'sku', $id);
+            }
             if (isset($data['type']))        $updateData['type']        = $data['type'];
             if (isset($data['status']))      $updateData['status']      = $data['status'];
             if (isset($data['description'])) $updateData['description'] = $data['description'];
@@ -280,17 +332,22 @@ class ProductController
                     ")->execute([$id]);
                 } else {
                     foreach ($data['variants'] as $v) {
-                        $this->pdo->prepare("
+                        [$type, $value] = $this->normalizeVariantTypeValue($v);
+                        $stmt = $this->pdo->prepare("
                             INSERT INTO product_variants (product_id, stock, variant_options, is_active, created_at, updated_at)
                             VALUES (?, ?, ?, 1, NOW(), NOW())
-                        ")->execute([
+                        ");
+                        $stmt->execute([
                             $id,
                             (int)($v['stock'] ?? 0),
                             json_encode([
-                                'type' => $v['type'] ?? 'Default',
-                                'value' => $v['value'] ?? ($v['label'] ?? '')
+                                'type' => $type,
+                                'value' => $value,
+                                'price' => isset($v['price']) ? (float)$v['price'] : null
                             ]),
                         ]);
+                        $variantId = (int) $this->pdo->lastInsertId();
+                        $this->attachVariantAttributes($variantId, $v, $type, $value);
                     }
                 }
             }
@@ -491,6 +548,125 @@ class ProductController
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    private function normalizeVariantTypeValue(array $variant): array
+    {
+        $type = trim((string)($variant['type'] ?? ($variant['attribute'] ?? '')));
+        $value = trim((string)($variant['value'] ?? ($variant['label'] ?? '')));
+
+        if ($type === '') $type = 'Default';
+        if ($value === '') $value = 'Default';
+
+        return [$type, $value];
+    }
+
+    private function attachVariantAttributes(int $variantId, array $variant, ?string $type = null, ?string $value = null): void
+    {
+        $attrs = [];
+        if (!empty($variant['attributes']) && is_array($variant['attributes'])) {
+            $attrs = $variant['attributes'];
+        } else {
+            $attrs[] = ['type' => $type ?? ($variant['type'] ?? null), 'value' => $value ?? ($variant['value'] ?? null)];
+        }
+
+        foreach ($attrs as $attr) {
+            $attrType = trim((string)($attr['type'] ?? ($attr['name'] ?? '')));
+            $attrValue = trim((string)($attr['value'] ?? ($attr['label'] ?? '')));
+            if ($attrType === '' || $attrValue === '') continue;
+            if (strcasecmp($attrType, 'Default') === 0 && strcasecmp($attrValue, 'Default') === 0) continue;
+
+            $attributeId = $this->resolveAttributeId($attrType);
+            if (!$attributeId) continue;
+            $valueId = $this->resolveAttributeValueId($attributeId, $attrValue);
+            if (!$valueId) continue;
+
+            $stmt = $this->pdo->prepare("
+                INSERT IGNORE INTO product_variant_attributes (variant_id, attribute_id, value_id, created_at, updated_at)
+                VALUES (?, ?, ?, NOW(), NOW())
+            ");
+            $stmt->execute([$variantId, $attributeId, $valueId]);
+        }
+    }
+
+    private function resolveAttributeId(string $name): ?int
+    {
+        $name = trim($name);
+        if ($name === '') return null;
+
+        $stmt = $this->pdo->prepare("SELECT id FROM product_attributes WHERE LOWER(name) = LOWER(?) LIMIT 1");
+        $stmt->execute([$name]);
+        $id = $stmt->fetchColumn();
+        if ($id) return (int) $id;
+
+        try {
+            $ins = $this->pdo->prepare("INSERT INTO product_attributes (name, label) VALUES (?, ?)");
+            $ins->execute([$name, $name]);
+            return (int) $this->pdo->lastInsertId();
+        } catch (Exception $e) {
+            $stmt->execute([$name]);
+            $id = $stmt->fetchColumn();
+            return $id ? (int) $id : null;
+        }
+    }
+
+    private function resolveAttributeValueId(int $attributeId, string $value): ?int
+    {
+        $value = trim($value);
+        if ($value === '') return null;
+
+        $stmt = $this->pdo->prepare("
+            SELECT id FROM product_attribute_values
+            WHERE attribute_id = ? AND LOWER(value) = LOWER(?) LIMIT 1
+        ");
+        $stmt->execute([$attributeId, $value]);
+        $id = $stmt->fetchColumn();
+        if ($id) return (int) $id;
+
+        try {
+            $ins = $this->pdo->prepare("INSERT INTO product_attribute_values (attribute_id, value, label) VALUES (?, ?, ?)");
+            $ins->execute([$attributeId, $value, $value]);
+            return (int) $this->pdo->lastInsertId();
+        } catch (Exception $e) {
+            $stmt->execute([$attributeId, $value]);
+            $id = $stmt->fetchColumn();
+            return $id ? (int) $id : null;
+        }
+    }
+
+    private function getVariantOptionsMap(array $variantIds): array
+    {
+        if (empty($variantIds)) return [];
+        $placeholders = implode(',', array_fill(0, count($variantIds), '?'));
+        $stmt = $this->pdo->prepare("
+            SELECT
+                pva.variant_id,
+                pa.id AS attribute_id,
+                pa.name AS attribute_name,
+                pav.id AS value_id,
+                pav.value AS value_value,
+                pav.label AS value_label
+            FROM product_variant_attributes pva
+            INNER JOIN product_attributes pa ON pa.id = pva.attribute_id
+            INNER JOIN product_attribute_values pav ON pav.id = pva.value_id
+            WHERE pva.variant_id IN ($placeholders)
+            ORDER BY pa.name ASC, pav.value ASC
+        ");
+        $stmt->execute($variantIds);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $labelValue = $row['value_label'] ?: $row['value_value'];
+            $map[$row['variant_id']][] = [
+                'attribute_id' => (int) $row['attribute_id'],
+                'type' => $row['attribute_name'],
+                'value_id' => (int) $row['value_id'],
+                'value' => $row['value_value'],
+                'label' => $row['attribute_name'] . ': ' . $labelValue,
+            ];
+        }
+        return $map;
+    }
 
     private function castProduct(array $p): array
     {

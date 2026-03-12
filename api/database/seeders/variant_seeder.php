@@ -60,6 +60,25 @@ class VariantSeeder
                     $stock,
                     json_encode(['type' => 'Size', 'value' => $attrValue])
                 ]);
+
+                $variantId = (int) $this->pdo->lastInsertId();
+                if ($variantId && $attrId) {
+                    $vStmt = $this->pdo->prepare("SELECT id FROM product_attribute_values WHERE attribute_id = ? AND value = ?");
+                    $vStmt->execute([$attrId, $attrValue]);
+                    $valueId = $vStmt->fetchColumn();
+                    if (!$valueId) {
+                        $iStmt = $this->pdo->prepare("INSERT INTO product_attribute_values (attribute_id, value, label) VALUES (?, ?, ?)");
+                        $iStmt->execute([$attrId, $attrValue, $attrValue]);
+                        $valueId = $this->pdo->lastInsertId();
+                    }
+                    if ($valueId) {
+                        $linkStmt = $this->pdo->prepare("
+                            INSERT INTO product_variant_attributes (variant_id, attribute_id, value_id, created_at, updated_at)
+                            VALUES (?, ?, ?, NOW(), NOW())
+                        ");
+                        $linkStmt->execute([$variantId, $attrId, $valueId]);
+                    }
+                }
             }
             echo "✅ Seeded variants for product: $slug\n";
         }

@@ -95,6 +95,8 @@ Router::post('/products', 'ProductController@store');
 Router::get('/products/{id}', 'ProductController@show');
 Router::put('/products/{id}', 'ProductController@update');
 Router::delete('/products/{id}', 'ProductController@destroy');
+Router::post('/products/{id}/upload-image', 'ProductController@uploadImage');
+Router::post('/products/{id}/upload-gallery', 'ProductController@uploadGallery');
 Router::put('/products/{id}/toggle-active', 'ProductController@toggleActive');
 
 // Settings Management Routes (admin only for create/update/delete, public for view)

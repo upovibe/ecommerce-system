@@ -116,6 +116,37 @@ class ProductsPage extends App {
     return match ? String(match.id) : "";
   }
 
+  getAttributeByName(name) {
+    if (!name) return null;
+    const target = String(name).toLowerCase();
+    return (this.productAttributes || []).find(
+      (a) => String(a.name || "").toLowerCase() === target,
+    ) || null;
+  }
+
+  buildTypeOptionsHtml() {
+    const attrs = (this.productAttributes || [])
+      .slice()
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    const opts = attrs.map(a => `<ui-option value="${a.name}">${a.name}</ui-option>`).join("");
+    return `
+      <ui-option value="">Select type...</ui-option>
+      ${opts}
+      <ui-option value="Other">Other (Custom)</ui-option>
+    `;
+  }
+
+  buildValueOptionsHtml(attribute, selectedValue = "") {
+    const values = Array.isArray(attribute?.values) ? attribute.values : [];
+    const sorted = values.slice().sort((a, b) => String(a.value || "").localeCompare(String(b.value || "")));
+    const opts = sorted.map(v => `<ui-option value="${v.value}">${v.label || v.value}</ui-option>`).join("");
+    return `
+      <ui-option value="">Select value...</ui-option>
+      ${opts}
+      <ui-option value="__custom__">Other (Custom)</ui-option>
+    `;
+  }
+
   handleCategoryChange(e) {
     const dropdown = e.target;
     const value = e.detail?.value || dropdown?.value;
@@ -287,14 +318,11 @@ class ProductsPage extends App {
     row.className = "p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3 variant-row";
 
     row.innerHTML = `
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="flex flex-col gap-4">
         <div class="space-y-2">
           <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Variation Type</label>
           <ui-dropdown data-field="type" placeholder="Select type..." class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleVariantTypeChange(event)">
-            <ui-option value="Size">Size</ui-option>
-            <ui-option value="Color">Color</ui-option>
-            <ui-option value="Weight">Weight</ui-option>
-            <ui-option value="Other">Other (Custom)</ui-option>
+            ${this.buildTypeOptionsHtml()}
           </ui-dropdown>
           <div class="mt-2 hidden custom-type-container animate-in fade-in slide-in-from-top-1 duration-200">
             <ui-input data-field="custom_type" placeholder="Type name (e.g. Resolution)" class="w-full bg-white border-slate-200"></ui-input>
@@ -302,39 +330,47 @@ class ProductsPage extends App {
         </div>
         <div class="space-y-2">
           <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Value</label>
-          <ui-input data-field="value" placeholder="e.g. XL, Red, 4K" class="w-full bg-white border-slate-200"></ui-input>
+          <ui-dropdown data-field="value" placeholder="Select value..." class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleVariantValueChange(event)">
+            <ui-option value="">Select value...</ui-option>
+          </ui-dropdown>
+          <div class="mt-2 hidden custom-value-container animate-in fade-in slide-in-from-top-1 duration-200">
+            <ui-input data-field="custom_value" placeholder="Value (e.g. XL, Red, 4K)" class="w-full bg-white border-slate-200"></ui-input>
+          </div>
         </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end pt-3 border-t border-slate-200/60">
         <div class="space-y-2">
-          <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stock Quantity</label>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Quantity</label>
           <ui-input data-field="stock" type="number" step="1" min="0" placeholder="0" class="w-full bg-white border-slate-200" oninput="this.closest('app-products-page').updateTotalStock()"></ui-input>
         </div>
-        <div class="flex justify-end">
-          <button type="button" onclick="this.closest('app-products-page').removeVariantRow(this)" class="px-4 py-2 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-            <i class="fas fa-trash-alt text-[10px]"></i> Remove variant
-          </button>
-        </div>
+      </div>
+      <div class="flex items-center justify-end pt-3 border-t border-slate-200/60">
+        <button type="button" onclick="this.closest('app-products-page').removeVariantRow(this)" class="px-4 py-2 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+          <i class="fas fa-trash-alt text-[10px]"></i> Remove variant
+        </button>
       </div>
     `;
     list.appendChild(row);
 
     if (data) {
-      const type = data.type || "Size";
-      const isOther = !["Size", "Color", "Weight"].includes(type);
-      
       const typeDrop = row.querySelector('[data-field="type"]');
+      const customTypeEl = row.querySelector('[data-field="custom_type"]');
+      const rawType = data.type || "Size";
+      const attr = this.getAttributeByName(rawType);
+      const isOther = !attr;
+
       if (isOther) {
         typeDrop.value = "Other";
         const container = row.querySelector(".custom-type-container");
         if (container) container.classList.remove("hidden");
-        row.querySelector('[data-field="custom_type"]').value = type;
+        if (customTypeEl) customTypeEl.value = rawType;
       } else {
-        typeDrop.value = type;
+        typeDrop.value = attr.name;
       }
-      
-      row.querySelector('[data-field="value"]').value = data.value || data.label || "";
+
+      this.setVariantValueOptions(row, typeDrop.value, data.value || data.label || "");
+
       row.querySelector('[data-field="stock"]').value = data.stock || 0;
+    } else {
+      this.setVariantValueOptions(row, "");
     }
     this.updateTotalStock();
   }
@@ -349,6 +385,58 @@ class ProductsPage extends App {
       container?.classList.remove("hidden");
     } else {
       container?.classList.add("hidden");
+    }
+    this.setVariantValueOptions(row, value);
+  }
+
+  handleVariantValueChange(e) {
+    const dropdown = e.target;
+    const value = e.detail?.value || dropdown?.value;
+    const row = dropdown.closest(".variant-row");
+    if (!row) return;
+    const container = row.querySelector(".custom-value-container");
+    if (value === "__custom__") {
+      container?.classList.remove("hidden");
+    } else {
+      container?.classList.add("hidden");
+    }
+  }
+
+  setVariantValueOptions(row, typeValue, selectedValue = "") {
+    const valueDrop = row.querySelector('[data-field="value"]');
+    const customValue = row.querySelector(".custom-value-container");
+    const customValueInput = row.querySelector('[data-field="custom_value"]');
+    if (!valueDrop) return;
+
+    if (!typeValue || typeValue === "Other") {
+      valueDrop.classList.add("hidden");
+      customValue?.classList.remove("hidden");
+      if (selectedValue && customValueInput) customValueInput.value = selectedValue;
+      return;
+    }
+
+    valueDrop.classList.remove("hidden");
+    Array.from(valueDrop.querySelectorAll("ui-option")).forEach(opt => opt.remove());
+    const attr = this.getAttributeByName(typeValue);
+    valueDrop.innerHTML = this.buildValueOptionsHtml(attr, selectedValue);
+
+    const values = Array.isArray(attr?.values) ? attr.values : [];
+    const matched = values.find(v => String(v.value).toLowerCase() === String(selectedValue).toLowerCase());
+    if (matched) {
+      valueDrop.value = matched.value;
+      customValue?.classList.add("hidden");
+      if (customValueInput) customValueInput.value = "";
+    } else if (selectedValue) {
+      valueDrop.value = "__custom__";
+      customValue?.classList.remove("hidden");
+      if (customValueInput) customValueInput.value = selectedValue;
+    } else if (!values.length) {
+      valueDrop.value = "__custom__";
+      customValue?.classList.remove("hidden");
+    } else {
+      valueDrop.value = "";
+      customValue?.classList.add("hidden");
+      if (customValueInput) customValueInput.value = "";
     }
   }
 
@@ -412,15 +500,23 @@ class ProductsPage extends App {
     const variants = rows.map((row) => {
       const typeDrop = row.querySelector('[data-field="type"]');
       const customTypeEl = row.querySelector('[data-field="custom_type"]');
-      const valueEl = row.querySelector('[data-field="value"]');
+      const valueDrop = row.querySelector('[data-field="value"]');
+      const customValueEl = row.querySelector('[data-field="custom_value"]');
       const stockEl = row.querySelector('[data-field="stock"]');
       
-      let type = typeDrop?.value || "Other";
-      if (type === "Other") {
+      let type = typeDrop?.value || "";
+      if (type === "Other" || type === "") {
         type = customTypeEl?.value?.trim() || "Other";
       }
 
-      const value = valueEl?.value?.trim() || "";
+      let value = "";
+      if (valueDrop && !valueDrop.classList.contains("hidden")) {
+        const selected = valueDrop.value;
+        if (selected && selected !== "__custom__") value = selected;
+      }
+      if (!value) {
+        value = customValueEl?.value?.trim() || "";
+      }
       const stock = stockEl?.value ? parseInt(stockEl.value, 10) : 0;
       
       return { type, value, stock };
@@ -657,14 +753,13 @@ class ProductsPage extends App {
                 <thead class="bg-slate-50 border-b border-slate-100">
                   <tr>
                     <th class="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Variation</th>
-                    <th class="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Price</th>
                     <th class="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Stock</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                   ${variants.map(v => {
                     const opt = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options) : v.variant_options;
-                    const type = opt?.type || "Size";
+                    const type = opt?.type || "Default";
                     const value = opt?.value || opt?.label || "Default";
                     const isLowStock = v.stock <= 5;
                     return `
@@ -933,11 +1028,13 @@ class ProductsPage extends App {
             <div class="pt-2 border-t border-slate-100">
               <div class="flex items-center justify-between mb-3">
                 <label class="block text-sm font-medium text-slate-700">Product Variations</label>
-                <button type="button" onclick="this.closest('app-products-page').addVariantRow()" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition">
-                  <i class="fas fa-plus mr-1"></i> Add Variant
-                </button>
               </div>
               <div id="variant-list" class="space-y-3"></div>
+              <div class="flex justify-end mt-3">
+                <button type="button" onclick="this.closest('app-products-page').addVariantRow()" class="px-4 py-2 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <i class="fas fa-plus text-[10px]"></i> Add variant
+                </button>
+              </div>
               <p class="text-[10px] text-slate-400 mt-2 italic">Add sizes, colors, or direct stock entries. Leave empty for single item.</p>
             </div>
 
