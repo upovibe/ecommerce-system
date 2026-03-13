@@ -9,6 +9,9 @@ export default class RootPage extends App {
     super();
     this.products = [];
     this.loading = true;
+    this.categories = [];
+    this.categoriesLoading = true;
+    this.currencyCode = "USD";
     this.pageData = null;
     this.pageLoading = true;
     this.heroImages = [];
@@ -30,7 +33,12 @@ export default class RootPage extends App {
     super.connectedCallback();
     if (this._isInitialized) return;
     this._isInitialized = true;
-    await Promise.all([this.loadPage(), this.loadProducts()]);
+    await Promise.all([
+      this.loadPage(),
+      this.loadProducts(),
+      this.loadCategories(),
+      this.loadCurrency(),
+    ]);
   }
 
   disconnectedCallback() {
@@ -136,11 +144,37 @@ export default class RootPage extends App {
     }
   }
 
+  async loadCategories() {
+    this.categoriesLoading = true;
+    this.updateView();
+    try {
+      const res = await api.get("/categories");
+      const data = res?.data?.data;
+      this.categories = Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.error("Failed to load categories", e);
+      this.categories = [];
+    } finally {
+      this.categoriesLoading = false;
+      this.updateView();
+    }
+  }
+
+  async loadCurrency() {
+    try {
+      const res = await api.get("/settings/key/currency");
+      const value = res?.data?.data?.setting_value;
+      if (value) this.currencyCode = String(value).toUpperCase();
+    } catch (e) {
+      // keep default
+    }
+  }
+
   formatCurrency(value) {
     const val = Number(value || 0);
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: this.currencyCode || "USD",
     }).format(val);
   }
 
@@ -157,6 +191,62 @@ export default class RootPage extends App {
     if (path.startsWith("/")) return baseUrl + path;
     if (path.startsWith("uploads/")) return `${baseUrl}/api/${path}`;
     return `${baseUrl}/api/${path.replace(/^\//, "")}`;
+  }
+
+  renderCategoriesRow() {
+    if (this.categoriesLoading) {
+      return `
+        <section class="mb-12">
+          <div class="flex items-center gap-4 overflow-x-auto pb-3 no-scrollbar -mx-2 px-2">
+            ${Array(6)
+              .fill(
+                `<div class="animate-pulse min-w-[140px]">
+                  <div class="h-24 w-24 rounded-2xl bg-slate-100 mb-3"></div>
+                  <div class="h-3 w-20 bg-slate-100 rounded"></div>
+                </div>`,
+              )
+              .join("")}
+          </div>
+        </section>
+      `;
+    }
+
+    if (!this.categories || this.categories.length === 0) return "";
+
+    const topCategories = this.categories.filter(
+      (cat) => cat.parent_id === null || Number(cat.parent_id) === 0,
+    );
+    if (topCategories.length === 0) return "";
+
+    return `
+      <section class="mb-12">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-2">Shop By Category</p>
+            <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Browse categories</h2>
+          </div>
+        </div>
+        <div class="flex items-start gap-5 overflow-x-auto pb-3 no-scrollbar -mx-2 px-2">
+          ${topCategories
+            .map((cat) => {
+              const image = this.getImageUrl(cat.image);
+              return `
+                <a href="/public/categories" class="group flex-[1_1_160px] min-w-[160px] max-w-[220px]">
+                  <div class="w-full aspect-square rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden shadow-sm group-hover:shadow-lg transition-all">
+                    ${
+                      image
+                        ? `<img src="${image}" alt="${cat.name || "Category"}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">`
+                        : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-3xl"><i class="fas fa-layer-group"></i></div>`
+                    }
+                  </div>
+                  <p class="mt-3 text-sm font-black text-slate-900">${cat.name || "Category"}</p>
+                </a>
+              `;
+            })
+            .join("")}
+        </div>
+      </section>
+    `;
   }
 
   renderHero() {
@@ -330,13 +420,15 @@ export default class RootPage extends App {
             : ""
         }
 
+        ${this.renderCategoriesRow()}
+
         <section class="mb-12">
           <div class="flex items-center justify-between mb-6">
             <div>
               <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-2">Featured Products</p>
               <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Latest arrivals to shop now</h2>
             </div>
-            <a href="/public/products" class="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700">View All</a>
+            <a href="/public/products" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-full">View all</a>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

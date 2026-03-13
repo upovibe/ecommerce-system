@@ -1,7 +1,96 @@
 import App from "@/core/App.js";
+import "@/components/ui/Skeleton.js";
+import api from "@/services/api.js";
 
 class ProductsPage extends App {
+  constructor() {
+    super();
+    this.products = [];
+    this.loading = true;
+    this.categories = ["All"];
+    this.activeCategory = "All";
+    this._lastRendered = "";
+    this._isInitialized = false;
+  }
+
+  updateView() {
+    const next = this.render();
+    if (next === this._lastRendered) return;
+    this._lastRendered = next;
+    this.innerHTML = next;
+    this.attachEvents();
+  }
+
+  async connectedCallback() {
+    super.connectedCallback();
+    if (this._isInitialized) return;
+    this._isInitialized = true;
+    await this.loadProducts();
+  }
+
+  async loadProducts() {
+    this.loading = true;
+    this.updateView();
+    try {
+      const res = await api.get("/products/public");
+      const data = res?.data?.data;
+      this.products = Array.isArray(data) ? data : [];
+      const catSet = new Set(
+        this.products
+          .map((p) => p.category_name || "General")
+          .filter(Boolean),
+      );
+      this.categories = ["All", ...Array.from(catSet)];
+    } catch (e) {
+      console.error("Failed to load products", e);
+      this.products = [];
+      this.categories = ["All"];
+    } finally {
+      this.loading = false;
+      this.updateView();
+    }
+  }
+
+  attachEvents() {
+    this.querySelectorAll("[data-category]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const value = e.currentTarget.dataset.category;
+        if (!value) return;
+        this.activeCategory = value;
+        this.updateView();
+      });
+    });
+  }
+
+  getImageUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
+    const baseUrl = window.location.origin;
+    if (path.startsWith("/api/")) return baseUrl + path;
+    if (path.startsWith("/")) return baseUrl + path;
+    if (path.startsWith("uploads/")) return `${baseUrl}/api/${path}`;
+    return `${baseUrl}/api/${path.replace(/^\//, "")}`;
+  }
+
+  formatCurrency(value) {
+    const val = Number(value || 0);
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
+  }
+
+  getFilteredProducts() {
+    if (this.activeCategory === "All") return this.products;
+    return this.products.filter(
+      (p) => (p.category_name || "General") === this.activeCategory,
+    );
+  }
+
   render() {
+    const filtered = this.getFilteredProducts();
+    const categories =
+      Array.isArray(this.categories) && this.categories.length
+        ? this.categories
+        : ["All"];
+
     return `
       <div class="py-20 px-8 max-w-7xl mx-auto">
         <header class="mb-16">
@@ -12,36 +101,63 @@ class ProductsPage extends App {
           <p class="text-slate-500 mt-4 text-lg font-medium max-w-2xl">Browse our curated selection of high-quality products across all categories. Designed for excellence, built for you.</p>
         </header>
 
-        <!-- Filters Bar -->
-        <div class="flex items-center justify-between mb-12 py-6 border-y border-slate-100">
-          <div class="flex items-center gap-4">
-            <span class="text-xs font-semibold text-slate-400">Sort By:</span>
-            <select class="bg-transparent border-none font-bold text-sm text-slate-900 focus:ring-0 cursor-pointer">
-              <option>Newest First</option>
-              <option>Price: Low to High</option>
-              <option>Price: High to Low</option>
-              <option>Popularity</option>
-            </select>
+        <!-- Categories Row -->
+        <div class="mb-10">
+          <div class="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar -mx-2 px-2">
+            ${categories
+              .map((cat) => {
+                const active = cat === this.activeCategory;
+                return `
+                  <button
+                    type="button"
+                    data-category="${cat}"
+                    class="whitespace-nowrap px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all ${
+                      active
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                    }">
+                    ${cat}
+                  </button>
+                `;
+              })
+              .join("")}
           </div>
-          <p class="text-xs font-semibold text-slate-400">Showing 24 of 1,280 Products</p>
         </div>
 
         <!-- Products Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
-          ${this.renderProductCard("Classic Urban Hoodie", "Fashion", "$89.00", "https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&q=80&w=400")}
-          ${this.renderProductCard("Vast Tech Watch v2", "Electronics", "$249.00", "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=400")}
-          ${this.renderProductCard("Minimalist Desk Lamp", "Home", "$120.00", "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&q=80&w=400")}
-          ${this.renderProductCard("Premium Leather Bag", "Accessories", "$180.00", "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&q=80&w=400")}
+          ${this.loading
+            ? Array(8)
+                .fill(
+                  `<div class="animate-pulse">
+                    <div class="aspect-[4/5] bg-slate-100 rounded-[2.5rem] mb-6"></div>
+                    <div class="h-3 w-20 bg-slate-100 rounded mb-2"></div>
+                    <div class="h-4 w-36 bg-slate-100 rounded mb-2"></div>
+                    <div class="h-4 w-24 bg-slate-100 rounded"></div>
+                  </div>`,
+                )
+                .join("")
+            : filtered.length
+              ? filtered.map((p) => this.renderProductCard(p)).join("")
+              : `<div class="col-span-full text-center text-slate-500 text-sm">No products found in this category.</div>`}
         </div>
       </div>
     `;
   }
 
-  renderProductCard(name, category, price, image) {
+  renderProductCard(product) {
+    const name = product.name || "Untitled Product";
+    const category = product.category_name || "General";
+    const price = this.formatCurrency(product.base_price);
+    const image = this.getImageUrl(product.main_image);
     return `
       <div class="group cursor-pointer">
         <div class="relative aspect-[4/5] bg-slate-50 rounded-[2.5rem] overflow-hidden mb-6 group-hover:shadow-2xl group-hover:shadow-indigo-100 transition-all duration-500">
-          <img src="${image}" alt="${name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">
+          ${
+            image
+              ? `<img src="${image}" alt="${name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
+              : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i class="fas fa-image"></i></div>`
+          }
           <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
             <button class="w-full py-4 bg-white text-slate-900 rounded-2xl font-semibold text-xs hover:bg-indigo-600 hover:text-white transition-colors">Quick View</button>
           </div>
