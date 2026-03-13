@@ -136,16 +136,6 @@ class ProductsPage extends App {
     `;
   }
 
-  buildValueOptionsHtml(attribute, selectedValue = "") {
-    const values = Array.isArray(attribute?.values) ? attribute.values : [];
-    const sorted = values.slice().sort((a, b) => String(a.value || "").localeCompare(String(b.value || "")));
-    const opts = sorted.map(v => `<ui-option value="${v.value}">${v.label || v.value}</ui-option>`).join("");
-    return `
-      <ui-option value="">Select value...</ui-option>
-      ${opts}
-      <ui-option value="__custom__">Other (Custom)</ui-option>
-    `;
-  }
 
   handleCategoryChange(e) {
     const dropdown = e.target;
@@ -310,8 +300,8 @@ class ProductsPage extends App {
     }
   }
 
-  addVariantRow(data = null) {
-    const list = this.querySelector("#variant-list");
+  addVariantRow(data = null, targetList = null) {
+    const list = targetList || this.getActiveVariantList();
     if (!list) return;
     
     const row = document.createElement("div");
@@ -330,16 +320,11 @@ class ProductsPage extends App {
         </div>
         <div class="space-y-2">
           <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Value</label>
-          <ui-dropdown data-field="value" placeholder="Select value..." class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleVariantValueChange(event)">
-            <ui-option value="">Select value...</ui-option>
-          </ui-dropdown>
-          <div class="mt-2 hidden custom-value-container animate-in fade-in slide-in-from-top-1 duration-200">
-            <ui-input data-field="custom_value" placeholder="Value (e.g. XL, Red, 4K)" class="w-full bg-white border-slate-200"></ui-input>
-          </div>
+          <ui-input data-field="value" placeholder="Enter value (e.g. Yellow, XL)" class="w-full bg-white border-slate-200"></ui-input>
         </div>
         <div class="space-y-2">
           <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Quantity</label>
-          <ui-input data-field="stock" type="number" step="1" min="0" placeholder="0" class="w-full bg-white border-slate-200" oninput="this.closest('app-products-page').updateTotalStock()"></ui-input>
+          <ui-input data-field="quantity" type="number" step="1" min="0" placeholder="0" class="w-full bg-white border-slate-200" oninput="this.closest('app-products-page').updateTotalStock()"></ui-input>
         </div>
       </div>
       <div class="flex items-center justify-end pt-3 border-t border-slate-200/60">
@@ -350,7 +335,7 @@ class ProductsPage extends App {
     `;
     list.appendChild(row);
 
-    if (data) {
+    if (data && typeof data === "object" && !data.nodeType) {
       const typeDrop = row.querySelector('[data-field="type"]');
       const customTypeEl = row.querySelector('[data-field="custom_type"]');
       const rawType = data.type || "Size";
@@ -366,13 +351,23 @@ class ProductsPage extends App {
         typeDrop.value = attr.name;
       }
 
-      this.setVariantValueOptions(row, typeDrop.value, data.value || data.label || "");
-
-      row.querySelector('[data-field="stock"]').value = data.stock || 0;
+      row.querySelector('[data-field="value"]').value = data.value || data.label || "";
+      row.querySelector('[data-field="quantity"]').value = data.quantity ?? data.stock ?? 0;
     } else {
-      this.setVariantValueOptions(row, "");
     }
     this.updateTotalStock();
+  }
+
+  getActiveVariantList() {
+    const editModal = this.querySelector("#product-edit-modal");
+    const createModal = this.querySelector("#product-create-modal");
+    if (editModal?.hasAttribute("open")) {
+      return editModal.querySelector("#variant-list");
+    }
+    if (createModal?.hasAttribute("open")) {
+      return createModal.querySelector("#variant-list");
+    }
+    return this.querySelector("#variant-list");
   }
 
   handleVariantTypeChange(e) {
@@ -385,58 +380,6 @@ class ProductsPage extends App {
       container?.classList.remove("hidden");
     } else {
       container?.classList.add("hidden");
-    }
-    this.setVariantValueOptions(row, value);
-  }
-
-  handleVariantValueChange(e) {
-    const dropdown = e.target;
-    const value = e.detail?.value || dropdown?.value;
-    const row = dropdown.closest(".variant-row");
-    if (!row) return;
-    const container = row.querySelector(".custom-value-container");
-    if (value === "__custom__") {
-      container?.classList.remove("hidden");
-    } else {
-      container?.classList.add("hidden");
-    }
-  }
-
-  setVariantValueOptions(row, typeValue, selectedValue = "") {
-    const valueDrop = row.querySelector('[data-field="value"]');
-    const customValue = row.querySelector(".custom-value-container");
-    const customValueInput = row.querySelector('[data-field="custom_value"]');
-    if (!valueDrop) return;
-
-    if (!typeValue || typeValue === "Other") {
-      valueDrop.classList.add("hidden");
-      customValue?.classList.remove("hidden");
-      if (selectedValue && customValueInput) customValueInput.value = selectedValue;
-      return;
-    }
-
-    valueDrop.classList.remove("hidden");
-    Array.from(valueDrop.querySelectorAll("ui-option")).forEach(opt => opt.remove());
-    const attr = this.getAttributeByName(typeValue);
-    valueDrop.innerHTML = this.buildValueOptionsHtml(attr, selectedValue);
-
-    const values = Array.isArray(attr?.values) ? attr.values : [];
-    const matched = values.find(v => String(v.value).toLowerCase() === String(selectedValue).toLowerCase());
-    if (matched) {
-      valueDrop.value = matched.value;
-      customValue?.classList.add("hidden");
-      if (customValueInput) customValueInput.value = "";
-    } else if (selectedValue) {
-      valueDrop.value = "__custom__";
-      customValue?.classList.remove("hidden");
-      if (customValueInput) customValueInput.value = selectedValue;
-    } else if (!values.length) {
-      valueDrop.value = "__custom__";
-      customValue?.classList.remove("hidden");
-    } else {
-      valueDrop.value = "";
-      customValue?.classList.add("hidden");
-      if (customValueInput) customValueInput.value = "";
     }
   }
 
@@ -467,7 +410,7 @@ class ProductsPage extends App {
     }
 
     const total = rows.reduce((sum, row) => {
-      const val = parseInt(row.querySelector('[data-field="stock"]')?.value || 0, 10);
+      const val = parseInt(row.querySelector('[data-field="quantity"]')?.value || 0, 10);
       return sum + (isNaN(val) ? 0 : val);
     }, 0);
 
@@ -493,35 +436,27 @@ class ProductsPage extends App {
     if (rows.length === 0) {
       const m = list.closest("ui-modal");
       const stockField = m?.querySelector("#create-stock-total") || m?.querySelector("#edit-stock-total");
-      const stock = stockField?.value ? parseInt(stockField.value, 10) : 0;
-      return [{ type: "Size", value: "Default", stock }];
+      const quantity = stockField?.value ? parseInt(stockField.value, 10) : 0;
+      return [{ type: "Default", value: "Default", quantity }];
     }
 
     const variants = rows.map((row) => {
       const typeDrop = row.querySelector('[data-field="type"]');
       const customTypeEl = row.querySelector('[data-field="custom_type"]');
-      const valueDrop = row.querySelector('[data-field="value"]');
-      const customValueEl = row.querySelector('[data-field="custom_value"]');
-      const stockEl = row.querySelector('[data-field="stock"]');
-      
+      const valueEl = row.querySelector('[data-field="value"]');
+      const quantityEl = row.querySelector('[data-field="quantity"]');
+
       let type = typeDrop?.value || "";
       if (type === "Other" || type === "") {
         type = customTypeEl?.value?.trim() || "Other";
       }
 
-      let value = "";
-      if (valueDrop && !valueDrop.classList.contains("hidden")) {
-        const selected = valueDrop.value;
-        if (selected && selected !== "__custom__") value = selected;
-      }
-      if (!value) {
-        value = customValueEl?.value?.trim() || "";
-      }
-      const stock = stockEl?.value ? parseInt(stockEl.value, 10) : 0;
+      const value = valueEl?.value?.trim() || "";
+      const quantity = quantityEl?.value ? parseInt(quantityEl.value, 10) : null;
       
-      return { type, value, stock };
+      return { type, value, quantity };
     });
-    return variants.filter((v) => v.value || v.stock);
+    return variants.filter((v) => v.value || v.quantity);
   }
 
   // ── EDIT ────────────────────────────────────────────
@@ -563,11 +498,15 @@ class ProductsPage extends App {
         if (p.variants && Array.isArray(p.variants)) {
           p.variants.forEach(v => {
             const opt = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options) : v.variant_options;
+            let resolvedValue = opt?.value || opt?.label || "";
+            if (resolvedValue.includes(":")) {
+              resolvedValue = resolvedValue.split(":").slice(1).join(":").trim();
+            }
             this.addVariantRow({
               type: opt?.type || "Size",
-              value: opt?.value || opt?.label || "",
-              stock: v.stock
-            });
+              value: resolvedValue,
+              quantity: v.quantity ?? v.stock ?? null
+            }, vList);
           });
         }
       }
@@ -761,7 +700,8 @@ class ProductsPage extends App {
                     const opt = typeof v.variant_options === 'string' ? JSON.parse(v.variant_options) : v.variant_options;
                     const type = opt?.type || "Default";
                     const value = opt?.value || opt?.label || "Default";
-                    const isLowStock = v.stock <= 5;
+                    const qty = v.quantity ?? v.stock ?? 0;
+                    const isLowStock = qty <= 5;
                     return `
                       <tr class="hover:bg-slate-50 transition">
                         <td class="px-4 py-3">
@@ -770,7 +710,7 @@ class ProductsPage extends App {
                         </td>
                         <td class="px-4 py-3">
                           <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${isLowStock ? 'bg-orange-100 text-orange-600' : 'bg-emerald-100 text-emerald-600'}">
-                            ${v.stock} pcs
+                            ${qty} pcs
                           </span>
                         </td>
                       </tr>
@@ -1031,7 +971,7 @@ class ProductsPage extends App {
               </div>
               <div id="variant-list" class="space-y-3"></div>
               <div class="flex justify-end mt-3">
-                <button type="button" onclick="this.closest('app-products-page').addVariantRow()" class="px-4 py-2 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <button type="button" onclick="this.closest('app-products-page').addVariantRow(null, this.closest('ui-modal').querySelector('#variant-list'))" class="px-4 py-2 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                   <i class="fas fa-plus text-[10px]"></i> Add variant
                 </button>
               </div>
@@ -1157,6 +1097,20 @@ class ProductsPage extends App {
                   ${materialOptions}
                 </ui-dropdown>
               </div>
+            </div>
+
+            <!-- 7. Variations -->
+            <div class="pt-2 border-t border-slate-100">
+              <div class="flex items-center justify-between mb-3">
+                <label class="block text-sm font-medium text-slate-700">Product Variations</label>
+              </div>
+              <div id="variant-list" class="space-y-3"></div>
+              <div class="flex justify-end mt-3">
+                <button type="button" onclick="this.closest('app-products-page').addVariantRow(null, this.closest('ui-modal').querySelector('#variant-list'))" class="px-4 py-2 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <i class="fas fa-plus text-[10px]"></i> Add variant
+                </button>
+              </div>
+              <p class="text-[10px] text-slate-400 mt-2 italic">Add sizes, colors, or direct stock entries. Leave empty for single item.</p>
             </div>
 
             <!-- Images Section -->

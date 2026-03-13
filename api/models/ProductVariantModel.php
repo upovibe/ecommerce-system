@@ -9,15 +9,13 @@ class ProductVariantModel extends BaseModel
 
     protected static $fillable = [
         'product_id',
-        'stock',
-        'variant_options',
-        'is_active'
+        'variant_type_id',
+        'value',
+        'quantity'
     ];
 
     protected static $casts = [
-        'stock' => 'integer',
-        'variant_options' => 'json',
-        'is_active' => 'boolean',
+        'quantity' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];

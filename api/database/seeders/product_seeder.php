@@ -243,6 +243,7 @@ class ProductSeeder
         ');
 
         $skip = $this->pdo->prepare('SELECT id FROM products WHERE slug = ?');
+        $typeStmt = $this->pdo->prepare("SELECT id FROM product_variant_types WHERE LOWER(name) = LOWER(?)");
 
         foreach ($products as $p) {
             [$name, $slug, $catSlug, $type, $desc, $price, $img, $brandSlug, $matSlug, $status] = $p;
@@ -273,13 +274,20 @@ class ProductSeeder
 
             // Seed default variant
             $newId = (int) $this->pdo->lastInsertId();
+            $typeStmt->execute(['Default']);
+            $typeId = $typeStmt->fetchColumn();
+            if (!$typeId) {
+                $this->pdo->prepare("INSERT INTO product_variant_types (name) VALUES ('Default')")->execute();
+                $typeId = $this->pdo->lastInsertId();
+            }
             $this->pdo->prepare('
-                INSERT INTO product_variants (product_id, stock, variant_options, is_active, created_at, updated_at)
-                VALUES (?, ?, ?, 1, NOW(), NOW())
+                INSERT INTO product_variants (product_id, variant_type_id, value, quantity, created_at, updated_at)
+                VALUES (?, ?, ?, ?, NOW(), NOW())
             ')->execute([
-                $newId, 
+                $newId,
+                $typeId,
+                'Default',
                 rand(5, 100),
-                json_encode(['type' => 'Size', 'value' => 'Default'])
             ]);
 
             echo "✅ Seeded: {$name}\n";
