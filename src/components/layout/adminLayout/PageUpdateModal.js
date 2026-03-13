@@ -14,6 +14,7 @@ class PageUpdateModal extends HTMLElement {
     this._galleryImages = [];
     this.formData = {
       title: "",
+      subtitle: "",
       content: "",
       is_active: true,
     };
@@ -27,6 +28,7 @@ class PageUpdateModal extends HTMLElement {
     this.page = page;
     this.formData = {
       title: page.title || "",
+      subtitle: page.subtitle || "",
       content: page.content || "",
       is_active: Number(page.is_active) === 1,
     };
@@ -56,6 +58,7 @@ class PageUpdateModal extends HTMLElement {
       const formData = new FormData();
       formData.append("_method", "PUT");
       formData.append("title", this.formData.title);
+      formData.append("subtitle", this.formData.subtitle);
       formData.append("content", this.formData.content);
       formData.append("is_active", this.formData.is_active ? 1 : 0);
 
@@ -124,6 +127,13 @@ class PageUpdateModal extends HTMLElement {
             placeholder="e.g. About VastCommerce">
           </ui-input>
 
+          <ui-input
+            label="Page Subtitle"
+            id="page-subtitle-input"
+            value="${this.formData.subtitle}"
+            placeholder="Short supporting headline">
+          </ui-input>
+
           <!-- Content WYSIWYG -->
           <div class="space-y-2 p-4 bg-gray-50 rounded-xl border border-gray-100">
             <label class="text-sm font-medium text-gray-900">Page Content</label>
@@ -186,6 +196,9 @@ class PageUpdateModal extends HTMLElement {
     // Bind events
     this.querySelector("#page-title-input")?.addEventListener("input", (e) => {
       this.formData.title = e.target.value;
+    });
+    this.querySelector("#page-subtitle-input")?.addEventListener("input", (e) => {
+      this.formData.subtitle = e.target.value;
     });
     this.querySelector("#cancel-page-btn")?.addEventListener("click", () => this.close());
     this.querySelector("#save-page-btn")?.addEventListener("click", () => this.savePage());

@@ -105,6 +105,7 @@ class PageViewModal extends HTMLElement {
 
           <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100">
             <h2 class="text-2xl font-bold text-slate-900">${page.title || "Untitled Page"}</h2>
+            ${page.subtitle ? `<p class="text-slate-600 font-medium mt-1">${page.subtitle}</p>` : ""}
             <p class="text-slate-500 font-medium mt-1">/${page.slug || ""}</p>
             <div class="mt-4 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
               isActive ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"

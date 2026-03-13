@@ -10,6 +10,7 @@ class PageModel extends BaseModel
     protected static $fillable = [
         'name',
         'title',
+        'subtitle',
         'slug',
         'content',
         'meta_info',

@@ -8,6 +8,12 @@ export default class RootPage extends App {
     super();
     this.products = [];
     this.loading = true;
+    this.pageData = null;
+    this.pageLoading = true;
+    this.heroImages = [];
+    this.heroIndex = 0;
+    this.heroTimer = null;
+    this.heroRotationMs = 5000;
     this._lastRendered = "";
     this._isInitialized = false;
   }
@@ -23,7 +29,75 @@ export default class RootPage extends App {
     super.connectedCallback();
     if (this._isInitialized) return;
     this._isInitialized = true;
-    await this.loadProducts();
+    await Promise.all([this.loadPage(), this.loadProducts()]);
+  }
+
+  disconnectedCallback() {
+    if (this.heroTimer) {
+      clearInterval(this.heroTimer);
+      this.heroTimer = null;
+    }
+  }
+
+  normalizeImageList(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [value];
+    }
+    return [];
+  }
+
+  startHeroRotation() {
+    if (this.heroTimer) {
+      clearInterval(this.heroTimer);
+      this.heroTimer = null;
+    }
+    if (this.heroImages.length <= 1) return;
+    this.heroTimer = setInterval(() => {
+      this.heroIndex = (this.heroIndex + 1) % this.heroImages.length;
+      this.updateView();
+    }, this.heroRotationMs);
+  }
+
+  async loadPage() {
+    this.pageLoading = true;
+    this.updateView();
+
+    try {
+      const res = await api.get("/pages/slug/home");
+      const data = res?.data?.data || null;
+      this.pageData = data;
+
+      const bannerImages = this.normalizeImageList(data?.banner_image);
+      const galleryImages = this.normalizeImageList(data?.images);
+
+      if (galleryImages.length > 0) {
+        this.heroImages = bannerImages.length > 0 ? [...bannerImages, ...galleryImages] : galleryImages;
+      } else {
+        this.heroImages = bannerImages;
+      }
+      this.heroIndex = 0;
+      this.startHeroRotation();
+    } catch (e) {
+      console.error("Failed to load home page", e);
+      this.pageData = null;
+      this.heroImages = [];
+      this.heroIndex = 0;
+    } finally {
+      this.pageLoading = false;
+      this.updateView();
+    }
   }
 
   async loadProducts() {
@@ -56,6 +130,92 @@ export default class RootPage extends App {
     if (path.startsWith("/")) return baseUrl + path;
     if (path.startsWith("uploads/")) return `${baseUrl}/api/${path}`;
     return `${baseUrl}/api/${path.replace(/^\//, "")}`;
+  }
+
+  renderHero() {
+    const defaultTitle = "One Store, Infinite Possibilities";
+    const defaultSubtitle =
+      "From real estate to luxury fashion, vehicles to fast food. Our universal architecture powers every industry with premium precision.";
+
+    const title = this.pageData?.title || defaultTitle;
+    const subtitle = this.pageData?.subtitle || defaultSubtitle;
+    const content = this.pageData?.content || "";
+
+    if (!this.heroImages.length) {
+      return `
+        <section class="bg-indigo-600 rounded-[2.5rem] p-10 sm:p-12 lg:p-16 text-center text-white mb-12 shadow-2xl overflow-hidden relative border border-indigo-500/50">
+          <div class="relative z-10 max-w-3xl mx-auto">
+            <div class="inline-block px-4 py-1.5 bg-indigo-500/30 rounded-full text-[10px] font-black uppercase tracking-widest mb-5 border border-white/10 backdrop-blur-sm">
+              VastCommerce Ecosystem Ready
+            </div>
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black mb-5 tracking-tighter leading-tight">${title}</h1>
+            <p class="text-indigo-100/80 text-base sm:text-lg mb-6 font-medium">${subtitle}</p>
+            ${content ? `<div class="text-indigo-100/70 text-sm sm:text-base font-medium max-w-2xl mx-auto">${content}</div>` : ""}
+            <div class="flex flex-wrap justify-center gap-4 mt-8">
+              <a href="/public/products" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-indigo-900/20">Explore All Collections</a>
+              <a href="/public/categories" class="bg-indigo-500/20 text-white border border-white/20 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all backdrop-blur-md">Browse Categories</a>
+            </div>
+          </div>
+          <div class="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+            <i class="fas fa-shopping-bag text-[20rem] absolute -top-20 -left-20 rotate-12"></i>
+            <i class="fas fa-rocket text-[14rem] absolute -bottom-24 -right-10 -rotate-12"></i>
+          </div>
+        </section>
+      `;
+    }
+
+    const slides = this.heroImages
+      .map((img, index) => {
+        const url = this.getImageUrl(img);
+        const active = index === this.heroIndex;
+        return `
+          <img
+            src="${url}"
+            alt="${title}"
+            class="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${active ? "opacity-100" : "opacity-0"}"
+          >
+        `;
+      })
+      .join("");
+
+    const dots =
+      this.heroImages.length > 1
+        ? `
+          <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+            ${this.heroImages
+              .map(
+                (_, index) => `
+                  <span class="w-2 h-2 rounded-full ${index === this.heroIndex ? "bg-white" : "bg-white/40"}"></span>
+                `
+              )
+              .join("")}
+          </div>
+        `
+        : "";
+
+    return `
+      <section class="relative overflow-hidden rounded-[2.5rem] mb-12 border border-slate-200 shadow-2xl">
+        <div class="relative h-[420px] sm:h-[520px] lg:h-[560px]">
+          ${slides}
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-slate-900/40 to-transparent"></div>
+          <div class="absolute inset-0 z-10 flex items-end sm:items-center">
+            <div class="w-full px-6 sm:px-12 lg:px-16 py-10 sm:py-0 text-left text-white">
+              <div class="max-w-2xl">
+                <p class="text-[10px] font-black uppercase tracking-widest text-white/70 mb-3">Featured Landing</p>
+                <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-4">${title}</h1>
+                <p class="text-white/85 text-sm sm:text-lg mb-6">${subtitle}</p>
+                ${content ? `<div class="text-white/70 text-sm sm:text-base">${content}</div>` : ""}
+                <div class="flex flex-wrap gap-4 mt-8">
+                  <a href="/public/products" class="bg-white text-slate-900 px-7 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all">Explore All Collections</a>
+                  <a href="/public/categories" class="bg-white/10 text-white border border-white/20 px-7 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/20 transition-all">Browse Categories</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          ${dots}
+        </div>
+      </section>
+    `;
   }
 
   renderProductCard(p) {
@@ -100,23 +260,7 @@ export default class RootPage extends App {
 
     return `
       <div class="py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <section class="bg-indigo-600 rounded-[2.5rem] p-10 sm:p-12 lg:p-16 text-center text-white mb-12 shadow-2xl overflow-hidden relative border border-indigo-500/50">
-          <div class="relative z-10 max-w-3xl mx-auto">
-            <div class="inline-block px-4 py-1.5 bg-indigo-500/30 rounded-full text-[10px] font-black uppercase tracking-widest mb-5 border border-white/10 backdrop-blur-sm">
-              VastCommerce Ecosystem Ready
-            </div>
-            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black mb-5 tracking-tighter leading-tight">One Store, <span class="text-indigo-200">Infinite</span> Possibilities</h1>
-            <p class="text-indigo-100/80 text-base sm:text-lg mb-8 font-medium">From real estate to luxury fashion, vehicles to fast food. Our universal architecture powers every industry with premium precision.</p>
-            <div class="flex flex-wrap justify-center gap-4">
-              <a href="/public/products" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-indigo-900/20">Explore All Collections</a>
-              <a href="/public/categories" class="bg-indigo-500/20 text-white border border-white/20 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all backdrop-blur-md">Browse Categories</a>
-            </div>
-          </div>
-          <div class="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-            <i class="fas fa-shopping-bag text-[20rem] absolute -top-20 -left-20 rotate-12"></i>
-            <i class="fas fa-rocket text-[14rem] absolute -bottom-24 -right-10 -rotate-12"></i>
-          </div>
-        </section>
+        ${this.renderHero()}
 
         <section class="mb-12">
           <div class="flex items-center justify-between mb-6">

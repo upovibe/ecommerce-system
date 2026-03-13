@@ -13,6 +13,7 @@ class PageSettingsModal extends HTMLElement {
     super();
     this.pageData = {
       title: "",
+      subtitle: "",
       name: "",
       content: "",
       is_active: true,
@@ -110,6 +111,15 @@ class PageSettingsModal extends HTMLElement {
                         </ui-input>
 
                         <ui-input 
+                            label="Page Subtitle" 
+                            placeholder="Enter page subtitle"
+                            id="page-subtitle-input"
+                            value="${this.pageData.subtitle}">
+                        </ui-input>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ui-input 
                             label="Page Name (Internal)" 
                             placeholder="Enter administrative name"
                             id="page-name-input"
@@ -161,6 +171,10 @@ class PageSettingsModal extends HTMLElement {
     this.querySelector("#page-title-input").addEventListener(
       "input",
       (e) => (this.pageData.title = e.target.value),
+    );
+    this.querySelector("#page-subtitle-input").addEventListener(
+      "input",
+      (e) => (this.pageData.subtitle = e.target.value),
     );
     this.querySelector("#page-name-input").addEventListener(
       "input",
