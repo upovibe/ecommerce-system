@@ -11,6 +11,7 @@ class ProductsPage extends App {
     this.categoriesMeta = [];
     this.activeCategory = "All";
     this.pendingCategory = "";
+    this.activeCategoryId = null;
     this._lastRendered = "";
     this._isInitialized = false;
   }
@@ -88,6 +89,7 @@ class ProductsPage extends App {
     );
     if (found) {
       this.activeCategory = found;
+      this.activeCategoryId = matchBySlug?.id ?? null;
       this.updateView();
     }
   }
@@ -123,6 +125,59 @@ class ProductsPage extends App {
     return this.products.filter(
       (p) => (p.category_name || "General") === this.activeCategory,
     );
+  }
+
+  getSubcategories() {
+    const list = Array.isArray(this.categoriesMeta) ? this.categoriesMeta : [];
+    const allSubcategories = list.filter(
+      (c) => c.parent_id !== null && Number(c.parent_id) !== 0,
+    );
+    return allSubcategories;
+  }
+
+  renderSubcategoriesRow() {
+    const subs = this.getSubcategories();
+    if (this.loading) {
+      return `
+        <div class="mb-10">
+          <div class="flex items-center gap-4 overflow-x-auto pb-2 no-scrollbar -mx-2 px-2">
+            ${Array(6)
+              .fill(
+                `<div class="animate-pulse min-w-[140px]">
+                  <div class="h-24 w-24 rounded-2xl bg-slate-100 mb-3"></div>
+                  <div class="h-3 w-20 bg-slate-100 rounded"></div>
+                </div>`,
+              )
+              .join("")}
+          </div>
+        </div>
+      `;
+    }
+    if (!subs.length) return "";
+
+    return `
+      <div class="mb-10">
+        <div class="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar -mx-2 px-2">
+          ${subs
+            .map((sub) => {
+              const image = this.getImageUrl(sub.image);
+              return `
+                <div class="group flex-[1_1_160px] min-w-[160px] max-w-[220px]">
+                  <div class="w-full aspect-square rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden shadow-sm group-hover:shadow-lg transition-all">
+                    ${
+                      image
+                        ? `<img src="${image}" alt="${sub.name || "Subcategory"}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+                        : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-3xl"><i class="fas fa-layer-group"></i></div>`
+                    }
+                  </div>
+                  <p class="mt-3 text-sm font-black text-slate-900">${sub.name || "Subcategory"}</p>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      </div>
+    `;
   }
 
   render() {
@@ -164,6 +219,8 @@ class ProductsPage extends App {
               .join("")}
           </div>
         </div>
+
+        ${this.renderSubcategoriesRow()}
 
         <!-- Products Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
