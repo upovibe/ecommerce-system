@@ -193,11 +193,6 @@ class AdminLayout extends App {
             href: "/dashboard/admin/products",
           },
           {
-            label: "Inventory",
-            icon: "fas fa-cubes",
-            href: "/dashboard/admin/inventory",
-          },
-          {
             label: "Orders",
             icon: "fas fa-receipt",
             href: "/dashboard/admin/orders",
@@ -267,7 +262,6 @@ class AdminLayout extends App {
       admin: "Overview",
       overview: "Overview",
       products: "Products",
-      inventory: "Inventory",
       orders: "Orders",
       categories: "Categories",
       brands: "Brands",

@@ -27,6 +27,7 @@ class ProductsPage extends App {
     this.productAttributes = []; // Global attributes
     this.loading = true;
     this.selectedProduct = null;
+    this.filters = { type: "", category: "", status: "", brand: "" };
     this._lastRendered = "";
     this._isInitialized = false;
     this._onTableEdit  = (e) => { const p = this._findRow(e); if (p) this.openEditModal(p); };
@@ -35,6 +36,38 @@ class ProductsPage extends App {
     this._onTableAdd   = () => this.openCreateModal();
     this._onTableRefresh = () => this.fetchData(true);
     this._onCategoryChange = (e) => this.handleCategoryChange(e);
+  }
+
+  handleFilterChange(e) {
+    const target = e?.target;
+    const value = e?.detail?.value ?? target?.value ?? "";
+    if (!target?.id) return;
+
+    if (target.id === "filter-type") this.filters.type = value;
+    if (target.id === "filter-category") this.filters.category = value;
+    if (target.id === "filter-status") this.filters.status = value;
+    if (target.id === "filter-brand") this.filters.brand = value;
+
+    this.updateView();
+  }
+
+  resetFilters() {
+    this.filters = { type: "", category: "", status: "", brand: "" };
+    this.updateView();
+  }
+
+  getFilteredProducts() {
+    let items = Array.isArray(this.products) ? [...this.products] : [];
+    const { type, category, status, brand } = this.filters || {};
+
+    if (type) items = items.filter((p) => String(p.type) === String(type));
+    if (category) items = items.filter((p) => String(p.category_id) === String(category));
+    if (brand) items = items.filter((p) => String(p.brand_id) === String(brand));
+    if (status) {
+      const wantActive = status === "active";
+      items = items.filter((p) => !!p.is_active === wantActive);
+    }
+    return items;
   }
 
   _findRow(e) {
@@ -743,7 +776,8 @@ class ProductsPage extends App {
       service:  this.products.filter((p) => p.type === "service").length,
     };
 
-    const rows = this.products.map((p, i) => {
+    const filteredProducts = this.getFilteredProducts();
+    const rows = filteredProducts.map((p, i) => {
       const imgSrc = this.imgUrl(p);
       return {
         id: p.id,
@@ -790,6 +824,13 @@ class ProductsPage extends App {
 
     const safeData = JSON.stringify(rows).replace(/"/g, "&quot;");
     const safeCols = JSON.stringify(columns).replace(/"/g, "&quot;");
+
+    const categoryOptions = (this.categories || [])
+      .map((c) => `<ui-option value="${c.id}">${c.name}</ui-option>`)
+      .join("");
+    const brandOptions = (this.brands || [])
+      .map((b) => `<ui-option value="${b.id}">${b.name}</ui-option>`)
+      .join("");
     
     return `
     <div>
@@ -823,6 +864,48 @@ class ProductsPage extends App {
               </div>
             </div>
           `).join("")}
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Type</label>
+            <ui-dropdown id="filter-type" value="${this.filters.type}" placeholder="All types" class="w-full" onchange="this.closest('app-products-page').handleFilterChange(event)">
+              <ui-option value="">All Types</ui-option>
+              <ui-option value="physical">Physical</ui-option>
+              <ui-option value="digital">Digital</ui-option>
+              <ui-option value="service">Service</ui-option>
+            </ui-dropdown>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Category</label>
+            <ui-dropdown id="filter-category" value="${this.filters.category}" placeholder="All categories" searchable class="w-full" onchange="this.closest('app-products-page').handleFilterChange(event)">
+              <ui-option value="">All Categories</ui-option>
+              ${categoryOptions}
+            </ui-dropdown>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Brand</label>
+            <ui-dropdown id="filter-brand" value="${this.filters.brand}" placeholder="All brands" searchable class="w-full" onchange="this.closest('app-products-page').handleFilterChange(event)">
+              <ui-option value="">All Brands</ui-option>
+              ${brandOptions}
+            </ui-dropdown>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Status</label>
+            <ui-dropdown id="filter-status" value="${this.filters.status}" placeholder="All statuses" class="w-full" onchange="this.closest('app-products-page').handleFilterChange(event)">
+              <ui-option value="">All Status</ui-option>
+              <ui-option value="active">Active</ui-option>
+              <ui-option value="inactive">Inactive</ui-option>
+            </ui-dropdown>
+          </div>
+          <div class="flex items-end">
+            <button onclick="this.closest('app-products-page').resetFilters()" class="w-full px-3 py-2 rounded-md border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition text-sm">
+              Clear Filters
+            </button>
+          </div>
         </div>
       </div>
 

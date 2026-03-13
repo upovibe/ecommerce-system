@@ -132,7 +132,7 @@ class LoginPage extends App {
               Manage your global marketplace in one place.
             </h1>
             <p class="text-slate-400 text-lg font-medium max-w-sm leading-relaxed mb-16">
-              Control inventory, track analytics, and manage customer experiences across all categories.
+              Control products, track analytics, and manage customer experiences across all categories.
             </p>
 
             <!-- Highlight Cards -->

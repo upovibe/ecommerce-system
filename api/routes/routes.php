@@ -80,10 +80,6 @@ Router::put('/pages/{id}', 'PageController@update');
 Router::delete('/pages/{id}', 'PageController@destroy');
 
 // Inventory Management Routes (admin only)
-Router::get('/inventory', 'InventoryController@index');
-Router::get('/inventory/summary', 'InventoryController@summary');
-Router::get('/inventory/{id}/variants', 'InventoryController@getVariants');
-Router::put('/inventory/variants/{id}/stock', 'InventoryController@updateVariantStock');
 
 // Attribute Management Routes (admin only)
 Router::get('/attributes', 'AttributeController@index');

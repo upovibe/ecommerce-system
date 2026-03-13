@@ -198,7 +198,7 @@ class ProductViewModal extends HTMLElement {
             ${[
               { label: "Price", value: this.formatCurrency(p.base_price), icon: "fa-tag", color: "text-emerald-500" },
               { label: "Total Stock", value: p.total_stock ?? 0, icon: "fa-cubes", color: "text-blue-500" },
-              { label: "Variants", value: p.variant_count ?? 0, icon: "fa-layer-group", color: "text-purple-500" },
+              { label: "Variants", value: p.variant_count ?? (Array.isArray(p.variants) ? p.variants.length : 0), icon: "fa-layer-group", color: "text-purple-500" },
               { label: "Product Type", value: p.type || "Physical", icon: "fa-shapes", color: "text-indigo-500" },
             ].map((s) => `
               <div class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
