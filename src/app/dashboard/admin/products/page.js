@@ -86,10 +86,21 @@ class ProductsPage extends App {
   }
 
   imgUrl(p) {
-    const img = p.main_image || p.metadata?.image || "";
-    if (!img) return "";
-    if (img.startsWith("http")) return img;
-    return `/api/${img.replace(/^\//, "")}`;
+    let img = p.main_image || p.metadata?.image || "";
+    if (!img && p.images) {
+      const imgs = Array.isArray(p.images) ? p.images : (typeof p.images === "string" ? JSON.parse(p.images) : []);
+      img = imgs?.[0] || "";
+    }
+    return this.fileUrl(img);
+  }
+
+  fileUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    if (path.startsWith("/api/")) return path;
+    if (path.startsWith("api/")) return `/${path}`;
+    if (path.startsWith("/uploads/")) return `/api${path}`;
+    return `/api/${path.replace(/^\//, "")}`;
   }
 
   getBrandById(id) {
@@ -524,12 +535,13 @@ class ProductsPage extends App {
       }
 
       const uploader = m.querySelector("#edit-uploader");
-      if (uploader) uploader.setValue(p.main_image || "");
+      if (uploader) uploader.setValue(this.fileUrl(p.main_image || ""));
 
       const gallery = m.querySelector("#edit-gallery");
       if (gallery && p.images) {
           const imgs = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
-          gallery.setValue(imgs || []);
+          const mapped = (imgs || []).map((img) => this.fileUrl(img)).filter(Boolean);
+          gallery.setValue(mapped);
       }
 
       m.querySelector("#edit-brand").value       = String(p.brand_id || "");
@@ -678,6 +690,28 @@ class ProductsPage extends App {
       
       // Description
       m.querySelector("#view-desc").innerHTML = p.description || "<span class='text-slate-400 italic'>No description provided</span>";
+
+      // Gallery
+      const galleryImages = Array.isArray(p.images)
+        ? p.images
+        : (typeof p.images === "string" ? JSON.parse(p.images) : []);
+      const galleryUrls = (galleryImages || []).map((img) => this.fileUrl(img)).filter(Boolean);
+      const galleryBlock = m.querySelector("#view-gallery");
+      if (galleryBlock) {
+        if (galleryUrls.length) {
+          galleryBlock.innerHTML = `
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              ${galleryUrls.map((src) => `
+                <div class="aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                  <img src="${src}" class="w-full h-full object-cover" alt="Product image">
+                </div>
+              `).join("")}
+            </div>
+          `;
+        } else {
+          galleryBlock.innerHTML = `<div class="text-sm text-slate-400 italic">No gallery images</div>`;
+        }
+      }
 
       // Render variations in view modal
       const vContainer = m.querySelector("#view-variants-list");
@@ -1200,6 +1234,17 @@ class ProductsPage extends App {
               <h3 class="font-bold text-slate-900 text-lg">Description</h3>
             </div>
             <div id="view-desc" class="text-slate-600 text-sm leading-relaxed prose prose-sm max-w-none"></div>
+          </div>
+
+          <!-- Gallery -->
+          <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="size-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <i class="fas fa-images text-lg"></i>
+              </div>
+              <h3 class="font-bold text-slate-900 text-lg">Gallery</h3>
+            </div>
+            <div id="view-gallery"></div>
           </div>
 
           <!-- Product Identifiers & Meta -->
