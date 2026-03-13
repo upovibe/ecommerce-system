@@ -24,10 +24,10 @@ class PublicLayout extends App {
               </div>
               Vast<span class="text-indigo-600">Commerce</span>
             </a>
-            <div class="hidden lg:flex items-center gap-8 text-sm font-bold text-slate-500">
-              <a href="/public/categories" class="hover:text-indigo-600 transition-colors uppercase tracking-widest text-[10px]">Collections</a>
-              <a href="/public/products" class="hover:text-indigo-600 transition-colors uppercase tracking-widest text-[10px]">All Products</a>
-              <a href="#" class="hover:text-indigo-600 transition-colors uppercase tracking-widest text-[10px]">Flash Deals</a>
+            <div class="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-500">
+              <a href="/public/categories" class="hover:text-indigo-600 transition-colors">Collections</a>
+              <a href="/public/products" class="hover:text-indigo-600 transition-colors">All Products</a>
+              <a href="#" class="hover:text-indigo-600 transition-colors">Flash Deals</a>
             </div>
           </div>
 
@@ -45,7 +45,7 @@ class PublicLayout extends App {
                 <span class="absolute top-2 right-2 w-4 h-4 bg-indigo-600 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white">0</span>
               </button>
               <div class="w-px h-6 bg-slate-100 mx-2"></div>
-              <a href="/auth/login" class="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black hover:bg-slate-800 transition-all shadow-lg shadow-slate-100 uppercase tracking-widest">Sign In</a>
+              <a href="/auth/login" class="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-lg shadow-slate-100">Sign In</a>
             </div>
           </div>
         </nav>
@@ -66,7 +66,7 @@ class PublicLayout extends App {
               </div>
             </div>
             <div>
-              <h4 class="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-6">Shop</h4>
+              <h4 class="text-xs font-semibold text-indigo-400 mb-6">Shop</h4>
               <ul class="space-y-4 text-sm font-bold text-slate-400">
                 <li><a href="/public/products" class="hover:text-white transition-colors">All Products</a></li>
                 <li><a href="/public/categories" class="hover:text-white transition-colors">Categories</a></li>
@@ -75,7 +75,7 @@ class PublicLayout extends App {
               </ul>
             </div>
             <div>
-              <h4 class="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-6">Support</h4>
+              <h4 class="text-xs font-semibold text-indigo-400 mb-6">Support</h4>
               <ul class="space-y-4 text-sm font-bold text-slate-400">
                 <li><a href="#" class="hover:text-white transition-colors">Help Center</a></li>
                 <li><a href="#" class="hover:text-white transition-colors">Shipping Info</a></li>
@@ -84,7 +84,7 @@ class PublicLayout extends App {
               </ul>
             </div>
           </div>
-          <div class="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <div class="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-semibold text-slate-500">
             <p>&copy; 2026 VastCommerce Architecture</p>
             <div class="flex gap-8">
               <a href="#" class="hover:text-white transition-colors">Privacy Policy</a>
