@@ -1,5 +1,6 @@
 import App from "@/core/App.js";
 import "@/components/ui/Skeleton.js";
+import "@/components/ui/ContentDisplay.js";
 import api from "@/services/api.js";
 
 // Root page - public landing
@@ -70,6 +71,21 @@ export default class RootPage extends App {
     }, this.heroRotationMs);
   }
 
+  nextHero() {
+    if (!this.heroImages.length) return;
+    this.heroIndex = (this.heroIndex + 1) % this.heroImages.length;
+    this.startHeroRotation();
+    this.updateView();
+  }
+
+  prevHero() {
+    if (!this.heroImages.length) return;
+    this.heroIndex =
+      (this.heroIndex - 1 + this.heroImages.length) % this.heroImages.length;
+    this.startHeroRotation();
+    this.updateView();
+  }
+
   async loadPage() {
     this.pageLoading = true;
     this.updateView();
@@ -83,7 +99,10 @@ export default class RootPage extends App {
       const galleryImages = this.normalizeImageList(data?.images);
 
       if (galleryImages.length > 0) {
-        this.heroImages = bannerImages.length > 0 ? [...bannerImages, ...galleryImages] : galleryImages;
+        this.heroImages =
+          bannerImages.length > 0
+            ? [...bannerImages, ...galleryImages]
+            : galleryImages;
       } else {
         this.heroImages = bannerImages;
       }
@@ -119,12 +138,20 @@ export default class RootPage extends App {
 
   formatCurrency(value) {
     const val = Number(value || 0);
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(val);
   }
 
   getImageUrl(path) {
     if (!path) return "";
-    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
+    if (
+      path.startsWith("http://") ||
+      path.startsWith("https://") ||
+      path.startsWith("data:")
+    )
+      return path;
     const baseUrl = window.location.origin;
     if (path.startsWith("/api/")) return baseUrl + path;
     if (path.startsWith("/")) return baseUrl + path;
@@ -195,7 +222,7 @@ export default class RootPage extends App {
               .map(
                 (_, index) => `
                   <span class="w-2 h-2 rounded-full ${index === this.heroIndex ? "bg-white" : "bg-white/40"}"></span>
-                `
+                `,
               )
               .join("")}
           </div>
@@ -203,23 +230,41 @@ export default class RootPage extends App {
         : "";
 
     return `
-      <section class="relative overflow-hidden rounded-[2.5rem] mb-12 border border-slate-200 shadow-2xl">
+      <section class="relative overflow-hidden rounded-[2.5rem] mb-12 border border-slate-200 shadow-2xl group">
         <div class="relative h-[420px] sm:h-[520px] lg:h-[560px]">
           ${slides}
-          <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-slate-900/40 to-transparent"></div>
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/60 to-slate-900/30"></div>
+          <div class="absolute inset-0 bg-slate-950/20"></div>
           <div class="absolute inset-0 z-10 flex items-end sm:items-center">
             <div class="w-full px-6 sm:px-12 lg:px-16 py-10 sm:py-0 text-left text-white">
               <div class="max-w-2xl">
                 <p class="text-[10px] font-black uppercase tracking-widest text-white/70 mb-3">Featured Landing</p>
                 ${title ? `<h1 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-4">${title}</h1>` : ""}
                 ${subtitle ? `<p class="text-white/85 text-sm sm:text-lg mb-6">${subtitle}</p>` : ""}
-                ${content ? `<div class="text-white/70 text-sm sm:text-base">${content}</div>` : ""}
                 <div class="flex flex-wrap gap-4 mt-8">
                   <a href="/public/products" class="bg-white text-slate-900 px-7 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all">Explore All Collections</a>
                   <a href="/public/categories" class="bg-white/10 text-white border border-white/20 px-7 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/20 transition-all">Browse Categories</a>
                 </div>
               </div>
             </div>
+          </div>
+          <div class="absolute inset-y-0 left-4 sm:left-6 flex items-center z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              class="size-11 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur border border-white/30 text-white flex items-center justify-center transition-all"
+              onclick="this.closest('app-root-page').prevHero()"
+              aria-label="Previous slide">
+              <i class="fas fa-chevron-left text-sm"></i>
+            </button>
+          </div>
+          <div class="absolute inset-y-0 right-4 sm:right-6 flex items-center z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              class="size-11 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur border border-white/30 text-white flex items-center justify-center transition-all"
+              onclick="this.closest('app-root-page').nextHero()"
+              aria-label="Next slide">
+              <i class="fas fa-chevron-right text-sm"></i>
+            </button>
           </div>
           ${dots}
         </div>
@@ -266,10 +311,24 @@ export default class RootPage extends App {
 
   render() {
     const featured = (this.products || []).slice(0, 8);
+    const pageContent = this.pageData?.content || "";
+    const pageContentAttr = pageContent.replace(/"/g, "&quot;");
 
     return `
       <div class="py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         ${this.renderHero()}
+
+        ${
+          pageContent
+            ? `
+            <section class="mb-12">
+              <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <content-display content="${pageContentAttr}" no-styles></content-display>
+              </div>
+            </section>
+          `
+            : ""
+        }
 
         <section class="mb-12">
           <div class="flex items-center justify-between mb-6">
@@ -281,11 +340,13 @@ export default class RootPage extends App {
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            ${this.loading
-              ? Array(8).fill(this.renderProductSkeleton()).join("")
-              : featured.length
-                ? featured.map((p) => this.renderProductCard(p)).join("")
-                : `<div class="col-span-full text-center text-slate-500 text-sm">No products available yet.</div>`}
+            ${
+              this.loading
+                ? Array(8).fill(this.renderProductSkeleton()).join("")
+                : featured.length
+                  ? featured.map((p) => this.renderProductCard(p)).join("")
+                  : `<div class="col-span-full text-center text-slate-500 text-sm">No products available yet.</div>`
+            }
           </div>
         </section>
       </div>
