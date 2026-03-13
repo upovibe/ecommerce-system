@@ -22,20 +22,20 @@ class PublicLayout extends App {
 
   async loadSettings() {
     try {
-      const [nameRes, logoRes, primaryRes, accentRes, loginRes, fallbackRes] = await Promise.all([
+      const [nameRes, logoRes, primaryRes, accentRes, loginRes, iconRes] = await Promise.all([
         api.get("/settings/key/site_name").catch(() => null),
         api.get("/settings/key/site_logo").catch(() => null),
         api.get("/settings/key/primary_color").catch(() => null),
         api.get("/settings/key/accent_color").catch(() => null),
         api.get("/settings/key/enable_user_login").catch(() => null),
-        api.get("/settings/key/site_logo_fallback").catch(() => null),
+        api.get("/settings/key/application_favicon").catch(() => null),
       ]);
 
       if (nameRes?.data?.success) this.siteName = nameRes.data.data.setting_value || this.siteName;
       if (logoRes?.data?.success) this.logoUrl = logoRes.data.data.setting_value || "";
       if (primaryRes?.data?.success) this.primaryColor = primaryRes.data.data.setting_value || this.primaryColor;
       if (accentRes?.data?.success) this.accentColor = accentRes.data.data.setting_value || this.accentColor;
-      if (fallbackRes?.data?.success) this.fallbackLogo = fallbackRes.data.data.setting_value || this.fallbackLogo;
+      if (iconRes?.data?.success) this.fallbackLogo = iconRes.data.data.setting_value || this.fallbackLogo;
       if (loginRes?.data?.success) {
         const raw = String(loginRes.data.data.setting_value || "1").toLowerCase();
         this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");

@@ -1,5 +1,6 @@
 import App from "@/core/App.js";
 import "@/app/public/layout.js";
+import "@/app/setFavicon.js";
 
 /**
  * Root Layout for Universal E-commerce System

@@ -213,9 +213,13 @@ class SettingsPage extends App {
             <h4 class="text-sm font-bold text-slate-900">${setting.setting_key.replace(/_/g, " ")}</h4>
             <p class="text-[11px] text-slate-500 mt-1">${setting.description || ""}</p>
           </div>
-          <ui-switch ${setting.is_active ? "checked" : ""}>
+          ${
+            isBoolean
+              ? ""
+              : `<ui-switch ${setting.is_active ? "checked" : ""}>
             <span slot="label" class="text-xs">Active</span>
-          </ui-switch>
+          </ui-switch>`
+          }
         </div>
 
         <div class="space-y-2">
