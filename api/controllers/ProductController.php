@@ -77,6 +77,57 @@ class ProductController
         }
     }
 
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // GET /products/public â€” public product list (active only)
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    public function publicIndex()
+    {
+        try {
+            $stmt = $this->pdo->query("
+                SELECT
+                    p.id,
+                    p.name,
+                    p.slug,
+                    p.type,
+                    p.status,
+                    p.description,
+                    p.main_image,
+                    p.images,
+                    p.base_price,
+                    p.is_active,
+                    p.created_at,
+                    p.updated_at,
+                    p.category_id,
+                    c.name  AS category_name,
+                    p.brand_id,
+                    b.name  AS brand_name,
+                    p.material_id,
+                    m.name  AS material_name,
+                    COUNT(v.id)          AS variant_count,
+                    COALESCE(SUM(COALESCE(v.quantity, 0)), 0) AS total_stock
+                FROM products p
+                LEFT JOIN categories c   ON c.id = p.category_id
+                LEFT JOIN brands b       ON b.id = p.brand_id
+                LEFT JOIN materials m    ON m.id = p.material_id
+                LEFT JOIN product_variants v ON v.product_id = p.id
+                WHERE p.is_active = 1 AND p.status = 'active'
+                GROUP BY p.id
+                ORDER BY p.created_at DESC
+            ");
+            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($products as &$p) {
+                $p = $this->castProduct($p);
+            }
+
+            http_response_code(200);
+            echo json_encode(['success' => true, 'data' => $products]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // GET /products/{id}
     // ─────────────────────────────────────────────────────────────────────────

@@ -87,6 +87,7 @@ Router::post('/attributes', 'AttributeController@store');
 
 // Product Management Routes (admin only)
 Router::get('/products', 'ProductController@index');
+Router::get('/products/public', 'ProductController@publicIndex');
 Router::post('/products', 'ProductController@store');
 Router::get('/products/{id}', 'ProductController@show');
 Router::put('/products/{id}', 'ProductController@update');

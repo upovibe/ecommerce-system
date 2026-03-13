@@ -1,13 +1,24 @@
 import App from "@/core/App.js";
 
 class PublicLayout extends App {
+  setPageContent(content) {
+    const container = this.querySelector("#page-content");
+    if (container) {
+      container.innerHTML = content;
+      return;
+    }
+    this.innerHTML = this.render();
+    const next = this.querySelector("#page-content");
+    if (next) next.innerHTML = content;
+  }
+
   render() {
     return `
       <div class="min-h-screen bg-white flex flex-col font-sans text-slate-900">
         <!-- Store Header -->
         <nav class="bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-5 flex items-center justify-between sticky top-0 z-50">
           <div class="flex items-center gap-12">
-            <a href="/public" class="text-2xl font-black text-slate-900 tracking-tighter flex items-center gap-3">
+            <a href="/" class="text-2xl font-black text-slate-900 tracking-tighter flex items-center gap-3">
               <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
                 <i class="fas fa-shopping-bag text-lg"></i>
               </div>
@@ -40,9 +51,7 @@ class PublicLayout extends App {
         </nav>
 
         <!-- Main Content -->
-        <main class="flex-grow">
-          <slot></slot>
-        </main>
+        <main id="page-content" class="flex-grow"></main>
 
         <!-- Global Footer -->
         <footer class="bg-slate-900 py-20 px-10 text-white">

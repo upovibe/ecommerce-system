@@ -27,6 +27,6 @@ export default {
   "*": {
     requireAuth: false,
     logAccess: false,
-    redirectTo: (user) => (window.location.pathname === "/" ? "/public" : null),
+    redirectTo: () => null,
   },
 };
