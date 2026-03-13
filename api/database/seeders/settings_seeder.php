@@ -18,6 +18,8 @@ class SettingsSeeder
             ['site_name', 'VastCommerce', 'text', 'general', 'Official storefront name'],
             ['site_description', 'Your One-Stop Universal Shop', 'text', 'general', 'Meta description for SEO'],
             ['site_logo', '/src/assets/logo.png', 'image', 'general', 'Main header logo'],
+            ['site_logo_fallback', '/src/assets/logo.png', 'image', 'general', 'Fallback logo when main logo missing'],
+            ['enable_user_login', '1', 'boolean', 'general', 'Allow user login/profile on public site'],
             ['currency', 'NGN', 'text', 'localization', 'Base currency code'],
             ['contact_email', 'info@vastcommerce.com', 'text', 'contact', 'Primary support email'],
             ['phone_number', '+234 800 VAST', 'text', 'contact', 'Customer service line'],

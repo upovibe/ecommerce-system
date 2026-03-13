@@ -166,6 +166,13 @@ class SettingsPage extends App {
           setting_value: JSON.stringify(parsed),
           is_active,
         });
+      } else if (setting.setting_type === "boolean") {
+        const toggle = card.querySelector("ui-switch");
+        const isEnabled = toggle?.checked ? "1" : "0";
+        await api.put(`/settings/${id}`, {
+          setting_value: isEnabled,
+          is_active,
+        });
       } else {
         const input = card.querySelector("ui-input");
         const value = input?.value ?? "";
@@ -197,6 +204,7 @@ class SettingsPage extends App {
       setting.setting_type === "image" || setting.setting_type === "file";
     const isArray = setting.setting_type === "array";
     const isColor = setting.setting_type === "color";
+    const isBoolean = setting.setting_type === "boolean";
 
     return `
       <div class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm" data-setting-id="${setting.id}">
@@ -212,15 +220,24 @@ class SettingsPage extends App {
 
         <div class="space-y-2">
           ${
-            isImage
+            isBoolean
               ? `
+            <div class="flex items-center gap-3 text-sm text-slate-600">
+              <ui-switch ${String(value) === "1" || String(value).toLowerCase() === "true" ? "checked" : ""}>
+                <span slot="label">Enabled</span>
+              </ui-switch>
+              <span>Toggle to enable or disable</span>
+            </div>
+          `
+              : isImage
+                ? `
             <ui-file-upload accept="image/*" max-size="5242880" max-files="1" ${setting.setting_value ? `value="${this.getImageUrl(setting.setting_value)}"` : ""}></ui-file-upload>
           `
-              : isArray
-                ? `
+                : isArray
+                  ? `
             <ui-textarea rows="3" placeholder="Enter JSON array..." class="w-full" value="${String(value).replace(/"/g, "&quot;")}"></ui-textarea>
           `
-                : `
+                  : `
             <ui-input type="${isColor ? "color" : "text"}" value="${String(value).replace(/"/g, "&quot;")}" class="w-full"></ui-input>
           `
           }

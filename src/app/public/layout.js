@@ -1,6 +1,61 @@
 import App from "@/core/App.js";
+import api from "@/services/api.js";
 
 class PublicLayout extends App {
+  constructor() {
+    super();
+    this.siteName = "VastCommerce";
+    this.logoUrl = "";
+    this.fallbackLogo = "/src/assets/logo.png";
+    this.primaryColor = "#4f46e5";
+    this.accentColor = "#4f46e5";
+    this.allowLogin = true;
+    this._loaded = false;
+  }
+
+  async connectedCallback() {
+    super.connectedCallback();
+    if (this._loaded) return;
+    this._loaded = true;
+    await this.loadSettings();
+  }
+
+  async loadSettings() {
+    try {
+      const [nameRes, logoRes, primaryRes, accentRes, loginRes, fallbackRes] = await Promise.all([
+        api.get("/settings/key/site_name").catch(() => null),
+        api.get("/settings/key/site_logo").catch(() => null),
+        api.get("/settings/key/primary_color").catch(() => null),
+        api.get("/settings/key/accent_color").catch(() => null),
+        api.get("/settings/key/enable_user_login").catch(() => null),
+        api.get("/settings/key/site_logo_fallback").catch(() => null),
+      ]);
+
+      if (nameRes?.data?.success) this.siteName = nameRes.data.data.setting_value || this.siteName;
+      if (logoRes?.data?.success) this.logoUrl = logoRes.data.data.setting_value || "";
+      if (primaryRes?.data?.success) this.primaryColor = primaryRes.data.data.setting_value || this.primaryColor;
+      if (accentRes?.data?.success) this.accentColor = accentRes.data.data.setting_value || this.accentColor;
+      if (fallbackRes?.data?.success) this.fallbackLogo = fallbackRes.data.data.setting_value || this.fallbackLogo;
+      if (loginRes?.data?.success) {
+        const raw = String(loginRes.data.data.setting_value || "1").toLowerCase();
+        this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
+      }
+      this.innerHTML = this.render();
+    } catch (_) {
+      this.innerHTML = this.render();
+    }
+  }
+
+  getImageUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
+    const baseUrl = window.location.origin;
+    if (path.startsWith("/api/")) return baseUrl + path;
+    if (path.startsWith("/")) return baseUrl + path;
+    if (path.startsWith("uploads/")) return `${baseUrl}/api/${path}`;
+    return `${baseUrl}/api/${path.replace(/^\//, "")}`;
+  }
+
   setPageContent(content) {
     const container = this.querySelector("#page-content");
     if (container) {
@@ -13,21 +68,31 @@ class PublicLayout extends App {
   }
 
   render() {
+    const siteName = this.siteName || "VastCommerce";
+    const logo = this.getImageUrl(this.logoUrl || this.fallbackLogo);
+    const primary = this.primaryColor || "#4f46e5";
+    const accent = this.accentColor || primary;
+
     return `
       <div class="min-h-screen bg-white flex flex-col font-sans text-slate-900">
         <!-- Store Header -->
-        <nav class="bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-5 flex items-center justify-between sticky top-0 z-50">
+        <nav class="bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-5 flex items-center justify-between sticky top-0 z-50" style="--primary:${primary}; --accent:${accent};">
           <div class="flex items-center gap-12">
             <a href="/" class="text-2xl font-black text-slate-900 tracking-tighter flex items-center gap-3">
-              <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-                <i class="fas fa-shopping-bag text-lg"></i>
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100" style="background:${primary}">
+                ${
+                  logo
+                    ? `<img src="${logo}" alt="${siteName}" class="w-full h-full object-cover rounded-xl" onerror="this.style.display='none'; this.parentElement.querySelector('i')?.classList.remove('hidden')">`
+                    : ""
+                }
+                <i class="fas fa-shopping-bag text-lg ${logo ? "hidden" : ""}"></i>
               </div>
-              Vast<span class="text-indigo-600">Commerce</span>
+              ${siteName.split(" ").map((w, i) => i === 0 ? w : `<span style="color:${accent}">${w}</span>`).join(" ")}
             </a>
             <div class="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-500">
-              <a href="/public/categories" class="hover:text-indigo-600 transition-colors">Collections</a>
-              <a href="/public/products" class="hover:text-indigo-600 transition-colors">All Products</a>
-              <a href="#" class="hover:text-indigo-600 transition-colors">Flash Deals</a>
+              <a href="/public/categories" class="transition-colors hover:text-[var(--primary)]">Collections</a>
+              <a href="/public/products" class="transition-colors hover:text-[var(--primary)]">All Products</a>
+              <a href="#" class="transition-colors hover:text-[var(--primary)]">Flash Deals</a>
             </div>
           </div>
 
@@ -36,16 +101,20 @@ class PublicLayout extends App {
               <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <i class="fas fa-search text-slate-400 text-xs"></i>
               </div>
-              <input type="text" placeholder="Search Vast catalog..." class="bg-slate-50 border-none rounded-2xl pl-10 pr-4 py-2.5 text-sm w-72 focus:ring-2 focus:ring-indigo-600/20 transition-all outline-none font-medium text-slate-600">
+              <input type="text" placeholder="Search Vast catalog..." class="bg-slate-50 border-none rounded-2xl pl-10 pr-4 py-2.5 text-sm w-72 focus:ring-2 focus:ring-[var(--primary)]/20 transition-all outline-none font-medium text-slate-600">
             </div>
             
             <div class="flex items-center gap-3">
-              <button class="w-11 h-11 flex items-center justify-center text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all relative">
+              <button class="w-11 h-11 flex items-center justify-center text-slate-600 hover:text-[var(--primary)] hover:bg-indigo-50 rounded-xl transition-all relative">
                 <i class="fas fa-shopping-cart text-lg"></i>
-                <span class="absolute top-2 right-2 w-4 h-4 bg-indigo-600 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white">0</span>
+                <span class="absolute top-2 right-2 w-4 h-4 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white" style="background:${primary}">0</span>
               </button>
               <div class="w-px h-6 bg-slate-100 mx-2"></div>
-              <a href="/auth/login" class="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all shadow-lg shadow-slate-100">Sign In</a>
+              ${
+                this.allowLogin
+                  ? `<a href="/profile" class="text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-slate-100" style="background:${primary}">Sign In</a>`
+                  : ""
+              }
             </div>
           </div>
         </nav>
@@ -57,7 +126,7 @@ class PublicLayout extends App {
         <footer class="bg-slate-900 py-20 px-10 text-white">
           <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
             <div class="col-span-1 md:col-span-2">
-              <h1 class="text-3xl font-black tracking-tighter mb-6">VastCommerce</h1>
+              <h1 class="text-3xl font-black tracking-tighter mb-6">${siteName}</h1>
               <p class="text-slate-400 max-w-sm font-medium leading-relaxed">The ultimate universal e-commerce engine powering the next generation of digital storefronts. From fashion to technology, we deliver excellence.</p>
               <div class="flex gap-4 mt-8">
                 <a href="#" class="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-indigo-600 transition-all text-slate-400 hover:text-white"><i class="fab fa-facebook-f"></i></a>
