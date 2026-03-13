@@ -34,7 +34,13 @@ class PageUpdateModal extends HTMLElement {
     };
     // Parse existing gallery images
     let imgs = page.images;
-    if (typeof imgs === "string") { try { imgs = JSON.parse(imgs); } catch { imgs = []; } }
+    if (typeof imgs === "string") {
+      try {
+        imgs = JSON.parse(imgs);
+      } catch {
+        imgs = [];
+      }
+    }
     this._galleryImages = Array.isArray(imgs) ? [...imgs] : [];
     this.render();
     const modal = this.querySelector("ui-modal");
@@ -81,7 +87,11 @@ class PageUpdateModal extends HTMLElement {
       });
 
       if (res.data) {
-        Toast.show({ title: "Saved", message: "Page updated successfully", variant: "success" });
+        Toast.show({
+          title: "Saved",
+          message: "Page updated successfully",
+          variant: "success",
+        });
         this.dispatchEvent(new CustomEvent("page-updated", { bubbles: true }));
         this.close();
       }
@@ -89,7 +99,10 @@ class PageUpdateModal extends HTMLElement {
       console.error(error);
       Toast.show({
         title: "Error",
-        message: error.response?.data?.message || error.response?.data?.error || "Failed to update page",
+        message:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Failed to update page",
         variant: "error",
       });
     } finally {
@@ -106,7 +119,13 @@ class PageUpdateModal extends HTMLElement {
 
     // Build existing banner preview
     let banners = this.page.banner_image;
-    if (typeof banners === "string") { try { banners = JSON.parse(banners); } catch { banners = []; } }
+    if (typeof banners === "string") {
+      try {
+        banners = JSON.parse(banners);
+      } catch {
+        banners = [];
+      }
+    }
     const hasBanner = Array.isArray(banners) && banners.length > 0;
 
     this.innerHTML = `
@@ -120,19 +139,21 @@ class PageUpdateModal extends HTMLElement {
           </div>
 
           <!-- Editable Title -->
-          <ui-input
-            label="Page Title"
-            id="page-title-input"
-            value="${this.formData.title}"
-            placeholder="e.g. About VastCommerce">
-          </ui-input>
+          <div class="flex flex-col gap-4">
+            <ui-input
+              label="Page Title"
+              id="page-title-input"
+              value="${this.formData.title}"
+              placeholder="e.g. About VastCommerce">
+            </ui-input>
 
-          <ui-input
-            label="Page Subtitle"
-            id="page-subtitle-input"
-            value="${this.formData.subtitle}"
-            placeholder="Short supporting headline">
-          </ui-input>
+            <ui-input
+              label="Page Subtitle"
+              id="page-subtitle-input"
+              value="${this.formData.subtitle}"
+              placeholder="Short supporting headline">
+            </ui-input>
+          </div>
 
           <!-- Content WYSIWYG -->
           <div class="space-y-2 p-4 bg-gray-50 rounded-xl border border-gray-100">
@@ -148,12 +169,16 @@ class PageUpdateModal extends HTMLElement {
           <!-- Banner Image -->
           <div class="space-y-2">
             <label class="text-sm font-medium text-gray-900">Banner Image</label>
-            ${hasBanner ? `
+            ${
+              hasBanner
+                ? `
               <div class="rounded-xl overflow-hidden border border-slate-200 h-28">
                 <img src="/api/${banners[0].replace(/^\//, "")}" class="w-full h-full object-cover" alt="Current banner" onerror="this.parentElement.style.display='none'">
               </div>
               <p class="text-xs text-slate-400">Upload a new image to replace the current banner.</p>
-            ` : ""}
+            `
+                : ""
+            }
             <ui-file-upload
               id="page-banner-uploader"
               accept="image/*"
@@ -197,15 +222,25 @@ class PageUpdateModal extends HTMLElement {
     this.querySelector("#page-title-input")?.addEventListener("input", (e) => {
       this.formData.title = e.target.value;
     });
-    this.querySelector("#page-subtitle-input")?.addEventListener("input", (e) => {
-      this.formData.subtitle = e.target.value;
-    });
-    this.querySelector("#cancel-page-btn")?.addEventListener("click", () => this.close());
-    this.querySelector("#save-page-btn")?.addEventListener("click", () => this.savePage());
+    this.querySelector("#page-subtitle-input")?.addEventListener(
+      "input",
+      (e) => {
+        this.formData.subtitle = e.target.value;
+      },
+    );
+    this.querySelector("#cancel-page-btn")?.addEventListener("click", () =>
+      this.close(),
+    );
+    this.querySelector("#save-page-btn")?.addEventListener("click", () =>
+      this.savePage(),
+    );
 
-    this.querySelector("#page-status-switch")?.addEventListener("change", (e) => {
-      this.formData.is_active = e.detail.checked;
-    });
+    this.querySelector("#page-status-switch")?.addEventListener(
+      "change",
+      (e) => {
+        this.formData.is_active = e.detail.checked;
+      },
+    );
 
     // Wire up individual gallery remove buttons
     this.querySelectorAll("[data-remove-gallery]").forEach((btn) => {
@@ -231,7 +266,9 @@ class PageUpdateModal extends HTMLElement {
 
     return `
       <div id="gallery-preview-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-        ${images.map((img, i) => `
+        ${images
+          .map(
+            (img, i) => `
           <div class="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-white shadow-sm">
             <img
               src="${this._getImageUrl(img)}"
@@ -246,7 +283,9 @@ class PageUpdateModal extends HTMLElement {
               <i class="fas fa-times"></i>
             </button>
           </div>
-        `).join("")}
+        `,
+          )
+          .join("")}
       </div>
       <p class="text-xs text-slate-400">
         <i class="fas fa-info-circle mr-1"></i>

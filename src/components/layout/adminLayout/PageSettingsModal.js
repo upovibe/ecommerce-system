@@ -102,7 +102,7 @@ class PageSettingsModal extends HTMLElement {
     this.innerHTML = `
             <ui-modal title="Create New Cloud Page" size="lg">
                 <div class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex flex-col gap-4">
                         <ui-input 
                             label="Page Title" 
                             placeholder="Enter page title"
@@ -110,12 +110,11 @@ class PageSettingsModal extends HTMLElement {
                             value="${this.pageData.title}">
                         </ui-input>
 
-                        <ui-input 
-                            label="Page Subtitle" 
+                        <ui-textarea
+                            label="Page Subtitle"
                             placeholder="Enter page subtitle"
                             id="page-subtitle-input"
-                            value="${this.pageData.subtitle}">
-                        </ui-input>
+                            rows="3">${this.pageData.subtitle || ""}</ui-textarea>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
