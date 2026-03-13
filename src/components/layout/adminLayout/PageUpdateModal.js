@@ -1,5 +1,6 @@
 import "@/components/ui/Modal.js";
 import "@/components/ui/Input.js";
+import "@/components/ui/Textarea.js";
 import "@/components/ui/Switch.js";
 import "@/components/ui/Button.js";
 import "@/components/ui/Wysiwyg.js";
@@ -147,12 +148,11 @@ class PageUpdateModal extends HTMLElement {
               placeholder="e.g. About VastCommerce">
             </ui-input>
 
-            <ui-input
+            <ui-textarea
               label="Page Subtitle"
               id="page-subtitle-input"
-              value="${this.formData.subtitle}"
-              placeholder="Short supporting headline">
-            </ui-input>
+              placeholder="Short supporting headline"
+              rows="3">${this.formData.subtitle || ""}</ui-textarea>
           </div>
 
           <!-- Content WYSIWYG -->
