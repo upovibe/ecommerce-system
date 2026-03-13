@@ -118,6 +118,8 @@ class ProductController
             ");
             $stmt->execute([$id]);
             $variants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $variantCount = 0;
+            $totalStock = 0;
             foreach ($variants as &$v) {
                 $v['quantity'] = $v['quantity'] !== null ? (int) $v['quantity'] : null;
                 $v['stock'] = $v['quantity'];
@@ -128,8 +130,14 @@ class ProductController
                     'value' => $value,
                     'label' => $type . ': ' . $value,
                 ];
+                $variantCount++;
+                if ($v['quantity'] !== null) {
+                    $totalStock += (int) $v['quantity'];
+                }
             }
             $product['variants'] = $variants;
+            $product['variant_count'] = $variantCount;
+            $product['total_stock'] = $totalStock;
 
             http_response_code(200);
             echo json_encode(['success' => true, 'data' => $product]);

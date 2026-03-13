@@ -558,15 +558,20 @@ class ProductsPage extends App {
 
       const editDetails = m.querySelector("#edit-details");
       if (editDetails) {
-          let d = p.details;
-          if (typeof d === "string") {
-            try {
-              d = JSON.parse(d);
-            } catch (_) {
-              d = { note: d };
-            }
+        let d = p.details;
+        if (typeof d === "string") {
+          try {
+            d = JSON.parse(d);
+          } catch (_) {
+            d = { note: d };
           }
-          editDetails.value = d?.note || "";
+        }
+        const note = d?.note || "";
+        if (typeof editDetails.setValue === "function") {
+          editDetails.setValue(note);
+        } else {
+          editDetails.value = note;
+        }
       }
 
       const uploader = m.querySelector("#edit-uploader");
@@ -700,15 +705,18 @@ class ProductsPage extends App {
   // ── DELETE ──────────────────────────────────────────
   openDeleteDialog(product) {
     this.selectedProduct = product;
-    const d = this.querySelector("#product-delete-dialog");
+    const d = this.querySelector("product-delete-dialog");
     if (!d) return;
-    d.querySelector("#delete-product-name").textContent = product.name;
-    d.querySelector("#delete-product-cat").textContent  = product.category_name || "—";
-    d.open();
+    if (typeof d.setProductData === "function") {
+      d.setProductData(product);
+    }
+    if (typeof d.open === "function") {
+      d.open();
+    }
   }
   closeDeleteDialog() {
-    const d = this.querySelector("#product-delete-dialog");
-    if (d) d.close();
+    const d = this.querySelector("product-delete-dialog");
+    if (d && typeof d.close === "function") d.close();
   }
   async confirmDelete() {
     if (!this.selectedProduct) return;
