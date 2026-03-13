@@ -34,4 +34,22 @@ class PageModel extends BaseModel
     {
         parent::__construct($pdo);
     }
+
+    /**
+     * Find page by slug (instance method)
+     */
+    public function findBySlugInstance($slug)
+    {
+        try {
+            $stmt = $this->pdo->prepare("SELECT * FROM {$this->table} WHERE slug = ?");
+            $stmt->execute([$slug]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($result) {
+                $result = $this->applyCasts($result);
+            }
+            return $result;
+        } catch (PDOException $e) {
+            throw new Exception('Error fetching page by slug: ' . $e->getMessage());
+        }
+    }
 }

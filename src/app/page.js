@@ -133,12 +133,21 @@ export default class RootPage extends App {
   }
 
   renderHero() {
-    const defaultTitle = "One Store, Infinite Possibilities";
-    const defaultSubtitle =
-      "From real estate to luxury fashion, vehicles to fast food. Our universal architecture powers every industry with premium precision.";
+    if (this.pageLoading) {
+      return `
+        <section class="bg-slate-100 rounded-[2.5rem] p-10 sm:p-12 lg:p-16 mb-12 animate-pulse">
+          <div class="h-6 w-40 bg-slate-200 rounded-full mb-6"></div>
+          <div class="h-10 w-2/3 bg-slate-200 rounded-xl mb-4"></div>
+          <div class="h-4 w-1/2 bg-slate-200 rounded mb-2"></div>
+          <div class="h-4 w-1/3 bg-slate-200 rounded"></div>
+        </section>
+      `;
+    }
 
-    const title = this.pageData?.title || defaultTitle;
-    const subtitle = this.pageData?.subtitle || defaultSubtitle;
+    if (!this.pageData) return "";
+
+    const title = this.pageData?.title || "";
+    const subtitle = this.pageData?.subtitle || "";
     const content = this.pageData?.content || "";
 
     if (!this.heroImages.length) {
@@ -148,8 +157,8 @@ export default class RootPage extends App {
             <div class="inline-block px-4 py-1.5 bg-indigo-500/30 rounded-full text-[10px] font-black uppercase tracking-widest mb-5 border border-white/10 backdrop-blur-sm">
               VastCommerce Ecosystem Ready
             </div>
-            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black mb-5 tracking-tighter leading-tight">${title}</h1>
-            <p class="text-indigo-100/80 text-base sm:text-lg mb-6 font-medium">${subtitle}</p>
+            ${title ? `<h1 class="text-4xl sm:text-5xl lg:text-6xl font-black mb-5 tracking-tighter leading-tight">${title}</h1>` : ""}
+            ${subtitle ? `<p class="text-indigo-100/80 text-base sm:text-lg mb-6 font-medium">${subtitle}</p>` : ""}
             ${content ? `<div class="text-indigo-100/70 text-sm sm:text-base font-medium max-w-2xl mx-auto">${content}</div>` : ""}
             <div class="flex flex-wrap justify-center gap-4 mt-8">
               <a href="/public/products" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-indigo-900/20">Explore All Collections</a>
@@ -202,8 +211,8 @@ export default class RootPage extends App {
             <div class="w-full px-6 sm:px-12 lg:px-16 py-10 sm:py-0 text-left text-white">
               <div class="max-w-2xl">
                 <p class="text-[10px] font-black uppercase tracking-widest text-white/70 mb-3">Featured Landing</p>
-                <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-4">${title}</h1>
-                <p class="text-white/85 text-sm sm:text-lg mb-6">${subtitle}</p>
+                ${title ? `<h1 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-4">${title}</h1>` : ""}
+                ${subtitle ? `<p class="text-white/85 text-sm sm:text-lg mb-6">${subtitle}</p>` : ""}
                 ${content ? `<div class="text-white/70 text-sm sm:text-base">${content}</div>` : ""}
                 <div class="flex flex-wrap gap-4 mt-8">
                   <a href="/public/products" class="bg-white text-slate-900 px-7 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all">Explore All Collections</a>
