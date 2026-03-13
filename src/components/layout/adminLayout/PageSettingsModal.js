@@ -118,7 +118,7 @@ class PageSettingsModal extends HTMLElement {
                         </ui-input>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
                         <ui-input 
                             label="Page Name (Internal)" 
                             placeholder="Enter administrative name"
