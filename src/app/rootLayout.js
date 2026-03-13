@@ -8,6 +8,27 @@ import "@/app/setFavicon.js";
 class RootLayout extends App {
   constructor() {
     super();
+    this._pendingContent = "";
+  }
+
+  async connectedCallback() {
+    super.connectedCallback();
+    if (this._pendingContent) {
+      await this.applyPendingContent();
+    }
+  }
+
+  async applyPendingContent() {
+    try {
+      await customElements.whenDefined("app-public-layout");
+    } catch (_) {
+      /* noop */
+    }
+    const layout = this.querySelector("app-public-layout");
+    if (layout && typeof layout.setPageContent === "function") {
+      layout.setPageContent(this._pendingContent);
+      this._pendingContent = "";
+    }
   }
 
   render() {
@@ -25,8 +46,8 @@ class RootLayout extends App {
       layout.setPageContent(content);
       return;
     }
-    const container = this.querySelector("#page-content");
-    if (container) container.innerHTML = content;
+    this._pendingContent = content;
+    this.applyPendingContent();
   }
 }
 

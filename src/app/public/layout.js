@@ -6,11 +6,12 @@ class PublicLayout extends App {
     super();
     this.siteName = "VastCommerce";
     this.logoUrl = "";
-    this.fallbackLogo = "/src/assets/logo.png";
+    this.fallbackLogo = "/favicon.ico";
     this.primaryColor = "#4f46e5";
     this.accentColor = "#4f46e5";
     this.allowLogin = true;
     this._loaded = false;
+    this._pageContent = "";
   }
 
   async connectedCallback() {
@@ -21,6 +22,8 @@ class PublicLayout extends App {
   }
 
   async loadSettings() {
+    const existingContent =
+      this.querySelector("#page-content")?.innerHTML || this._pageContent || "";
     try {
       const [nameRes, logoRes, primaryRes, accentRes, loginRes, iconRes] = await Promise.all([
         api.get("/settings/key/site_name").catch(() => null),
@@ -40,9 +43,15 @@ class PublicLayout extends App {
         const raw = String(loginRes.data.data.setting_value || "1").toLowerCase();
         this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
       }
+      const latestContent =
+        this.querySelector("#page-content")?.innerHTML || this._pageContent || existingContent || "";
       this.innerHTML = this.render();
+      this.setPageContent(latestContent);
     } catch (_) {
+      const latestContent =
+        this.querySelector("#page-content")?.innerHTML || this._pageContent || existingContent || "";
       this.innerHTML = this.render();
+      this.setPageContent(latestContent);
     }
   }
 
@@ -60,16 +69,20 @@ class PublicLayout extends App {
     const container = this.querySelector("#page-content");
     if (container) {
       container.innerHTML = content;
+      this._pageContent = content;
       return;
     }
     this.innerHTML = this.render();
     const next = this.querySelector("#page-content");
-    if (next) next.innerHTML = content;
+    if (next) {
+      next.innerHTML = content;
+      this._pageContent = content;
+    }
   }
 
   render() {
     const siteName = this.siteName || "VastCommerce";
-    const logo = this.getImageUrl(this.logoUrl || this.fallbackLogo);
+    const logo = this.logoUrl ? this.getImageUrl(this.logoUrl) : this.fallbackLogo;
     const primary = this.primaryColor || "#4f46e5";
     const accent = this.accentColor || primary;
 
