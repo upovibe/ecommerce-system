@@ -34,11 +34,16 @@ class PublicLayout extends App {
         api.get("/settings/key/application_favicon").catch(() => null),
       ]);
 
-      if (nameRes?.data?.success) this.siteName = nameRes.data.data.setting_value || this.siteName;
+      if (nameRes?.data?.success) {
+        const nameVal = nameRes.data.data.setting_value || "";
+        this.siteName = nameVal.trim() ? nameVal : this.siteName;
+      }
       if (logoRes?.data?.success) this.logoUrl = logoRes.data.data.setting_value || "";
       if (primaryRes?.data?.success) this.primaryColor = primaryRes.data.data.setting_value || this.primaryColor;
       if (accentRes?.data?.success) this.accentColor = accentRes.data.data.setting_value || this.accentColor;
-      if (iconRes?.data?.success) this.fallbackLogo = iconRes.data.data.setting_value || this.fallbackLogo;
+      if (iconRes?.data?.success) {
+        this.fallbackLogo = this.getImageUrl(iconRes.data.data.setting_value) || this.fallbackLogo;
+      }
       if (loginRes?.data?.success) {
         const raw = String(loginRes.data.data.setting_value || "1").toLowerCase();
         this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
@@ -100,7 +105,9 @@ class PublicLayout extends App {
                 }
                 <i class="fas fa-shopping-bag text-lg ${logo ? "hidden" : ""}"></i>
               </div>
-              ${siteName.split(" ").map((w, i) => i === 0 ? w : `<span style="color:${accent}">${w}</span>`).join(" ")}
+              ${
+                siteName.split(" ").map((w, i) => i === 0 ? w : `<span style="color:${accent}">${w}</span>`).join(" ")
+              }
             </a>
             <div class="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-500">
               <a href="/public/categories" class="transition-colors hover:text-[var(--primary)]">Collections</a>

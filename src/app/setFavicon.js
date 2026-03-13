@@ -12,10 +12,19 @@ export async function setDynamicFavicon() {
         document.head.appendChild(link);
       }
       link.href = faviconUrl;
+      return;
     }
   } catch (error) {
-    // fallback: keep default favicon
+    // fallback below
   }
+  // fallback to bundled favicon
+  let link = document.querySelector("link[rel~='icon']");
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
+  }
+  link.href = "/favicon.ico";
 }
 
 // Auto-run if imported

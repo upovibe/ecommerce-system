@@ -75,8 +75,10 @@ class AdminLayout extends App {
 
       if (logoRes?.data?.success)
         this.logoUrl = logoRes.data.data.setting_value;
-      if (nameRes?.data?.success)
-        this.brandName = nameRes.data.data.setting_value;
+      if (nameRes?.data?.success) {
+        const nameVal = nameRes.data.data.setting_value || "";
+        this.brandName = nameVal.trim() ? nameVal : this.brandName;
+      }
       Object.entries(colors).forEach(([k, v]) => this.set(k, v));
 
       this.innerHTML = this.render();
