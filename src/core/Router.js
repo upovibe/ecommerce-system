@@ -224,32 +224,48 @@ class Router {
       const slugPath = `${dynamicPathBase}/[slug]/page.js`;
       attemptedPaths.push(slugPath);
       try {
-        const encodedComponentPath = slugPath
-          .replace(/\[/g, "%5B")
-          .replace(/\]/g, "%5D");
-        const module = await import(`@/${encodedComponentPath}`);
+        const module = await import(`@/${slugPath}`);
         this.componentCache.set(path, module.default);
         const params = this.extractDynamicParams(slugPath, path);
         this.componentCache.set(`${path}:params`, params);
         return module.default;
       } catch (error) {
-        errors.push({ path: slugPath, error: error.message });
+        try {
+          const encodedComponentPath = slugPath
+            .replace(/\[/g, "%5B")
+            .replace(/\]/g, "%5D");
+          const module = await import(`@/${encodedComponentPath}`);
+          this.componentCache.set(path, module.default);
+          const params = this.extractDynamicParams(slugPath, path);
+          this.componentCache.set(`${path}:params`, params);
+          return module.default;
+        } catch (encodedError) {
+          errors.push({ path: slugPath, error: encodedError.message });
+        }
       }
 
       // Try [id]
       const idPath = `${dynamicPathBase}/[id]/page.js`;
       attemptedPaths.push(idPath);
       try {
-        const encodedComponentPath = idPath
-          .replace(/\[/g, "%5B")
-          .replace(/\]/g, "%5D");
-        const module = await import(`@/${encodedComponentPath}`);
+        const module = await import(`@/${idPath}`);
         this.componentCache.set(path, module.default);
         const params = this.extractDynamicParams(idPath, path);
         this.componentCache.set(`${path}:params`, params);
         return module.default;
       } catch (error) {
-        errors.push({ path: idPath, error: error.message });
+        try {
+          const encodedComponentPath = idPath
+            .replace(/\[/g, "%5B")
+            .replace(/\]/g, "%5D");
+          const module = await import(`@/${encodedComponentPath}`);
+          this.componentCache.set(path, module.default);
+          const params = this.extractDynamicParams(idPath, path);
+          this.componentCache.set(`${path}:params`, params);
+          return module.default;
+        } catch (encodedError) {
+          errors.push({ path: idPath, error: encodedError.message });
+        }
       }
     }
 

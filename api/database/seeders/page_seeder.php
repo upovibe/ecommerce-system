@@ -32,19 +32,6 @@ class PageSeeder
                 ],
             ],
             [
-                'title' => 'Shop by Category',
-                'subtitle' => 'Explore our collections and find what fits your lifestyle.',
-                'name' => 'Categories',
-                'slug' => 'categories',
-                'content' => '<h2>Browse Categories</h2><p>Discover curated collections across fashion, electronics, home, and more.</p>',
-                'banner' => $splash,
-                'images' => [$splashAlt],
-                'meta' => [
-                    'keywords' => 'categories, collections, browse, shop',
-                    'description' => 'Browse all available categories and collections.'
-                ],
-            ],
-            [
                 'title' => 'Category',
                 'subtitle' => 'Focused selection from a single collection.',
                 'name' => 'Category',
@@ -55,19 +42,6 @@ class PageSeeder
                 'meta' => [
                     'keywords' => 'category, collection, products',
                     'description' => 'Category detail page for selected collection.'
-                ],
-            ],
-            [
-                'title' => 'Subcategory',
-                'subtitle' => 'Refined picks within a collection.',
-                'name' => 'Subcategory',
-                'slug' => 'subcategory',
-                'content' => '<h2>Subcategory Collection</h2><p>Discover products within this subcategory.</p>',
-                'banner' => $splash,
-                'images' => [$splashAlt],
-                'meta' => [
-                    'keywords' => 'subcategory, category, products',
-                    'description' => 'Subcategory detail page for selected collection.'
                 ],
             ],
             [

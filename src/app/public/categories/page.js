@@ -51,7 +51,7 @@ class CategoriesPage extends App {
     this.pageLoading = true;
     this.updateView();
     try {
-      const res = await api.get("/pages/slug/categories");
+      const res = await api.get("/pages/slug/category");
       this.pageData = res?.data?.data || null;
     } catch (e) {
       console.error("Failed to load categories page", e);
@@ -115,13 +115,17 @@ class CategoriesPage extends App {
   render() {
     const pageContent = this.pageData?.content || "";
     const pageContentAttr = pageContent.replace(/"/g, "&quot;");
+    const title = this.pageData?.title || "Shop by Category";
+    const subtitle =
+      this.pageData?.subtitle ||
+      "Discover our diverse range of premium collections, each curated to bring you the best in quality and style.";
 
     return `
       <div class="py-20 px-8 max-w-7xl mx-auto">
         <header class="mb-16 text-center">
           <p class="text-indigo-600 font-semibold text-xs mb-3">Store Collections</p>
-          <h1 class="text-6xl font-black text-slate-900 tracking-tighter">Shop by <span class="text-indigo-600">Category</span></h1>
-          <p class="text-slate-500 mt-4 text-lg font-medium max-w-xl mx-auto">Discover our diverse range of premium collections, each curated to bring you the best in quality and style.</p>
+          <h1 class="text-6xl font-black text-slate-900 tracking-tighter">${title}</h1>
+          <p class="text-slate-500 mt-4 text-lg font-medium max-w-xl mx-auto">${subtitle}</p>
         </header>
 
         ${this.renderBanner()}
@@ -159,19 +163,20 @@ class CategoriesPage extends App {
     const image = this.getImageUrl(category.image);
     const name = category.name || "Category";
     const description = category.description || "";
+    const slug = category.slug || "";
     return `
-      <div class="group relative h-96 rounded-[3rem] overflow-hidden cursor-pointer shadow-xl shadow-slate-100 transition-all hover:-translate-y-2">
-        ${
-          image
-            ? `<img src="${image}" alt="${name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
-            : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-5xl bg-slate-50"><i class="fas fa-layer-group"></i></div>`
-        }
-        <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/30 to-transparent flex flex-col justify-end p-12">
-          ${description ? `<p class="text-white/70 font-semibold text-xs mb-2 line-clamp-2">${description}</p>` : ""}
-          <h3 class="text-4xl font-black text-white mb-6">${name}</h3>
-          <button class="w-fit px-8 py-3 bg-white text-slate-900 rounded-2xl font-semibold text-xs hover:bg-indigo-600 hover:text-white transition-colors">Explore Collection</button>
-        </div>
-      </div>
+      <a href="/public/products?category=${encodeURIComponent(slug)}" class="group relative h-96 rounded-[3rem] overflow-hidden cursor-pointer shadow-xl shadow-slate-100 transition-all hover:-translate-y-2 block">
+          ${
+            image
+              ? `<img src="${image}" alt="${name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
+              : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-5xl bg-slate-50"><i class="fas fa-layer-group"></i></div>`
+          }
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/30 to-transparent flex flex-col justify-end p-12">
+            ${description ? `<p class="text-white/70 font-semibold text-xs mb-2 line-clamp-2">${description}</p>` : ""}
+            <h3 class="text-4xl font-black text-white mb-6">${name}</h3>
+            <span class="w-fit px-8 py-3 bg-white text-slate-900 rounded-2xl font-semibold text-xs hover:bg-indigo-600 hover:text-white transition-colors">Explore Collection</span>
+          </div>
+      </a>
     `;
   }
 }

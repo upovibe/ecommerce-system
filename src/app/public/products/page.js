@@ -8,7 +8,9 @@ class ProductsPage extends App {
     this.products = [];
     this.loading = true;
     this.categories = ["All"];
+    this.categoriesMeta = [];
     this.activeCategory = "All";
+    this.pendingCategory = "";
     this._lastRendered = "";
     this._isInitialized = false;
   }
@@ -25,7 +27,7 @@ class ProductsPage extends App {
     super.connectedCallback();
     if (this._isInitialized) return;
     this._isInitialized = true;
-    await this.loadProducts();
+    await Promise.all([this.loadProducts(), this.loadCategoriesMeta()]);
   }
 
   async loadProducts() {
@@ -41,12 +43,51 @@ class ProductsPage extends App {
           .filter(Boolean),
       );
       this.categories = ["All", ...Array.from(catSet)];
+      this.applyCategoryFromQuery();
     } catch (e) {
       console.error("Failed to load products", e);
       this.products = [];
       this.categories = ["All"];
     } finally {
       this.loading = false;
+      this.updateView();
+    }
+  }
+
+  async loadCategoriesMeta() {
+    try {
+      const res = await api.get("/categories");
+      const data = res?.data?.data;
+      this.categoriesMeta = Array.isArray(data) ? data : [];
+      this.applyCategoryFromQuery();
+    } catch (e) {
+      this.categoriesMeta = [];
+    }
+  }
+
+  set(key, value) {
+    super.set(key, value);
+    if (key === "queryParams") {
+      this.pendingCategory = value?.category || "";
+      this.applyCategoryFromQuery();
+    }
+    return this;
+  }
+
+  applyCategoryFromQuery() {
+    const raw = (this.pendingCategory || "").trim();
+    if (!raw) return;
+    const slug = raw.toLowerCase();
+    const matchBySlug = this.categoriesMeta.find(
+      (c) => String(c.slug || "").toLowerCase() === slug,
+    );
+    const targetName = matchBySlug?.name || raw;
+    const normalized = String(targetName).toLowerCase();
+    const found = this.categories.find(
+      (c) => String(c).toLowerCase() === normalized,
+    );
+    if (found) {
+      this.activeCategory = found;
       this.updateView();
     }
   }

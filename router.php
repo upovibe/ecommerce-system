@@ -3,9 +3,10 @@
 // Serves static files directly, routes API calls to the API, and falls back to index.html for SPA routes
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$filePath = __DIR__ . $uri;
+$decodedUri = urldecode($uri);
+$filePath = __DIR__ . $decodedUri;
 // Shared uploads live one level above this project root (C:\laragon\www\uploads)
-$sharedUploadPath = dirname(__DIR__) . $uri;
+$sharedUploadPath = dirname(__DIR__) . $decodedUri;
 
 // Serve shared uploads explicitly to avoid SPA fallback returning index.html for images.
 if (str_starts_with($uri, '/uploads/') && file_exists($sharedUploadPath) && !is_dir($sharedUploadPath)) {
