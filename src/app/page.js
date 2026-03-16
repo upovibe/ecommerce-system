@@ -27,6 +27,7 @@ export default class RootPage extends App {
     if (next === this._lastRendered) return;
     this._lastRendered = next;
     this.innerHTML = next;
+    this.attachEvents();
   }
 
   async connectedCallback() {
@@ -39,6 +40,64 @@ export default class RootPage extends App {
       this.loadCategories(),
       this.loadCurrency(),
     ]);
+  }
+
+  attachEvents() {
+    this.initCarousel("landing-categories");
+  }
+
+  initCarousel(key) {
+    const track = this.querySelector(`[data-carousel-track="${key}"]`);
+    const prev = this.querySelector(`[data-carousel-prev="${key}"]`);
+    const next = this.querySelector(`[data-carousel-next="${key}"]`);
+    const dots = this.querySelector(`[data-carousel-dots="${key}"]`);
+    if (!track || !dots) return;
+
+    const items = Array.from(track.children);
+    if (!items.length) return;
+
+    const getPageCount = () => {
+      const first = items[0];
+      if (!first) return 1;
+      const itemWidth = first.getBoundingClientRect().width;
+      const gap = 20;
+      const viewport = track.getBoundingClientRect().width;
+      const perView = Math.max(1, Math.floor((viewport + gap) / (itemWidth + gap)));
+      return Math.max(1, Math.ceil(items.length / perView));
+    };
+
+    const buildDots = (pages, active) => {
+      dots.innerHTML = Array.from({ length: pages })
+        .map(
+          (_, i) =>
+            `<span class="w-2 h-2 rounded-full ${i === active ? "bg-slate-900" : "bg-slate-300"}"></span>`,
+        )
+        .join("");
+      dots.style.display = "flex";
+    };
+
+    const updateDots = () => {
+      const pages = getPageCount();
+      const pageWidth = track.getBoundingClientRect().width;
+      const active = Math.round(track.scrollLeft / pageWidth);
+      buildDots(pages, Math.min(active, pages - 1));
+    };
+
+    if (prev) {
+      prev.onclick = () => {
+        track.scrollBy({ left: -track.getBoundingClientRect().width, behavior: "smooth" });
+      };
+    }
+    if (next) {
+      next.onclick = () => {
+        track.scrollBy({ left: track.getBoundingClientRect().width, behavior: "smooth" });
+      };
+    }
+    track.addEventListener("scroll", () => {
+      window.requestAnimationFrame(updateDots);
+    });
+    window.addEventListener("resize", () => updateDots());
+    updateDots();
   }
 
   disconnectedCallback() {
@@ -226,7 +285,22 @@ export default class RootPage extends App {
             <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Browse categories</h2>
           </div>
         </div>
-        <div class="flex items-start gap-5 overflow-x-auto pb-3 no-scrollbar -mx-2 px-2">
+        <div class="relative">
+          <button
+            type="button"
+            class="absolute left-0 top-1/2 -translate-y-1/2 z-10 size-10 rounded-full bg-white/90 border border-slate-200 text-slate-600 shadow-sm hover:shadow-md transition-all flex items-center justify-center"
+            data-carousel-prev="landing-categories"
+            aria-label="Previous categories">
+            <i class="fas fa-chevron-left text-xs"></i>
+          </button>
+          <button
+            type="button"
+            class="absolute right-0 top-1/2 -translate-y-1/2 z-10 size-10 rounded-full bg-white/90 border border-slate-200 text-slate-600 shadow-sm hover:shadow-md transition-all flex items-center justify-center"
+            data-carousel-next="landing-categories"
+            aria-label="Next categories">
+            <i class="fas fa-chevron-right text-xs"></i>
+          </button>
+          <div class="flex items-start gap-5 overflow-x-auto pb-3 -mx-2 px-2 scroll-smooth" data-carousel-track="landing-categories">
           ${topCategories
             .map((cat) => {
               const image = this.getImageUrl(cat.image);
@@ -244,6 +318,8 @@ export default class RootPage extends App {
               `;
             })
             .join("")}
+          </div>
+          <div class="flex justify-center gap-2 mt-4" data-carousel-dots="landing-categories"></div>
         </div>
       </section>
     `;
