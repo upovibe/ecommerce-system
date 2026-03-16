@@ -112,8 +112,10 @@ class Router {
 
   // Navigate to a path
   navigate(path) {
-    if (window.location.pathname === path) return;
-    history.pushState(null, null, path);
+    const target = path || "/";
+    const current = window.location.pathname + window.location.search;
+    if (current === target) return;
+    history.pushState(null, null, target);
     this.render();
   }
 
@@ -141,7 +143,7 @@ class Router {
       const link = e.target.closest("a");
       if (link && link.origin === window.location.origin) {
         e.preventDefault();
-        this.navigate(link.pathname);
+        this.navigate(link.pathname + link.search);
       }
     });
 

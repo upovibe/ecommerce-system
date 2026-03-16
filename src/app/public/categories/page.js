@@ -19,6 +19,7 @@ class CategoriesPage extends App {
     if (next === this._lastRendered) return;
     this._lastRendered = next;
     this.innerHTML = next;
+    this.attachEvents();
   }
 
   async connectedCallback() {
@@ -26,6 +27,22 @@ class CategoriesPage extends App {
     if (this._isInitialized) return;
     this._isInitialized = true;
     await Promise.all([this.loadCategories(), this.loadPage()]);
+  }
+
+  attachEvents() {
+    this.querySelectorAll("[data-category-slug]").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        e.preventDefault();
+        const slug = e.currentTarget.dataset.categorySlug || "";
+        const target = `/public/products?category=${encodeURIComponent(slug)}`;
+        console.log("[CategoriesPage] navigate:", target);
+        if (window.router?.navigate) {
+          window.router.navigate(target);
+        } else {
+          window.location.href = target;
+        }
+      });
+    });
   }
 
   async loadCategories() {
@@ -165,7 +182,7 @@ class CategoriesPage extends App {
     const description = category.description || "";
     const slug = category.slug || "";
     return `
-      <a href="/public/products?category=${encodeURIComponent(slug)}" class="group relative h-96 rounded-[3rem] overflow-hidden cursor-pointer shadow-xl shadow-slate-100 transition-all hover:-translate-y-2 block">
+      <a href="/public/products?category=${encodeURIComponent(slug)}" data-category-slug="${slug}" class="group relative h-96 rounded-[3rem] overflow-hidden cursor-pointer shadow-xl shadow-slate-100 transition-all hover:-translate-y-2 block">
           ${
             image
               ? `<img src="${image}" alt="${name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
