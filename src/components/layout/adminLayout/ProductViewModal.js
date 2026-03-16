@@ -121,7 +121,21 @@ class ProductViewModal extends HTMLElement {
               const type = opt?.type || "Default";
               const value = opt?.value || opt?.label || "Default";
               const qty = v.quantity ?? v.stock ?? 0;
-              const isLow = qty <= 5;
+              const threshold = product.low_stock_threshold ?? 5;
+              const isOut = qty <= 0;
+              const isLow = qty <= threshold;
+              
+              let badgeClass = "bg-emerald-100 text-emerald-600";
+              let label = `${qty} pcs`;
+              
+              if (isOut) {
+                badgeClass = "bg-rose-100 text-rose-600";
+                label = "Out of Stock";
+              } else if (isLow) {
+                badgeClass = "bg-amber-100 text-amber-600";
+                label = `${qty} (Low Stock)`;
+              }
+
               return `
                 <tr class="hover:bg-slate-50 transition">
                   <td class="px-4 py-3">
@@ -129,8 +143,8 @@ class ProductViewModal extends HTMLElement {
                     <div class="font-semibold text-slate-700">${value}</div>
                   </td>
                   <td class="px-4 py-3">
-                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${isLow ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"}">
-                      ${qty} pcs
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${badgeClass}">
+                      ${label}
                     </span>
                   </td>
                 </tr>
@@ -219,7 +233,22 @@ class ProductViewModal extends HTMLElement {
               `}
             </div>
             ${[
-              { label: "Total Stock", value: p.total_stock ?? 0, icon: "fa-cubes", color: "text-blue-500" },
+              { 
+                label: "Total Stock", 
+                value: `
+                  <div class="flex flex-col">
+                    <span class="text-2xl font-black text-slate-900 leading-none">${p.total_stock ?? 0}</span>
+                    <span class="mt-2 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit
+                      ${p.stock_status === 'out_of_stock' ? 'bg-rose-100 text-rose-600 border border-rose-200' : 
+                        p.stock_status === 'low_stock' ? 'bg-amber-100 text-amber-600 border border-amber-200' : 
+                        'bg-emerald-100 text-emerald-600 border border-emerald-200'}">
+                      ${p.stock_status?.replace(/_/g, ' ') || 'In Stock'}
+                    </span>
+                  </div>
+                `, 
+                icon: "fa-cubes", 
+                color: "text-blue-500" 
+              },
               { label: "Variants", value: p.variant_count ?? (Array.isArray(p.variants) ? p.variants.length : 0), icon: "fa-layer-group", color: "text-purple-500" },
               { label: "Product Type", value: p.type || "Physical", icon: "fa-shapes", color: "text-indigo-500" },
             ].map((s) => `
@@ -230,7 +259,7 @@ class ProductViewModal extends HTMLElement {
                   </div>
                   <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">${s.label}</span>
                 </div>
-                <p class="text-2xl font-black text-slate-900 tracking-tight">${s.value}</p>
+                <div class="${s.label === 'Total Stock' ? '' : 'text-2xl font-black text-slate-900 tracking-tight'}">${s.value}</div>
               </div>
             `).join("")}
           </div>

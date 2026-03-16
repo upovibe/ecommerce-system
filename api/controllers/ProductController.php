@@ -238,6 +238,16 @@ class ProductController
             $product['variant_count'] = $variantCount;
             $product['total_stock'] = $totalStock;
 
+            // Re-calculate stock status now that we have total_stock
+            $threshold = $this->getStockThreshold();
+            if ($product['total_stock'] === null || $product['total_stock'] <= 0) {
+                $product['stock_status'] = 'out_of_stock';
+            } elseif ($product['total_stock'] <= $threshold) {
+                $product['stock_status'] = 'low_stock';
+            } else {
+                $product['stock_status'] = 'in_stock';
+            }
+
             http_response_code(200);
             echo json_encode(['success' => true, 'data' => $product]);
         } catch (Exception $e) {
@@ -631,6 +641,22 @@ class ProductController
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
 
+    private function getStockThreshold(): int
+    {
+        static $threshold = null;
+        if ($threshold === null) {
+            try {
+                $stmt = $this->pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = 'low_stock_threshold' LIMIT 1");
+                $stmt->execute();
+                $val = $stmt->fetchColumn();
+                $threshold = ($val !== false) ? (int)$val : 5;
+            } catch (Exception $e) {
+                $threshold = 5;
+            }
+        }
+        return $threshold;
+    }
+
     private function resolveVariantTypeId(string $name): int
     {
         $name = trim($name);
@@ -654,6 +680,22 @@ class ProductController
         $p['sku']           = $p['sku'] ?? null;
         $p['variant_count'] = isset($p['variant_count']) ? (int) $p['variant_count'] : null;
         $p['total_stock']   = isset($p['total_stock'])   ? (int) $p['total_stock']   : null;
+
+        // Stock status processing
+        $threshold = $this->getStockThreshold();
+        $p['low_stock_threshold'] = $threshold;
+        
+        if (isset($p['total_stock'])) {
+            if ($p['total_stock'] === null || $p['total_stock'] <= 0) {
+                $p['stock_status'] = 'out_of_stock';
+            } elseif ($p['total_stock'] <= $threshold) {
+                $p['stock_status'] = 'low_stock';
+            } else {
+                $p['stock_status'] = 'in_stock';
+            }
+        } else {
+            $p['stock_status'] = 'unknown'; // Will be refined in show() for single product
+        }
         
         // Promotion processing
         $p['is_on_promotion'] = !empty($p['promotion_id']);

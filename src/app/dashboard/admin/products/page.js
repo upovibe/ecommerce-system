@@ -812,7 +812,14 @@ class ProductsPage extends App {
              </div>`
           : `<span class="font-bold text-slate-700">${this.fmt(p.base_price)}</span>`,
         variants: p.variant_count,
-        stock: p.total_stock,
+        stock: p.stock_status === 'out_of_stock' 
+          ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">Out of Stock</span>`
+          : p.stock_status === 'low_stock'
+            ? `<div class="flex flex-col">
+                 <span class="font-bold text-amber-600 leading-none">${p.total_stock}</span>
+                 <span class="text-[9px] font-bold text-amber-500 uppercase tracking-tighter mt-1">Low Stock</span>
+               </div>`
+            : `<span class="font-bold text-slate-700">${p.total_stock}</span>`,
         status: p.is_active
           ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>Active</span>`
           : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500"><span class="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span>Inactive</span>`,
@@ -827,7 +834,7 @@ class ProductsPage extends App {
       { key: "price", label: "Price", html: true },
       { key: "variants", label: "Variants", html: false },
 
-      { key: "stock", label: "Stock", html: false },
+      { key: "stock", label: "Stock", html: true },
       { key: "status", label: "Status" },
     ];
 
