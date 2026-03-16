@@ -730,10 +730,10 @@ class ProductsPage extends App {
             </button>
           </div>
         </div>
-        <div class="px-2">
+        <div class="px-2 min-w-0">
           <p class="text-xs font-semibold text-indigo-600 mb-1">${category}</p>
           <h3 class="text-lg font-black text-slate-900 mb-2 leading-tight">${name}</h3>
-          <p class="text-lg font-black text-slate-900 break-all">${price}</p>
+          <p class="text-base font-black text-slate-900 break-words leading-tight">${price}</p>
         </div>
       </div>
     `;

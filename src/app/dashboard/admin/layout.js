@@ -214,6 +214,11 @@ class AdminLayout extends App {
             icon: "fas fa-feather",
             href: "/dashboard/admin/materials",
           },
+          {
+            label: "Promotions",
+            icon: "fas fa-bullhorn",
+            href: "/dashboard/admin/promotions",
+          },
         ],
       },
       {
@@ -273,6 +278,7 @@ class AdminLayout extends App {
       customers: "Customers",
       pages: "Cloud Pages",
       settings: "Preferences",
+      promotions: "Promotions",
       profile: "Profile",
     };
     return map[last] || last.charAt(0).toUpperCase() + last.slice(1);
