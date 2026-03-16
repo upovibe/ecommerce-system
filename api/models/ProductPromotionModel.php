@@ -54,6 +54,38 @@ class ProductPromotionModel extends BaseModel
     }
 
     /**
+     * Get active promotions for a list of product IDs
+     */
+    public function getActivePromotionsForProducts($productIds, $excludePromotionId = null)
+    {
+        if (empty($productIds)) return [];
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $date = date('Y-m-d H:i:s');
+        
+        $sql = "SELECT pp.product_id, pr.name as promotion_name, pr.id as promotion_id 
+                FROM promotions pr
+                JOIN " . static::$table . " pp ON pp.promotion_id = pr.id
+                WHERE pp.product_id IN ({$placeholders})
+                AND pr.status = 'active'
+                AND pr.start_date <= ?
+                AND pr.end_date >= ?";
+        
+        $params = $productIds;
+        $params[] = $date;
+        $params[] = $date;
+
+        if ($excludePromotionId) {
+            $sql .= " AND pr.id != ?";
+            $params[] = $excludePromotionId;
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * Delete all associations for a specific promotion
      */
     public function deleteByPromotionId($promotionId)

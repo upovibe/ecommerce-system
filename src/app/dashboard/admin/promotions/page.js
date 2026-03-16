@@ -429,44 +429,67 @@ class PromotionsPage extends App {
       .map((b) => `<ui-option value="${b.id}">${b.name}</ui-option>`)
       .join("");
 
-    const activeProductIds = new Set();
+    const activeProductPromotions = new Map();
     const now = new Date();
     (this.promotions || []).forEach(p => {
-      if (p.status === 'active' && new Date(p.end_date) > now) {
-        (p.product_ids || []).forEach(id => activeProductIds.add(Number(id)));
+      const isCurrentlyActive = p.status === 'active' && new Date(p.start_date) <= now && new Date(p.end_date) > now;
+      if (isCurrentlyActive) {
+        (p.product_ids || []).forEach(id => {
+          activeProductPromotions.set(Number(id), {
+            name: p.name,
+            discount: p.discount_type === 'percentage' ? p.discount_value + '%' : '$' + p.discount_value,
+            type: p.discount_type
+          });
+        });
       }
     });
 
     const filteredProducts = this.getFilteredProducts();
-    const rows = filteredProducts.map((p, i) => ({
-      id: p.id,
-      no: i + 1,
-      name: `
-        <div class="py-1">
-          <p class="font-bold text-slate-900 text-sm mb-1">${p.name}</p>
-          <div class="flex items-center gap-2">
-            <span class="text-[9px] bg-slate-100 px-1 rounded font-mono">${p.sku || "N/A"}</span>
-            <span class="text-[9px] text-indigo-500 font-bold uppercase">${p.category_name || ""}</span>
+    const rows = filteredProducts.map((p, i) => {
+      const activePromo = activeProductPromotions.get(Number(p.id));
+      return {
+        id: p.id,
+        no: i + 1,
+        name: `
+          <div class="py-1">
+            <p class="font-bold text-slate-900 text-sm mb-1 line-clamp-1">${p.name}</p>
+            <div class="flex items-center gap-2">
+              <span class="text-[9px] bg-slate-100 px-1 rounded font-mono">${p.sku || "N/A"}</span>
+              <span class="text-[9px] text-indigo-500 font-bold uppercase">${p.category_name || ""}</span>
+            </div>
           </div>
-        </div>
-      `,
-      type: `<span class="capitalize text-[10px] px-2 py-0.5 rounded-full font-bold ${p.type === "physical" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}">${p.type}</span>`,
-      price: `<span class="font-bold text-slate-700">$${p.base_price}</span>`,
-      stock: `<span class="${p.total_stock < 10 ? 'text-rose-600' : 'text-slate-600'} font-bold">${p.total_stock}</span>`,
-      status: activeProductIds.has(Number(p.id))
-        ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-tight"><i class="fas fa-tag text-[8px]"></i> On Promotion</span>`
-        : (p.is_active 
-            ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase tracking-tight"><span class="w-1 h-1 rounded-full bg-emerald-500"></span>Active</span>`
-            : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 uppercase tracking-tight"><span class="w-1 h-1 rounded-full bg-slate-400"></span>Inactive</span>`),
-      _disabled: activeProductIds.has(Number(p.id))
-    }));
+        `,
+        type: `<span class="capitalize text-[10px] px-2 py-0.5 rounded-full font-bold ${p.type === "physical" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}">${p.type}</span>`,
+        price: `<span class="font-bold text-slate-700">$${p.base_price}</span>`,
+        stock: `<span class="${p.total_stock < 10 ? 'text-rose-600' : 'text-slate-600'} font-bold">${p.total_stock}</span>`,
+        promotion: activePromo
+          ? `
+            <div class="flex flex-col">
+              <span class="text-[10px] font-black text-blue-600 tracking-tight">${activePromo.discount}</span>
+              <span class="text-[8px] text-slate-400 uppercase font-bold truncate max-w-[80px]" title="${activePromo.name}">${activePromo.name}</span>
+            </div>
+          `
+          : `<span class="text-slate-300 text-[10px] italic">No active offer</span>`,
+        promo_type: activePromo
+          ? `<span class="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">${activePromo.type}</span>`
+          : "-",
+        status: activePromo
+          ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-tight"><i class="fas fa-tag text-[8px]"></i> On Promotion</span>`
+          : (p.is_active 
+              ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase tracking-tight"><span class="w-1 h-1 rounded-full bg-emerald-500"></span>Active</span>`
+              : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 uppercase tracking-tight"><span class="w-1 h-1 rounded-full bg-slate-400"></span>Inactive</span>`),
+        _disabled: !!activePromo
+      };
+    });
 
     const columns = [
       { key: "no", label: "#", html: false },
       { key: "name", label: "Product Info" },
       { key: "type", label: "Type" },
-      { key: "price", label: "Base Price" },
+      { key: "price", label: "Price" },
       { key: "stock", label: "Stock" },
+      { key: "promotion", label: "Active Offer" },
+      { key: "promo_type", label: "Promo Type" },
       { key: "status", label: "Status" },
     ];
 

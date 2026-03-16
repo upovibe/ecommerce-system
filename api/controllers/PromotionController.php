@@ -56,6 +56,21 @@ class PromotionController
                 return;
             }
 
+            // [VALIDATION] Enforce exclusivity for active promotions
+            if (($data['status'] ?? 'active') === 'active' && !empty($productIds)) {
+                $conflicts = $this->productPromotionModel->getActivePromotionsForProducts($productIds);
+                if (!empty($conflicts)) {
+                    $conflictNames = array_unique(array_column($conflicts, 'promotion_name'));
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false, 
+                        'message' => 'One or more products are already assigned to active promotions: ' . implode(', ', $conflictNames),
+                        'conflicts' => $conflicts
+                    ]);
+                    return;
+                }
+            }
+
             $id = $this->promotionModel->create($data);
 
             if ($id && !empty($productIds)) {
@@ -102,8 +117,43 @@ class PromotionController
             RoleMiddleware::requireAdmin($this->pdo);
             $data = json_decode(file_get_contents('php://input'), true);
 
-            $productIds = $data['product_ids'] ?? null; // Use null to differentiate between empty array and not provided
+            $productIds = $data['product_ids'] ?? null; 
             unset($data['product_ids']);
+
+            // [VALIDATION] Enforce exclusivity for active promotions
+            $currentPromotion = $this->promotionModel->findById($id);
+            if (!$currentPromotion) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Promotion not found']);
+                return;
+            }
+
+            $effectiveStatus = $data['status'] ?? $currentPromotion['status'];
+            
+            if ($effectiveStatus === 'active') {
+                // Determine which products to validate
+                $idsToValidate = $productIds;
+                
+                // If productIds weren't provided in the request, we use the ones already attached
+                if ($idsToValidate === null) {
+                    $existingProducts = $this->productPromotionModel->getProductsByPromotion($id);
+                    $idsToValidate = array_column($existingProducts, 'id');
+                }
+
+                if (!empty($idsToValidate)) {
+                    $conflicts = $this->productPromotionModel->getActivePromotionsForProducts($idsToValidate, $id);
+                    if (!empty($conflicts)) {
+                        $conflictNames = array_unique(array_column($conflicts, 'promotion_name'));
+                        http_response_code(409);
+                        echo json_encode([
+                            'success' => false, 
+                            'message' => 'One or more products are already assigned to active promotions: ' . implode(', ', $conflictNames),
+                            'conflicts' => $conflicts
+                        ]);
+                        return;
+                    }
+                }
+            }
 
             $result = $this->promotionModel->update($id, $data);
 
@@ -150,6 +200,22 @@ class PromotionController
             RoleMiddleware::requireAdmin($this->pdo);
             $data = json_decode(file_get_contents('php://input'), true);
             $productIds = $data['product_ids'] ?? [];
+
+            // [VALIDATION] Enforce exclusivity for active promotions
+            $currentPromotion = $this->promotionModel->findById($id);
+            if ($currentPromotion && $currentPromotion['status'] === 'active' && !empty($productIds)) {
+                $conflicts = $this->productPromotionModel->getActivePromotionsForProducts($productIds, $id);
+                if (!empty($conflicts)) {
+                    $conflictNames = array_unique(array_column($conflicts, 'promotion_name'));
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false, 
+                        'message' => 'One or more products are already assigned to active promotions: ' . implode(', ', $conflictNames),
+                        'conflicts' => $conflicts
+                    ]);
+                    return;
+                }
+            }
 
             foreach ($productIds as $productId) {
                 $this->productPromotionModel->create([
