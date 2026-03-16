@@ -1,6 +1,9 @@
 import App from "@/core/App.js";
 import "@/components/ui/Skeleton.js";
 import "@/components/ui/ContentDisplay.js";
+import "@/components/ui/Input.js";
+import "@/components/ui/Dropdown.js";
+import "@/components/ui/Switch.js";
 import api from "@/services/api.js";
 
 class ProductsPage extends App {
@@ -241,7 +244,7 @@ class ProductsPage extends App {
     const search = this.querySelector("#product-search");
     if (search) {
       search.addEventListener("input", (e) => {
-        this.searchTerm = e.target.value || "";
+        this.searchTerm = e.detail?.value ?? "";
         this.updateView();
       });
     }
@@ -249,7 +252,7 @@ class ProductsPage extends App {
     const sort = this.querySelector("#product-sort");
     if (sort) {
       sort.addEventListener("change", (e) => {
-        this.sortBy = e.target.value || "newest";
+        this.sortBy = e.detail?.value || "newest";
         this.updateView();
       });
     }
@@ -257,14 +260,14 @@ class ProductsPage extends App {
     const min = this.querySelector("#price-min");
     if (min) {
       min.addEventListener("input", (e) => {
-        this.priceMin = e.target.value;
+        this.priceMin = e.detail?.value ?? "";
         this.updateView();
       });
     }
     const max = this.querySelector("#price-max");
     if (max) {
       max.addEventListener("input", (e) => {
-        this.priceMax = e.target.value;
+        this.priceMax = e.detail?.value ?? "";
         this.updateView();
       });
     }
@@ -272,36 +275,38 @@ class ProductsPage extends App {
     const stock = this.querySelector("#stock-only");
     if (stock) {
       stock.addEventListener("change", (e) => {
-        this.inStockOnly = e.target.checked;
+        this.inStockOnly = !!e.detail?.checked;
         this.updateView();
       });
     }
 
-    this.querySelectorAll("[data-filter-brand]").forEach((el) => {
-      el.addEventListener("change", (e) => {
-        const value = e.currentTarget.dataset.filterBrand;
-        if (!value) return;
-        if (e.currentTarget.checked) {
-          this.selectedBrands.add(value);
-        } else {
-          this.selectedBrands.delete(value);
-        }
+    const brandSelect = this.querySelector("#brand-filter");
+    if (brandSelect) {
+      brandSelect.addEventListener("change", (e) => {
+        const raw = e.detail?.value || "";
+        this.selectedBrands = new Set(
+          raw
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean),
+        );
         this.updateView();
       });
-    });
+    }
 
-    this.querySelectorAll("[data-filter-material]").forEach((el) => {
-      el.addEventListener("change", (e) => {
-        const value = e.currentTarget.dataset.filterMaterial;
-        if (!value) return;
-        if (e.currentTarget.checked) {
-          this.selectedMaterials.add(value);
-        } else {
-          this.selectedMaterials.delete(value);
-        }
+    const materialSelect = this.querySelector("#material-filter");
+    if (materialSelect) {
+      materialSelect.addEventListener("change", (e) => {
+        const raw = e.detail?.value || "";
+        this.selectedMaterials = new Set(
+          raw
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean),
+        );
         this.updateView();
       });
-    });
+    }
 
     const clear = this.querySelector("#clear-filters");
     if (clear) {
@@ -314,6 +319,16 @@ class ProductsPage extends App {
         this.selectedBrands.clear();
         this.selectedMaterials.clear();
         this.activeSubcategoryId = null;
+        const brandSelectEl = this.querySelector("#brand-filter");
+        if (brandSelectEl) brandSelectEl.value = [];
+        const materialSelectEl = this.querySelector("#material-filter");
+        if (materialSelectEl) materialSelectEl.value = [];
+        const searchEl = this.querySelector("#product-search");
+        if (searchEl) searchEl.setAttribute("value", "");
+        const minEl = this.querySelector("#price-min");
+        if (minEl) minEl.setAttribute("value", "");
+        const maxEl = this.querySelector("#price-max");
+        if (maxEl) maxEl.setAttribute("value", "");
         this.updateView();
       });
     }
@@ -592,67 +607,56 @@ class ProductsPage extends App {
 
             <div class="space-y-5">
               <div>
-                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Search</label>
-                <div class="mt-2 relative">
-                  <i class="fas fa-search text-slate-400 text-xs absolute left-3 top-1/2 -translate-y-1/2"></i>
-                  <input id="product-search" type="text" value="${this.searchTerm}" placeholder="Search products..." class="w-full pl-9 pr-3 py-2.5 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
-                </div>
+                <label class="text-[11px] font-semibold text-slate-500">Search products</label>
+                <ui-input
+                  id="product-search"
+                  placeholder="Search products..."
+                  value="${this.searchTerm}">
+                </ui-input>
               </div>
 
               <div>
-                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Sort</label>
-                <select id="product-sort" class="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm">
-                  <option value="newest" ${this.sortBy === "newest" ? "selected" : ""}>Newest first</option>
-                  <option value="price_asc" ${this.sortBy === "price_asc" ? "selected" : ""}>Price: low to high</option>
-                  <option value="price_desc" ${this.sortBy === "price_desc" ? "selected" : ""}>Price: high to low</option>
-                  <option value="name_asc" ${this.sortBy === "name_asc" ? "selected" : ""}>Name: A-Z</option>
-                  <option value="name_desc" ${this.sortBy === "name_desc" ? "selected" : ""}>Name: Z-A</option>
-                </select>
+                <label class="text-[11px] font-semibold text-slate-500">Sort</label>
+                <ui-dropdown id="product-sort" value="${this.sortBy}">
+                  <ui-option value="newest">Newest first</ui-option>
+                  <ui-option value="price_asc">Price: low to high</ui-option>
+                  <ui-option value="price_desc">Price: high to low</ui-option>
+                  <ui-option value="name_asc">Name: A-Z</ui-option>
+                  <ui-option value="name_desc">Name: Z-A</ui-option>
+                </ui-dropdown>
               </div>
 
               <div>
-                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Price range</label>
+                <label class="text-[11px] font-semibold text-slate-500">Price range</label>
                 <div class="mt-2 grid grid-cols-2 gap-3">
-                  <input id="price-min" type="number" min="0" placeholder="${priceBounds.min}" value="${this.priceMin}" class="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm">
-                  <input id="price-max" type="number" min="0" placeholder="${priceBounds.max}" value="${this.priceMax}" class="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm">
+                  <ui-input id="price-min" type="number" label="Min price" placeholder="${priceBounds.min}" value="${this.priceMin}"></ui-input>
+                  <ui-input id="price-max" type="number" label="Max price" placeholder="${priceBounds.max}" value="${this.priceMax}"></ui-input>
                 </div>
               </div>
 
-              <label class="flex items-center gap-2 text-sm text-slate-700">
-                <input id="stock-only" type="checkbox" ${this.inStockOnly ? "checked" : ""} class="rounded border-slate-300">
-                In stock only
-              </label>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-500">Stock</label>
+                <div class="mt-2 flex items-center">
+                  <ui-switch id="stock-only" ${this.inStockOnly ? "checked" : ""} label="In stock only"></ui-switch>
+                </div>
+              </div>
 
               <div>
-                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Brands</label>
-                <div class="mt-2 space-y-2 max-h-36 overflow-auto pr-1">
+                <label class="text-[11px] font-semibold text-slate-500">Brands</label>
+                <ui-dropdown id="brand-filter" multiple searchable placeholder="Select brands">
                   ${filterOptions.brands
-                    .map(
-                      (b) => `
-                        <label class="flex items-center gap-2 text-sm text-slate-700">
-                          <input type="checkbox" data-filter-brand="${b}" ${this.selectedBrands.has(b) ? "checked" : ""} class="rounded border-slate-300">
-                          ${b}
-                        </label>
-                      `,
-                    )
+                    .map((b) => `<ui-option value="${b}">${b}</ui-option>`)
                     .join("")}
-                </div>
+                </ui-dropdown>
               </div>
 
               <div>
-                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Materials</label>
-                <div class="mt-2 space-y-2 max-h-36 overflow-auto pr-1">
+                <label class="text-[11px] font-semibold text-slate-500">Materials</label>
+                <ui-dropdown id="material-filter" multiple searchable placeholder="Select materials">
                   ${filterOptions.materials
-                    .map(
-                      (m) => `
-                        <label class="flex items-center gap-2 text-sm text-slate-700">
-                          <input type="checkbox" data-filter-material="${m}" ${this.selectedMaterials.has(m) ? "checked" : ""} class="rounded border-slate-300">
-                          ${m}
-                        </label>
-                      `,
-                    )
+                    .map((m) => `<ui-option value="${m}">${m}</ui-option>`)
                     .join("")}
-                </div>
+                </ui-dropdown>
               </div>
             </div>
           </aside>
@@ -711,17 +715,17 @@ class ProductsPage extends App {
     const image = this.getImageUrl(product.main_image);
     return `
       <div class="group cursor-pointer">
-        <div class="relative aspect-[4/5] bg-slate-50 rounded-[2.5rem] overflow-hidden mb-6 group-hover:shadow-2xl group-hover:shadow-indigo-100 transition-all duration-500">
+        <div class="relative aspect-[4/5] bg-slate-50 rounded-[1.75rem] overflow-hidden mb-5 group-hover:shadow-2xl group-hover:shadow-indigo-100 transition-all duration-500">
           ${
             image
               ? `<img src="${image}" alt="${name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
               : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i class="fas fa-image"></i></div>`
           }
           <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
-            <button class="w-full py-4 bg-white text-slate-900 rounded-2xl font-semibold text-xs hover:bg-indigo-600 hover:text-white transition-colors">Quick View</button>
+            <button class="w-full py-3 bg-white text-slate-900 rounded-xl font-semibold text-xs hover:bg-indigo-600 hover:text-white transition-colors">Quick View</button>
           </div>
           <div class="absolute top-6 right-6">
-            <button class="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm">
+            <button class="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm">
               <i class="far fa-heart"></i>
             </button>
           </div>
@@ -729,7 +733,7 @@ class ProductsPage extends App {
         <div class="px-2">
           <p class="text-xs font-semibold text-indigo-600 mb-1">${category}</p>
           <h3 class="text-lg font-black text-slate-900 mb-2 leading-tight">${name}</h3>
-          <p class="text-xl font-black text-slate-900">${price}</p>
+          <p class="text-lg font-black text-slate-900 break-all">${price}</p>
         </div>
       </div>
     `;
