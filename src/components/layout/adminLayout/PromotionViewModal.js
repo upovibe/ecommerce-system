@@ -72,11 +72,8 @@ class PromotionViewModal extends HTMLElement {
           </div>
 
           <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <h4 class="text-sm font-black text-slate-900 uppercase tracking-wider">Assigned Products</h4>
-              <button onclick="this.closest('app-promotions-page').openProductSelectionModal(${this.promotion.id})" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2">
-                <i class="fas fa-plus"></i> Attach Products
-              </button>
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Products</h4>
             </div>
             <div class="space-y-2 max-h-[300px] overflow-y-auto pr-1">
               ${productsHtml || '<p class="text-center py-8 text-slate-400 text-sm italic">No products attached to this promotion.</p>'}

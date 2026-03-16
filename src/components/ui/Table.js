@@ -301,6 +301,17 @@ class Table extends HTMLElement {
                     background-color: #bfdbfe;
                 }
                 
+                .upo-row-disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed !important;
+                    background-color: #f3f4f6 !important;
+                    pointer-events: none;
+                }
+
+                .upo-row-disabled * {
+                    pointer-events: none;
+                }
+                
                 .upo-table-action-column {
                     position: sticky;
                     right: 0;
@@ -1446,18 +1457,18 @@ class Table extends HTMLElement {
             const isSelected = this.selectedRows.has(row);
             
             return `
-                <tr class="${isSelected ? 'selected' : ''}" data-row-index="${index}">
+                <tr class="${isSelected ? 'selected' : ''} ${row._disabled ? 'upo-row-disabled' : ''}" data-row-index="${index}">
                     ${this.selectable ? `
                         <td class="upo-table-checkbox-column">
-                            <input type="checkbox" class="upo-table-checkbox" data-row-index="${index}" ${isSelected ? 'checked' : ''}>
+                            <input type="checkbox" class="upo-table-checkbox" data-row-index="${index}" ${isSelected ? 'checked' : ''} ${row._disabled ? 'disabled' : ''}>
                         </td>
                     ` : ''}
                     ${this.columns.map(col => {
                         const value = row[col.key];
                         if (col.html) {
-                            return `<td class="upo-table-cell">${value || ''}</td>`;
+                            return `<td class="upo-table-cell" title="${row._disabled ? 'This item is already assigned to a promotion' : ''}">${value || ''}</td>`;
                         } else {
-                            return `<td class="upo-table-cell">${this.escapeHtml(value || '')}</td>`;
+                            return `<td class="upo-table-cell" title="${row._disabled ? 'This item is already assigned to a promotion' : ''}">${this.escapeHtml(value || '')}</td>`;
                         }
                     }).join('')}
                     ${this.action ? `

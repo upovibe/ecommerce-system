@@ -52,5 +52,14 @@ class ProductPromotionModel extends BaseModel
         $stmt->execute([$productId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Delete all associations for a specific promotion
+     */
+    public function deleteByPromotionId($promotionId)
+    {
+        $stmt = $this->pdo->prepare("DELETE FROM " . static::$table . " WHERE promotion_id = ?");
+        return $stmt->execute([$promotionId]);
+    }
 }
 ?>
