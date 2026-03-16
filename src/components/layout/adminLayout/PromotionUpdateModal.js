@@ -40,6 +40,18 @@ class PromotionUpdateModal extends HTMLElement {
     }
   }
 
+  getImageUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+      return path;
+    }
+    const baseUrl = window.location.origin;
+    if (path.startsWith("/api/")) return baseUrl + path;
+    if (path.startsWith("/")) return baseUrl + path;
+    if (path.startsWith("uploads/")) return `${baseUrl}/api/${path}`;
+    return `${baseUrl}/api/${path.replace(/^\//, "")}`;
+  }
+
   removeProduct(productId) {
     this.currentProducts = this.currentProducts.filter(p => p.id !== productId);
     this.renderProductList();
@@ -55,18 +67,26 @@ class PromotionUpdateModal extends HTMLElement {
       if (this.currentProducts.length === 0) {
         container.innerHTML = `<div class="py-4 text-center text-[10px] text-slate-400 italic bg-white rounded-lg border border-dashed border-slate-200">No products targeted</div>`;
       } else {
-        container.innerHTML = this.currentProducts.map(p => `
-          <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 group hover:border-blue-100 transition-colors">
-            <div class="min-w-0 flex-1">
-              <div class="text-[11px] font-bold text-slate-700 truncate group-hover:text-blue-600">${p.name}</div>
-              <div class="text-[9px] text-slate-400 font-mono">${p.sku || 'N/A'}</div>
+        container.innerHTML = this.currentProducts.map(p => {
+          const image = p.main_image ? this.getImageUrl(p.main_image) : "";
+          return `
+            <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 group hover:border-blue-100 transition-colors">
+              <div class="flex items-center gap-3 min-w-0 flex-1">
+                <div class="size-8 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  ${image ? `<img src="${image}" class="w-full h-full object-cover">` : `<i class="fas fa-image text-slate-300 text-xs"></i>`}
+                </div>
+                <div class="min-w-0">
+                  <div class="text-[11px] font-bold text-slate-700 truncate group-hover:text-blue-600">${p.name}</div>
+                  <div class="text-[9px] text-slate-400 font-mono">${p.sku || 'N/A'}</div>
+                </div>
+              </div>
+              <button onclick="this.closest('promotion-update-modal').removeProduct(${p.id})" 
+                class="size-6 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition" title="Remove Product">
+                <i class="fas fa-times text-[10px]"></i>
+              </button>
             </div>
-            <button onclick="this.closest('promotion-update-modal').removeProduct(${p.id})" 
-              class="size-6 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition" title="Remove Product">
-              <i class="fas fa-times text-[10px]"></i>
-            </button>
-          </div>
-        `).join("");
+          `;
+        }).join("");
       }
     }
   }
@@ -79,7 +99,7 @@ class PromotionUpdateModal extends HTMLElement {
     this.innerHTML = `
       <ui-modal id="promotion-update-modal" position="right" size="md" close-on-backdrop-click="false">
         <span slot="title" class="flex items-center gap-2 font-black uppercase tracking-tighter text-slate-800">
-          <i class="fas fa-edit text-blue-500"></i> Update Promotion
+          <i class="fas fa-edit text-blue-500 font-normal"></i> Update Promotion
         </span>
         <div class="space-y-6">
           <div class="space-y-4">
@@ -141,9 +161,9 @@ class PromotionUpdateModal extends HTMLElement {
         </div>
 
         <div slot="footer" class="w-full flex gap-3 justify-end items-center">
-          <button modal-action="cancel" class="px-5 py-2 rounded-xl text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:bg-slate-50 transition">Cancel</button>
-          <button id="edit-save-btn" onclick="this.closest('app-promotions-page').submitUpdate()" class="px-6 py-2 rounded-xl bg-blue-600 text-white font-bold uppercase tracking-widest text-[10px] hover:bg-blue-700 transition shadow-lg flex items-center gap-2">
-            <i class="fas fa-save text-[8px]"></i> Save Changes
+          <button modal-action="cancel" class="px-4 py-2 rounded-md text-slate-500 font-medium hover:bg-slate-50 transition text-sm">Cancel</button>
+          <button id="edit-save-btn" onclick="this.closest('app-promotions-page').submitUpdate()" class="px-4 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm flex items-center gap-2 shadow-sm">
+            <i class="fas fa-save text-[10px]"></i> Save Changes
           </button>
         </div>
       </ui-modal>

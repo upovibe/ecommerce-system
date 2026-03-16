@@ -87,9 +87,9 @@ class PromotionCreateModal extends HTMLElement {
         </div>
 
         <div slot="footer" class="w-full flex gap-3 justify-end items-center">
-          <button modal-action="cancel" class="px-5 py-2 rounded-xl text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:bg-slate-50 transition">Cancel</button>
-          <button id="create-save-btn" onclick="this.closest('app-promotions-page').submitCreate()" class="px-6 py-2 rounded-xl bg-slate-900 text-white font-bold uppercase tracking-widest text-[10px] hover:bg-slate-800 transition shadow-lg flex items-center gap-2">
-            <i class="fas fa-bullhorn text-[8px]"></i> Launch Promotion
+          <button modal-action="cancel" class="px-4 py-2 rounded-md text-slate-500 font-medium hover:bg-slate-50 transition text-sm">Cancel</button>
+          <button id="create-save-btn" onclick="this.closest('app-promotions-page').submitCreate()" class="px-4 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm flex items-center gap-2 shadow-sm">
+            <i class="fas fa-bullhorn text-[10px]"></i> Launch Promotion
           </button>
         </div>
       </ui-modal>
