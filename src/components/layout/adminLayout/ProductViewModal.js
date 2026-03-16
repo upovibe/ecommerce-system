@@ -166,7 +166,9 @@ class ProductViewModal extends HTMLElement {
 
     this.innerHTML = `
       <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="lg" close-button="true">
-        <span slot="title">Product Overview</span>
+        <span slot="title" class="flex items-center gap-2 font-black uppercase tracking-tighter text-slate-800">
+          <i class="fas fa-eye text-blue-500 font-normal"></i> Product Overview
+        </span>
         <div class="space-y-6">
           <div class="relative h-64 bg-slate-900 rounded-2xl overflow-hidden group">
             <div class="w-full h-full opacity-60 group-hover:opacity-100 transition duration-500 flex items-center justify-center">
