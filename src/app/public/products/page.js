@@ -22,6 +22,13 @@ class ProductsPage extends App {
     this.bannerIndex = 0;
     this.bannerTimer = null;
     this.bannerRotationMs = 5000;
+    this.searchTerm = "";
+    this.sortBy = "newest";
+    this.priceMin = "";
+    this.priceMax = "";
+    this.inStockOnly = false;
+    this.selectedBrands = new Set();
+    this.selectedMaterials = new Set();
     this._lastRendered = "";
     this._isInitialized = false;
   }
@@ -82,12 +89,21 @@ class ProductsPage extends App {
       const res = await api.get("/categories");
       const data = res?.data?.data;
       this.categoriesMeta = Array.isArray(data) ? data : [];
-      console.log("[ProductsPage] categories loaded:", this.categoriesMeta);
       this.applyCategoryFromQuery();
       this.updateView();
     } catch (e) {
       this.categoriesMeta = [];
       this.updateView();
+    }
+  }
+
+  async loadCurrency() {
+    try {
+      const res = await api.get("/settings/key/currency");
+      const value = res?.data?.data?.setting_value;
+      if (value) this.currencyCode = String(value).toUpperCase();
+    } catch (_) {
+      // keep default
     }
   }
 
@@ -221,6 +237,86 @@ class ProductsPage extends App {
     });
 
     this.initCarousel("product-subcategories");
+
+    const search = this.querySelector("#product-search");
+    if (search) {
+      search.addEventListener("input", (e) => {
+        this.searchTerm = e.target.value || "";
+        this.updateView();
+      });
+    }
+
+    const sort = this.querySelector("#product-sort");
+    if (sort) {
+      sort.addEventListener("change", (e) => {
+        this.sortBy = e.target.value || "newest";
+        this.updateView();
+      });
+    }
+
+    const min = this.querySelector("#price-min");
+    if (min) {
+      min.addEventListener("input", (e) => {
+        this.priceMin = e.target.value;
+        this.updateView();
+      });
+    }
+    const max = this.querySelector("#price-max");
+    if (max) {
+      max.addEventListener("input", (e) => {
+        this.priceMax = e.target.value;
+        this.updateView();
+      });
+    }
+
+    const stock = this.querySelector("#stock-only");
+    if (stock) {
+      stock.addEventListener("change", (e) => {
+        this.inStockOnly = e.target.checked;
+        this.updateView();
+      });
+    }
+
+    this.querySelectorAll("[data-filter-brand]").forEach((el) => {
+      el.addEventListener("change", (e) => {
+        const value = e.currentTarget.dataset.filterBrand;
+        if (!value) return;
+        if (e.currentTarget.checked) {
+          this.selectedBrands.add(value);
+        } else {
+          this.selectedBrands.delete(value);
+        }
+        this.updateView();
+      });
+    });
+
+    this.querySelectorAll("[data-filter-material]").forEach((el) => {
+      el.addEventListener("change", (e) => {
+        const value = e.currentTarget.dataset.filterMaterial;
+        if (!value) return;
+        if (e.currentTarget.checked) {
+          this.selectedMaterials.add(value);
+        } else {
+          this.selectedMaterials.delete(value);
+        }
+        this.updateView();
+      });
+    });
+
+    const clear = this.querySelector("#clear-filters");
+    if (clear) {
+      clear.addEventListener("click", () => {
+        this.searchTerm = "";
+        this.sortBy = "newest";
+        this.priceMin = "";
+        this.priceMax = "";
+        this.inStockOnly = false;
+        this.selectedBrands.clear();
+        this.selectedMaterials.clear();
+        this.activeSubcategoryId = null;
+        this.updateView();
+      });
+    }
   }
 
   initCarousel(key) {
@@ -299,19 +395,70 @@ class ProductsPage extends App {
 
   getFilteredProducts() {
     if (!this.products.length) return [];
+    let list = [...this.products];
+
     if (this.activeSubcategoryId) {
-      return this.products.filter(
+      list = list.filter(
         (p) => Number(p.category_id) === Number(this.activeSubcategoryId),
       );
-    }
-    if (this.activeParentCategoryId) {
+    } else if (this.activeParentCategoryId) {
       const children = this.categoriesMeta
         .filter((c) => Number(c.parent_id) === Number(this.activeParentCategoryId))
         .map((c) => c.id);
-      if (!children.length) return this.products;
-      return this.products.filter((p) => children.includes(Number(p.category_id)));
+      if (children.length) {
+        list = list.filter((p) => children.includes(Number(p.category_id)));
+      }
     }
-    return this.products;
+
+    const q = this.searchTerm.trim().toLowerCase();
+    if (q) {
+      list = list.filter((p) => {
+        const name = String(p.name || "").toLowerCase();
+        const brand = String(p.brand_name || "").toLowerCase();
+        const category = String(p.category_name || "").toLowerCase();
+        return name.includes(q) || brand.includes(q) || category.includes(q);
+      });
+    }
+
+    const minVal = this.priceMin !== "" ? Number(this.priceMin) : null;
+    const maxVal = this.priceMax !== "" ? Number(this.priceMax) : null;
+    if (minVal !== null && !Number.isNaN(minVal)) {
+      list = list.filter((p) => Number(p.base_price || 0) >= minVal);
+    }
+    if (maxVal !== null && !Number.isNaN(maxVal)) {
+      list = list.filter((p) => Number(p.base_price || 0) <= maxVal);
+    }
+
+    if (this.inStockOnly) {
+      list = list.filter((p) => Number(p.total_stock || 0) > 0);
+    }
+
+    if (this.selectedBrands.size) {
+      list = list.filter((p) => this.selectedBrands.has(p.brand_name || ""));
+    }
+
+    if (this.selectedMaterials.size) {
+      list = list.filter((p) => this.selectedMaterials.has(p.material_name || ""));
+    }
+
+    switch (this.sortBy) {
+      case "price_asc":
+        list.sort((a, b) => Number(a.base_price || 0) - Number(b.base_price || 0));
+        break;
+      case "price_desc":
+        list.sort((a, b) => Number(b.base_price || 0) - Number(a.base_price || 0));
+        break;
+      case "name_asc":
+        list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+        break;
+      case "name_desc":
+        list.sort((a, b) => String(b.name || "").localeCompare(String(a.name || "")));
+        break;
+      default:
+        list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    }
+
+    return list;
   }
 
   getSubcategories() {
@@ -333,7 +480,6 @@ class ProductsPage extends App {
 
   renderSubcategoriesRow() {
     const subs = this.getSubcategories();
-    console.log("[ProductsPage] subcategories:", subs);
     if (this.loading) {
       return `
         <div class="mb-10">
@@ -371,7 +517,7 @@ class ProductsPage extends App {
           </button>
           <div class="flex items-center gap-3 overflow-x-auto pb-2 -mx-2 px-2 scroll-smooth" data-carousel-track="product-subcategories">
           <div data-subcategory-id="all" class="group cursor-pointer" style="flex: 0 0 calc((100% - 48px) / 5); min-width: 160px; max-width: 220px;">
-            <div class="w-full aspect-square rounded-2xl border border-slate-200 bg-slate-900 text-white flex items-center justify-center shadow-sm group-hover:shadow-lg transition-all">
+            <div class="w-full aspect-square rounded-2xl border ${this.activeSubcategoryId === null ? "border-slate-900 ring-2 ring-slate-900/20" : "border-slate-200"} bg-slate-900 text-white flex items-center justify-center shadow-sm group-hover:shadow-lg transition-all">
               <i class="fas fa-layer-group text-3xl"></i>
             </div>
             <p class="mt-3 text-sm font-black text-slate-900">All</p>
@@ -381,7 +527,7 @@ class ProductsPage extends App {
               const image = this.getImageUrl(sub.image);
               return `
                 <div data-subcategory-id="${sub.id}" class="group cursor-pointer" style="flex: 0 0 calc((100% - 48px) / 5); min-width: 160px; max-width: 220px;">
-                  <div class="w-full aspect-square rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden shadow-sm group-hover:shadow-lg transition-all">
+                  <div class="w-full aspect-square rounded-2xl bg-slate-50 border ${this.activeSubcategoryId === Number(sub.id) ? "border-slate-900 ring-2 ring-slate-900/20" : "border-slate-100"} overflow-hidden shadow-sm group-hover:shadow-lg transition-all">
                     ${
                       image
                         ? `<img src="${image}" alt="${sub.name || "Subcategory"}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
@@ -402,16 +548,14 @@ class ProductsPage extends App {
 
   render() {
     const filtered = this.getFilteredProducts();
-    const categories =
-      Array.isArray(this.categories) && this.categories.length
-        ? this.categories
-        : ["All"];
     const pageContent = this.pageData?.content || "";
     const pageContentAttr = pageContent.replace(/"/g, "&quot;");
     const title = this.pageData?.title || "Premium Collection";
     const subtitle =
       this.pageData?.subtitle ||
       "Browse our curated selection of high-quality products across all categories. Designed for excellence, built for you.";
+    const filterOptions = this.getFilterOptions();
+    const priceBounds = this.getPriceBounds();
 
     return `
       <div class="py-20 px-8 max-w-7xl mx-auto">
@@ -439,25 +583,125 @@ class ProductsPage extends App {
 
         ${this.renderSubcategoriesRow()}
 
-        <!-- Products Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
-          ${this.loading
-            ? Array(8)
-                .fill(
-                  `<div class="animate-pulse">
-                    <div class="aspect-[4/5] bg-slate-100 rounded-[2.5rem] mb-6"></div>
-                    <div class="h-3 w-20 bg-slate-100 rounded mb-2"></div>
-                    <div class="h-4 w-36 bg-slate-100 rounded mb-2"></div>
-                    <div class="h-4 w-24 bg-slate-100 rounded"></div>
-                  </div>`,
-                )
-                .join("")
-            : filtered.length
-              ? filtered.map((p) => this.renderProductCard(p)).join("")
-              : `<div class="col-span-full text-center text-slate-500 text-sm">No products found in this category.</div>`}
+        <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
+          <aside class="bg-white border border-slate-200 rounded-3xl p-6 h-fit lg:sticky lg:top-28">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-lg font-black text-slate-900">Filter Studio</h2>
+              <button id="clear-filters" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700">Clear</button>
+            </div>
+
+            <div class="space-y-5">
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Search</label>
+                <div class="mt-2 relative">
+                  <i class="fas fa-search text-slate-400 text-xs absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <input id="product-search" type="text" value="${this.searchTerm}" placeholder="Search products..." class="w-full pl-9 pr-3 py-2.5 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Sort</label>
+                <select id="product-sort" class="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm">
+                  <option value="newest" ${this.sortBy === "newest" ? "selected" : ""}>Newest first</option>
+                  <option value="price_asc" ${this.sortBy === "price_asc" ? "selected" : ""}>Price: low to high</option>
+                  <option value="price_desc" ${this.sortBy === "price_desc" ? "selected" : ""}>Price: high to low</option>
+                  <option value="name_asc" ${this.sortBy === "name_asc" ? "selected" : ""}>Name: A-Z</option>
+                  <option value="name_desc" ${this.sortBy === "name_desc" ? "selected" : ""}>Name: Z-A</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Price range</label>
+                <div class="mt-2 grid grid-cols-2 gap-3">
+                  <input id="price-min" type="number" min="0" placeholder="${priceBounds.min}" value="${this.priceMin}" class="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm">
+                  <input id="price-max" type="number" min="0" placeholder="${priceBounds.max}" value="${this.priceMax}" class="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm">
+                </div>
+              </div>
+
+              <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input id="stock-only" type="checkbox" ${this.inStockOnly ? "checked" : ""} class="rounded border-slate-300">
+                In stock only
+              </label>
+
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Brands</label>
+                <div class="mt-2 space-y-2 max-h-36 overflow-auto pr-1">
+                  ${filterOptions.brands
+                    .map(
+                      (b) => `
+                        <label class="flex items-center gap-2 text-sm text-slate-700">
+                          <input type="checkbox" data-filter-brand="${b}" ${this.selectedBrands.has(b) ? "checked" : ""} class="rounded border-slate-300">
+                          ${b}
+                        </label>
+                      `,
+                    )
+                    .join("")}
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Materials</label>
+                <div class="mt-2 space-y-2 max-h-36 overflow-auto pr-1">
+                  ${filterOptions.materials
+                    .map(
+                      (m) => `
+                        <label class="flex items-center gap-2 text-sm text-slate-700">
+                          <input type="checkbox" data-filter-material="${m}" ${this.selectedMaterials.has(m) ? "checked" : ""} class="rounded border-slate-300">
+                          ${m}
+                        </label>
+                      `,
+                    )
+                    .join("")}
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <section>
+            <div class="flex items-center justify-between mb-6">
+              <p class="text-sm text-slate-500">Showing <span class="text-slate-900 font-semibold">${filtered.length}</span> items</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
+              ${this.loading
+                ? Array(10)
+                    .fill(
+                      `<div class="animate-pulse">
+                        <div class="aspect-[4/5] bg-slate-100 rounded-[2.5rem] mb-6"></div>
+                        <div class="h-3 w-20 bg-slate-100 rounded mb-2"></div>
+                        <div class="h-4 w-36 bg-slate-100 rounded mb-2"></div>
+                        <div class="h-4 w-24 bg-slate-100 rounded"></div>
+                      </div>`,
+                    )
+                    .join("")
+                : filtered.length
+                  ? filtered.map((p) => this.renderProductCard(p)).join("")
+                  : `<div class="col-span-full text-center text-slate-500 text-sm">No products found.</div>`}
+            </div>
+          </section>
         </div>
       </div>
     `;
+  }
+
+  getFilterOptions() {
+    const brands = new Set();
+    const materials = new Set();
+    (this.products || []).forEach((p) => {
+      if (p.brand_name) brands.add(p.brand_name);
+      if (p.material_name) materials.add(p.material_name);
+    });
+    return {
+      brands: Array.from(brands).sort(),
+      materials: Array.from(materials).sort(),
+    };
+  }
+
+  getPriceBounds() {
+    const prices = (this.products || [])
+      .map((p) => Number(p.base_price || 0))
+      .filter((p) => !Number.isNaN(p));
+    if (!prices.length) return { min: 0, max: 0 };
+    return { min: Math.min(...prices), max: Math.max(...prices) };
   }
 
   renderProductCard(product) {
