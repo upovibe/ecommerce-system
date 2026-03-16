@@ -64,7 +64,7 @@ class PromotionController
                     http_response_code(409);
                     echo json_encode([
                         'success' => false, 
-                        'message' => 'One or more products are already assigned to active promotions: ' . implode(', ', $conflictNames),
+                        'message' => "You can't add the same product to multiple active promotions. (Conflicts in: " . implode(', ', $conflictNames) . ")",
                         'conflicts' => $conflicts
                     ]);
                     return;
@@ -147,7 +147,7 @@ class PromotionController
                         http_response_code(409);
                         echo json_encode([
                             'success' => false, 
-                            'message' => 'One or more products are already assigned to active promotions: ' . implode(', ', $conflictNames),
+                            'message' => "You can't add the same product to multiple active promotions. (Conflicts in: " . implode(', ', $conflictNames) . ")",
                             'conflicts' => $conflicts
                         ]);
                         return;
@@ -210,7 +210,7 @@ class PromotionController
                     http_response_code(409);
                     echo json_encode([
                         'success' => false, 
-                        'message' => 'One or more products are already assigned to active promotions: ' . implode(', ', $conflictNames),
+                        'message' => "You can't add the same product to multiple active promotions. (Conflicts in: " . implode(', ', $conflictNames) . ")",
                         'conflicts' => $conflicts
                     ]);
                     return;

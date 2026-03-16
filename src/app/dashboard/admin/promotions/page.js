@@ -252,7 +252,8 @@ class PromotionsPage extends App {
       this.querySelector("promotion-create-modal").close();
       await this.fetchData(true);
     } catch (e) {
-      Toast.show({ title: "Error", message: "Failed to create promotion", variant: "error" });
+      const msg = e.response?.data?.message || "Failed to create promotion";
+      Toast.show({ title: "Error", message: msg, variant: "error" });
     }
   }
 
@@ -275,7 +276,8 @@ class PromotionsPage extends App {
       m.close();
       await this.fetchData(true);
     } catch (e) {
-      Toast.show({ title: "Error", message: "Failed to update promotion", variant: "error" });
+      const msg = e.response?.data?.message || "Failed to update promotion";
+      Toast.show({ title: "Error", message: msg, variant: "error" });
     }
   }
 
@@ -286,7 +288,8 @@ class PromotionsPage extends App {
       this.querySelector("promotion-delete-dialog").close();
       await this.fetchData(true);
     } catch (e) {
-      Toast.show({ title: "Error", message: "Failed to delete promotion", variant: "error" });
+      const msg = e.response?.data?.message || "Failed to delete promotion";
+      Toast.show({ title: "Error", message: msg, variant: "error" });
     }
   }
 
@@ -296,7 +299,8 @@ class PromotionsPage extends App {
       Toast.show({ title: "Detached", message: "Product removed", variant: "success" });
       await this.openViewModal(this.selectedPromotion);
     } catch (e) {
-      Toast.show({ title: "Error", message: "Failed to detach product", variant: "error" });
+      const msg = e.response?.data?.message || "Failed to detach product";
+      Toast.show({ title: "Error", message: msg, variant: "error" });
     }
   }
 
