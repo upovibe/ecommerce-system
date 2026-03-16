@@ -210,6 +210,7 @@ class Router {
     try {
       const module = await import(`@/${staticPath}`);
       this.componentCache.set(path, module.default);
+      this.componentCache.set(`${path}:componentPath`, staticPath);
       return module.default;
     } catch (error) {
       // Ignore error, as we'll try dynamic paths next.
@@ -228,6 +229,7 @@ class Router {
       try {
         const module = await import(`@/${slugPath}`);
         this.componentCache.set(path, module.default);
+        this.componentCache.set(`${path}:componentPath`, slugPath);
         const params = this.extractDynamicParams(slugPath, path);
         this.componentCache.set(`${path}:params`, params);
         return module.default;
@@ -238,6 +240,7 @@ class Router {
             .replace(/\]/g, "%5D");
           const module = await import(`@/${encodedComponentPath}`);
           this.componentCache.set(path, module.default);
+          this.componentCache.set(`${path}:componentPath`, slugPath);
           const params = this.extractDynamicParams(slugPath, path);
           this.componentCache.set(`${path}:params`, params);
           return module.default;
@@ -252,6 +255,7 @@ class Router {
       try {
         const module = await import(`@/${idPath}`);
         this.componentCache.set(path, module.default);
+        this.componentCache.set(`${path}:componentPath`, idPath);
         const params = this.extractDynamicParams(idPath, path);
         this.componentCache.set(`${path}:params`, params);
         return module.default;
@@ -262,6 +266,7 @@ class Router {
             .replace(/\]/g, "%5D");
           const module = await import(`@/${encodedComponentPath}`);
           this.componentCache.set(path, module.default);
+          this.componentCache.set(`${path}:componentPath`, idPath);
           const params = this.extractDynamicParams(idPath, path);
           this.componentCache.set(`${path}:params`, params);
           return module.default;
@@ -401,16 +406,33 @@ class Router {
         .replace(/^-/, "")}`;
 
       // Create page content
-      const pageContent = `<${tagName}></${tagName}>`;
+      const routeAttr = encodeURIComponent(JSON.stringify(routeParams || {}));
+      const queryAttr = encodeURIComponent(JSON.stringify(queryParams || {}));
+      const pageContent = `<${tagName} data-route="${routeAttr}" data-query="${queryAttr}"></${tagName}>`;
 
       // --- LAYOUT OVERRIDE LOGIC ---
       const pathSegments = path.split("/").filter(Boolean);
+      const cachedComponentPath =
+        routeInfo?.componentPath || this.componentCache.get(`${path}:componentPath`);
+      let layoutSegments = pathSegments;
+      if (cachedComponentPath) {
+        const cleanSegments = cachedComponentPath.replace(/^app\//, "").split("/");
+        if (cleanSegments.length) cleanSegments.pop(); // remove page.js
+        if (
+          cleanSegments.length &&
+          cleanSegments[cleanSegments.length - 1].startsWith("[") &&
+          cleanSegments[cleanSegments.length - 1].endsWith("]")
+        ) {
+          cleanSegments.pop();
+        }
+        if (cleanSegments.length) layoutSegments = cleanSegments;
+      }
       let customLayoutTagName = null;
       let CustomLayoutClass = null;
 
       // --- NESTED LAYOUT DISCOVERY LOGIC ---
-      for (let i = pathSegments.length; i > 0; i--) {
-        const groupPath = pathSegments.slice(0, i).join("/");
+      for (let i = layoutSegments.length; i > 0; i--) {
+        const groupPath = layoutSegments.slice(0, i).join("/");
         const layoutPath = `@/app/${groupPath}/layout.js`;
         try {
           const layoutModule = await import(layoutPath);

@@ -713,8 +713,10 @@ class ProductsPage extends App {
     const category = product.category_name || "General";
     const price = this.formatCurrency(product.base_price);
     const image = this.getImageUrl(product.main_image);
+    const slug = product.slug || product.id;
+    const url = `/public/products/${slug}`;
     return `
-      <div class="group cursor-pointer">
+      <a href="${url}" class="group block">
         <div class="relative aspect-[4/5] bg-slate-50 rounded-[1.75rem] overflow-hidden mb-5 group-hover:shadow-2xl group-hover:shadow-indigo-100 transition-all duration-500">
           ${
             image
@@ -735,7 +737,7 @@ class ProductsPage extends App {
           <h3 class="text-lg font-black text-slate-900 mb-2 leading-tight">${name}</h3>
           <p class="text-base font-black text-slate-900 break-words leading-tight">${price}</p>
         </div>
-      </div>
+      </a>
     `;
   }
 }

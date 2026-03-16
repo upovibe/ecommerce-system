@@ -444,6 +444,8 @@ export default class RootPage extends App {
     const image = this.getImageUrl(p.main_image) || "";
     const category = p.category_name || "General";
     const price = this.formatCurrency(p.base_price);
+    const slug = p.slug || p.id;
+    const url = `/public/products/${slug}`;
 
     return `
       <div class="group cursor-pointer">
@@ -454,7 +456,7 @@ export default class RootPage extends App {
               : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i class="fas fa-image"></i></div>`
           }
           <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-6">
-            <a href="/public/products" class="w-full py-3 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-colors text-center">View Details</a>
+            <a href="${url}" class="w-full py-3 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-colors text-center">View Details</a>
           </div>
         </div>
         <div class="px-1">

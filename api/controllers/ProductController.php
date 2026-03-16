@@ -165,6 +165,104 @@ class ProductController
     // ─────────────────────────────────────────────────────────────────────────
     // GET /products/{id}
     // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────
+    // GET /products/public/{slug} — public product details
+    // ─────────────────────────────────────────────────────────
+    public function publicShow($slug)
+    {
+        try {
+            $slug = urldecode($slug);
+            $isId = ctype_digit($slug);
+            $where = $isId ? "p.id = ?" : "p.slug = ?";
+
+            $stmt = $this->pdo->prepare("
+                SELECT
+                    p.*,
+                    c.name  AS category_name,
+                    b.name  AS brand_name,
+                    m.name  AS material_name,
+                    promo.id AS promotion_id,
+                    promo.name AS promotion_name,
+                    promo.discount_type,
+                    promo.discount_value,
+                    promo.start_date AS promotion_start,
+                    promo.end_date AS promotion_end
+                FROM products p
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN brands b     ON b.id = p.brand_id
+                LEFT JOIN materials m  ON m.id = p.material_id
+                LEFT JOIN (
+                    SELECT pp.product_id, pr.id, pr.name, pr.discount_type, pr.discount_value, pr.start_date, pr.end_date
+                    FROM product_promotions pp
+                    JOIN promotions pr ON pr.id = pp.promotion_id
+                    WHERE pr.status = 'active' 
+                      AND pr.start_date <= NOW() 
+                      AND pr.end_date >= NOW()
+                ) promo ON promo.product_id = p.id
+                WHERE {$where}
+                  AND p.is_active = 1
+                  AND p.status = 'active'
+            ");
+            $stmt->execute([$slug]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$product) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Product not found']);
+                return;
+            }
+
+            $product = $this->castProduct($product);
+
+            // Get variants
+            $stmt = $this->pdo->prepare("
+                SELECT v.*, t.name AS type_name
+                FROM product_variants v
+                JOIN product_variant_types t ON t.id = v.variant_type_id
+                WHERE v.product_id = ?
+                ORDER BY v.id
+            ");
+            $stmt->execute([$product['id']]);
+            $variants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $variantCount = 0;
+            $totalStock = 0;
+            foreach ($variants as &$v) {
+                $v['quantity'] = $v['quantity'] !== null ? (int) $v['quantity'] : null;
+                $v['stock'] = $v['quantity'];
+                $type = $v['type_name'] ?? 'Default';
+                $value = $v['value'] ?? 'Default';
+                $v['variant_options'] = [
+                    'type'  => $type,
+                    'value' => $value,
+                    'label' => $type . ': ' . $value,
+                ];
+                $variantCount++;
+                if ($v['quantity'] !== null) {
+                    $totalStock += (int) $v['quantity'];
+                }
+            }
+            $product['variants'] = $variants;
+            $product['variant_count'] = $variantCount;
+            $product['total_stock'] = $totalStock;
+
+            // Re-calculate stock status now that we have total_stock
+            $threshold = $this->getStockThreshold();
+            if ($product['total_stock'] === null || $product['total_stock'] <= 0) {
+                $product['stock_status'] = 'out_of_stock';
+            } elseif ($product['total_stock'] <= $threshold) {
+                $product['stock_status'] = 'low_stock';
+            } else {
+                $product['stock_status'] = 'in_stock';
+            }
+
+            http_response_code(200);
+            echo json_encode(['success' => true, 'data' => $product]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     public function show($id)
     {
         try {

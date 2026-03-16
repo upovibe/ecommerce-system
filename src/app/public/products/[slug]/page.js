@@ -1,0 +1,516 @@
+import App from "@/core/App.js";
+import api from "@/services/api.js";
+import "@/components/ui/ContentDisplay.js";
+
+class PublicProductDetailsPage extends App {
+  constructor() {
+    super();
+    this.product = null;
+    this.loading = true;
+    this.error = "";
+    this.currencyCode = "USD";
+    this.gallery = [];
+    this.activeImageIndex = 0;
+    this.autoSlideTimer = null;
+    this._lastRendered = "";
+    this._routeRetries = 0;
+    this.routeParams = {};
+  }
+
+  set(key, value) {
+    this.data[key] = value;
+    if (key === "routeParams") {
+      this.routeParams = value || {};
+      this.loadProductFromRoute(true);
+    }
+    if (this.isConnected) this.updateView();
+    return this;
+  }
+
+  updateView() {
+    const next = this.render();
+    if (next === this._lastRendered) return;
+    this._lastRendered = next;
+    this.innerHTML = next;
+    this.attachEvents();
+  }
+
+  async connectedCallback() {
+    super.connectedCallback();
+    await this.loadCurrency();
+    if (this.dataset.route) {
+      try {
+        this.routeParams = JSON.parse(decodeURIComponent(this.dataset.route));
+      } catch (_) {
+        // ignore bad data
+      }
+    }
+    this.loadProductFromRoute();
+  }
+
+  disconnectedCallback() {
+    if (this.autoSlideTimer) {
+      clearInterval(this.autoSlideTimer);
+      this.autoSlideTimer = null;
+    }
+  }
+
+  async loadCurrency() {
+    try {
+      const res = await api.get("/settings/key/currency");
+      const value = res?.data?.data?.setting_value;
+      if (value) this.currencyCode = String(value).toUpperCase();
+    } catch (_) {
+      // keep default
+    }
+  }
+
+  loadProductFromRoute(force = false) {
+    const params = this.routeParams || this.get("routeParams") || {};
+    const slug = params.slug;
+    if (!slug) {
+      if (this._routeRetries < 6) {
+        this._routeRetries += 1;
+        setTimeout(() => this.loadProductFromRoute(), 60);
+        return;
+      }
+      this.loading = false;
+      this.error = "Product not found";
+      this.updateView();
+      return;
+    }
+
+    if (!force && slug === this.currentSlug && this.product) return;
+    this.currentSlug = slug;
+    this.loadProduct(slug);
+  }
+
+  async loadProduct(slug) {
+    this.loading = true;
+    this.error = "";
+    this.updateView();
+    try {
+      const res = await api.get(`/products/public/${encodeURIComponent(slug)}`);
+      this.product = res?.data?.data || null;
+      if (!this.product) this.error = "Product not found";
+    } catch (e) {
+      this.product = null;
+      this.error =
+        e?.response?.data?.message || "Unable to load this product.";
+    } finally {
+      this.loading = false;
+      this.gallery = this.buildGallery(this.product);
+      this.activeImageIndex = 0;
+      this.startAutoSlide();
+      this.updateView();
+    }
+  }
+
+  startAutoSlide() {
+    if (this.autoSlideTimer) {
+      clearInterval(this.autoSlideTimer);
+      this.autoSlideTimer = null;
+    }
+    if (this.gallery.length <= 1) return;
+    this.autoSlideTimer = setInterval(() => {
+      this.activeImageIndex =
+        (this.activeImageIndex + 1) % this.gallery.length;
+      this.updateView();
+    }, 5000);
+  }
+
+  attachEvents() {
+    const prev = this.querySelector("[data-gallery-prev]");
+    const next = this.querySelector("[data-gallery-next]");
+    const thumbs = this.querySelectorAll("[data-gallery-thumb]");
+    const dots = this.querySelectorAll("[data-gallery-dot]");
+
+    if (prev) {
+      prev.addEventListener("click", () => {
+        if (!this.gallery.length) return;
+        this.activeImageIndex =
+          (this.activeImageIndex - 1 + this.gallery.length) %
+          this.gallery.length;
+        this.updateView();
+      });
+    }
+
+    if (next) {
+      next.addEventListener("click", () => {
+        if (!this.gallery.length) return;
+        this.activeImageIndex =
+          (this.activeImageIndex + 1) % this.gallery.length;
+        this.updateView();
+      });
+    }
+
+    thumbs.forEach((thumb) => {
+      thumb.addEventListener("click", () => {
+        const idx = Number(thumb.dataset.index || 0);
+        this.activeImageIndex = idx;
+        this.updateView();
+      });
+    });
+
+    dots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        const idx = Number(dot.dataset.index || 0);
+        this.activeImageIndex = idx;
+        this.updateView();
+      });
+    });
+  }
+
+  buildGallery(product) {
+    if (!product) return [];
+    const images = [];
+    if (product.main_image) images.push(product.main_image);
+    if (Array.isArray(product.images)) {
+      product.images.forEach((img) => {
+        if (img && !images.includes(img)) images.push(img);
+      });
+    }
+    return images;
+  }
+
+  getImageUrl(path) {
+    if (!path) return "";
+    if (
+      path.startsWith("http://") ||
+      path.startsWith("https://") ||
+      path.startsWith("data:")
+    )
+      return path;
+    const baseUrl = window.location.origin;
+    if (path.startsWith("/api/")) return baseUrl + path;
+    return `${baseUrl}/api/${path.replace(/^\/+/, "")}`;
+  }
+
+  formatCurrency(value) {
+    const val = Number(value || 0);
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: this.currencyCode || "USD",
+    }).format(val);
+  }
+
+  renderVariants() {
+    const variants = Array.isArray(this.product?.variants)
+      ? this.product.variants
+      : [];
+    if (!variants.length) {
+      return `<p class="text-sm text-slate-500">No variants configured for this product.</p>`;
+    }
+
+    const grouped = variants.reduce((acc, v) => {
+      const type = v.type_name || v.variant_options?.type || "Variant";
+      if (!acc[type]) acc[type] = [];
+      acc[type].push(v);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .map(([type, items]) => {
+        const chips = items
+          .map((item) => {
+            const label = item.value || item.variant_options?.value || "N/A";
+            const qty =
+              item.quantity !== null && item.quantity !== undefined
+                ? ` • ${item.quantity} in stock`
+                : "";
+            return `<span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">${label}${qty}</span>`;
+          })
+          .join("");
+        return `
+          <div>
+            <p class="text-xs font-semibold text-slate-500 mb-2">${type}</p>
+            <div class="flex flex-wrap gap-2">${chips}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  renderDetails() {
+    const details = this.product?.details;
+    if (!details) return "";
+
+    if (typeof details === "string") {
+      const contentAttr = details.replace(/"/g, "&quot;");
+      return `<content-display content="${contentAttr}" no-styles></content-display>`;
+    }
+
+    const entries = Array.isArray(details)
+      ? details.map((item, idx) => ({
+          label: item?.label || `Detail ${idx + 1}`,
+          value: item?.value ?? item,
+        }))
+      : Object.entries(details).map(([key, value]) => ({
+          label: key,
+          value,
+        }));
+
+    return `
+      <div class="space-y-3">
+        ${entries
+          .map(
+            (entry) => `
+              <div class="flex items-start justify-between gap-6 border-b border-slate-100 pb-3">
+                <span class="text-xs font-semibold text-slate-500">${entry.label}</span>
+                <span class="text-sm font-semibold text-slate-800 text-right break-words">${entry.value ?? ""}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  renderGallery() {
+    const images = this.gallery || [];
+    const active =
+      images.length > 0 ? this.getImageUrl(images[this.activeImageIndex]) : "";
+    const dots =
+      images.length > 1
+        ? `
+          <div class="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2">
+            ${images
+              .map((_, idx) => {
+                const activeDot =
+                  idx === this.activeImageIndex
+                    ? "bg-white w-6"
+                    : "bg-white/50 w-2.5";
+                return `<button data-gallery-dot data-index="${idx}" class="h-2.5 ${activeDot} rounded-full transition-all"></button>`;
+              })
+              .join("")}
+          </div>
+        `
+        : "";
+
+    return `
+      <div class="relative rounded-3xl bg-slate-50 overflow-hidden aspect-[4/5]">
+        ${
+          active
+            ? `<img src="${active}" alt="${this.product?.name || "Product"}" class="absolute inset-0 w-full h-full object-cover transition-opacity duration-700">`
+            : `<div class="absolute inset-0 flex items-center justify-center text-slate-300 text-5xl"><i class="fas fa-image"></i></div>`
+        }
+        ${
+          images.length > 1
+            ? `
+            <button data-gallery-prev class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur text-slate-700 shadow hover:bg-white transition">
+              <i class="fas fa-chevron-left text-xs"></i>
+            </button>
+            <button data-gallery-next class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur text-slate-700 shadow hover:bg-white transition">
+              <i class="fas fa-chevron-right text-xs"></i>
+            </button>
+          `
+            : ""
+        }
+        ${dots}
+      </div>
+      ${
+        images.length > 1
+          ? `
+        <div class="grid grid-cols-4 gap-3 mt-4">
+          ${images
+            .map((img, idx) => {
+              const url = this.getImageUrl(img);
+              const activeClass =
+                idx === this.activeImageIndex
+                  ? "ring-2 ring-slate-900"
+                  : "ring-1 ring-transparent";
+              return `
+                <button data-gallery-thumb data-index="${idx}" class="relative aspect-square rounded-2xl overflow-hidden ${activeClass} transition">
+                  <img src="${url}" alt="Thumbnail ${idx + 1}" class="w-full h-full object-cover">
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      `
+          : ""
+      }
+    `;
+  }
+
+  render() {
+    if (this.loading) {
+      return `
+        <section class="max-w-6xl mx-auto px-6 py-12">
+          <div class="grid lg:grid-cols-[1.15fr_1fr] gap-10">
+            <div class="rounded-3xl bg-slate-100 animate-pulse aspect-[4/5]"></div>
+            <div class="space-y-6">
+              <div class="h-4 w-32 bg-slate-100 rounded-full animate-pulse"></div>
+              <div class="h-10 w-3/4 bg-slate-100 rounded-xl animate-pulse"></div>
+              <div class="h-6 w-40 bg-slate-100 rounded-xl animate-pulse"></div>
+              <div class="h-24 w-full bg-slate-100 rounded-2xl animate-pulse"></div>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    if (this.error || !this.product) {
+      return `
+        <section class="max-w-4xl mx-auto px-6 py-20 text-center">
+          <p class="text-sm font-semibold text-slate-400 mb-3">Product details</p>
+          <h1 class="text-3xl font-black text-slate-900 mb-4">We couldn't find that product.</h1>
+          <p class="text-slate-500 mb-8">${this.error || "Product not found."}</p>
+          <a href="/public/products" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">
+            <i class="fas fa-arrow-left text-xs"></i>
+            Back to products
+          </a>
+        </section>
+      `;
+    }
+
+    const product = this.product;
+    const price = this.formatCurrency(product.discounted_price ?? product.base_price);
+    const basePrice = this.formatCurrency(product.base_price);
+    const showPromo = product.is_on_promotion && product.promotion_details;
+    const status =
+      product.stock_status === "in_stock"
+        ? "In stock"
+        : product.stock_status === "low_stock"
+        ? "Low stock"
+        : "Out of stock";
+    const statusClass =
+      product.stock_status === "in_stock"
+        ? "bg-emerald-100 text-emerald-700"
+        : product.stock_status === "low_stock"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-rose-100 text-rose-700";
+
+    const description = product.description || "";
+    const descriptionAttr = description.replace(/"/g, "&quot;");
+
+    return `
+      <section class="max-w-6xl mx-auto px-6 py-10">
+        <div class="text-xs text-slate-500 mb-6 flex flex-wrap gap-2">
+          <a href="/" class="hover:text-slate-900">Home</a>
+          <span>/</span>
+          <a href="/public/products" class="hover:text-slate-900">Products</a>
+          <span>/</span>
+          <span class="text-slate-900 font-semibold">${product.name || "Product"}</span>
+        </div>
+
+        <div class="grid lg:grid-cols-[1.15fr_1fr] gap-12 items-start">
+          <div>
+            ${this.renderGallery()}
+          </div>
+
+          <div class="space-y-6">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 mb-2">${product.category_name || "General"}</p>
+              <h1 class="text-3xl sm:text-4xl font-black text-slate-900 leading-tight">${product.name || "Untitled Product"}</h1>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="text-2xl font-black text-slate-900">${price}</span>
+              ${
+                showPromo
+                  ? `<span class="text-sm font-semibold text-slate-400 line-through">${basePrice}</span>`
+                  : ""
+              }
+              ${
+                showPromo
+                  ? `<span class="px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">${product.promotion_details.label || "Promo"}</span>`
+                  : ""
+              }
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="px-3 py-1.5 rounded-full text-xs font-semibold ${statusClass}">${status}</span>
+              ${
+                product.total_stock !== null && product.total_stock !== undefined
+                  ? `<span class="text-xs font-semibold text-slate-500">${product.total_stock} total units</span>`
+                  : ""
+              }
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-xs text-slate-600">
+              <div class="p-3 rounded-2xl bg-white border border-slate-100">
+                <p class="text-[10px] font-semibold text-slate-400 mb-1">SKU</p>
+                <p class="font-semibold text-slate-900">${product.sku || "—"}</p>
+              </div>
+              <div class="p-3 rounded-2xl bg-white border border-slate-100">
+                <p class="text-[10px] font-semibold text-slate-400 mb-1">Product code</p>
+                <p class="font-semibold text-slate-900">${product.product_code || "—"}</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <p class="text-xs font-semibold text-slate-500 mb-1">Brand</p>
+                <p class="font-semibold text-slate-900">${product.brand_name || "—"}</p>
+              </div>
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <p class="text-xs font-semibold text-slate-500 mb-1">Material</p>
+                <p class="font-semibold text-slate-900">${product.material_name || "—"}</p>
+              </div>
+            </div>
+
+            <div class="p-5 rounded-2xl border border-slate-100 bg-white shadow-sm">
+              <p class="text-xs font-semibold text-slate-500 mb-3">Available variations</p>
+              ${this.renderVariants()}
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <button class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Add to cart</button>
+              <button class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900 transition">Save for later</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-[1fr_320px] gap-10 mt-14">
+          <div class="space-y-8">
+            <div>
+              <h2 class="text-xl font-black text-slate-900 mb-3">Product overview</h2>
+              ${
+                description
+                  ? `<content-display content="${descriptionAttr}" no-styles></content-display>`
+                  : `<p class="text-sm text-slate-500">No description has been provided for this product.</p>`
+              }
+            </div>
+
+            ${
+              this.product?.details
+                ? `
+              <div>
+                <h3 class="text-lg font-black text-slate-900 mb-3">Details</h3>
+                ${this.renderDetails()}
+              </div>
+            `
+                : ""
+            }
+          </div>
+
+          <div class="space-y-6">
+            <div class="p-6 rounded-3xl bg-slate-900 text-white">
+              <p class="text-xs font-semibold text-slate-300 mb-2">Need help?</p>
+              <h3 class="text-lg font-black mb-3">Talk to our product team</h3>
+              <p class="text-sm text-slate-300 mb-5">We can help you with sizing, custom orders, and delivery timelines.</p>
+              <a href="/profile" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-slate-900 text-xs font-semibold">
+                Contact support
+                <i class="fas fa-arrow-right text-[10px]"></i>
+              </a>
+            </div>
+
+            <div class="p-6 rounded-3xl bg-slate-50 border border-slate-100">
+              <p class="text-xs font-semibold text-slate-500 mb-2">Category</p>
+              <h4 class="text-base font-black text-slate-900 mb-4">${product.category_name || "General"}</h4>
+              <p class="text-sm text-slate-500">Explore more pieces curated under this collection.</p>
+              <a href="/public/products?category=${encodeURIComponent(product.category_name || "")}" class="inline-flex items-center gap-2 mt-4 text-xs font-semibold text-slate-900 hover:text-indigo-600">
+                View related products
+                <i class="fas fa-chevron-right text-[10px]"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+}
+
+customElements.define("app-public-product-details-page", PublicProductDetailsPage);
+export default PublicProductDetailsPage;
