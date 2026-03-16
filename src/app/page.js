@@ -81,6 +81,8 @@ export default class RootPage extends App {
       const pageWidth = track.getBoundingClientRect().width;
       const active = Math.round(track.scrollLeft / pageWidth);
       buildDots(pages, Math.min(active, pages - 1));
+      const hasOverflow = track.scrollWidth > track.clientWidth + 2;
+      track.classList.toggle("no-scrollbar", !hasOverflow);
     };
 
     if (prev) {
@@ -507,7 +509,7 @@ export default class RootPage extends App {
             <a href="/public/products" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-full">View all</a>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
             ${
               this.loading
                 ? Array(8).fill(this.renderProductSkeleton()).join("")

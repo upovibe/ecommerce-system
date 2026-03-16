@@ -1,5 +1,6 @@
 import App from "@/core/App.js";
 import "@/components/ui/Skeleton.js";
+import "@/components/ui/ContentDisplay.js";
 import api from "@/services/api.js";
 
 class ProductsPage extends App {
@@ -14,6 +15,13 @@ class ProductsPage extends App {
     this.activeCategoryId = null;
     this.activeParentCategoryId = null;
     this.activeSubcategoryId = null;
+    this.currencyCode = "USD";
+    this.pageData = null;
+    this.pageLoading = true;
+    this.bannerImages = [];
+    this.bannerIndex = 0;
+    this.bannerTimer = null;
+    this.bannerRotationMs = 5000;
     this._lastRendered = "";
     this._isInitialized = false;
   }
@@ -30,7 +38,19 @@ class ProductsPage extends App {
     super.connectedCallback();
     if (this._isInitialized) return;
     this._isInitialized = true;
-    await Promise.all([this.loadProducts(), this.loadCategoriesMeta()]);
+    await Promise.all([
+      this.loadProducts(),
+      this.loadCategoriesMeta(),
+      this.loadCurrency(),
+      this.loadPage(),
+    ]);
+  }
+
+  disconnectedCallback() {
+    if (this.bannerTimer) {
+      clearInterval(this.bannerTimer);
+      this.bannerTimer = null;
+    }
   }
 
   async loadProducts() {
@@ -68,6 +88,95 @@ class ProductsPage extends App {
     } catch (e) {
       this.categoriesMeta = [];
       this.updateView();
+    }
+  }
+
+  async loadPage() {
+    this.pageLoading = true;
+    this.updateView();
+    try {
+      const res = await api.get("/pages/slug/product");
+      this.pageData = res?.data?.data || null;
+      const banners = this.normalizeImageList(this.pageData?.banner_image);
+      const gallery = this.normalizeImageList(this.pageData?.images);
+      this.bannerImages = banners.length ? [...banners, ...gallery] : gallery;
+      this.bannerIndex = 0;
+      this.startBannerRotation();
+    } catch (e) {
+      console.error("Failed to load category page content", e);
+      this.pageData = null;
+      this.bannerImages = [];
+      this.bannerIndex = 0;
+    } finally {
+      this.pageLoading = false;
+      this.updateView();
+    }
+  }
+
+  startBannerRotation() {
+    if (this.bannerTimer) {
+      clearInterval(this.bannerTimer);
+      this.bannerTimer = null;
+    }
+    if (this.bannerImages.length <= 1) return;
+    this.bannerTimer = setInterval(() => {
+      this.bannerIndex = (this.bannerIndex + 1) % this.bannerImages.length;
+      this.updateView();
+    }, this.bannerRotationMs);
+  }
+
+  normalizeImageList(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [value];
+    }
+    return [];
+  }
+
+  renderBanner() {
+    const images = this.bannerImages || [];
+    if (!images.length) return "";
+
+    const slides = images
+      .map(
+        (img, idx) => `
+          <img
+            src="${this.getImageUrl(img)}"
+            alt="Products banner ${idx + 1}"
+            class="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${idx === this.bannerIndex ? "opacity-100" : "opacity-0"}"
+            data-banner-slide
+          >
+        `,
+      )
+      .join("");
+
+    return `
+      <div class="mb-12">
+        <div class="relative overflow-hidden rounded-[2.5rem] border border-slate-200 shadow-2xl h-[280px] sm:h-[360px]">
+          ${slides}
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/20 to-transparent"></div>
+        </div>
+      </div>
+    `;
+  }
+  async loadCurrency() {
+    try {
+      const res = await api.get("/settings/key/currency");
+      const value = res?.data?.data?.setting_value;
+      if (value) this.currencyCode = String(value).toUpperCase();
+    } catch (_) {
+      // keep default
     }
   }
 
@@ -149,6 +258,8 @@ class ProductsPage extends App {
       const pageWidth = track.getBoundingClientRect().width;
       const active = Math.round(track.scrollLeft / pageWidth);
       buildDots(pages, Math.min(active, pages - 1));
+      const hasOverflow = track.scrollWidth > track.clientWidth + 2;
+      track.classList.toggle("no-scrollbar", !hasOverflow);
     };
 
     if (prev) {
@@ -180,7 +291,10 @@ class ProductsPage extends App {
 
   formatCurrency(value) {
     const val = Number(value || 0);
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: this.currencyCode || "USD",
+    }).format(val);
   }
 
   getFilteredProducts() {
@@ -256,7 +370,7 @@ class ProductsPage extends App {
             <i class="fas fa-chevron-right text-xs"></i>
           </button>
           <div class="flex items-center gap-3 overflow-x-auto pb-2 -mx-2 px-2 scroll-smooth" data-carousel-track="product-subcategories">
-          <div data-subcategory-id="all" class="group flex-[1_1_160px] min-w-[160px] max-w-[220px] cursor-pointer">
+          <div data-subcategory-id="all" class="group cursor-pointer" style="flex: 0 0 calc((100% - 48px) / 5); min-width: 160px; max-width: 220px;">
             <div class="w-full aspect-square rounded-2xl border border-slate-200 bg-slate-900 text-white flex items-center justify-center shadow-sm group-hover:shadow-lg transition-all">
               <i class="fas fa-layer-group text-3xl"></i>
             </div>
@@ -266,7 +380,7 @@ class ProductsPage extends App {
             .map((sub) => {
               const image = this.getImageUrl(sub.image);
               return `
-                <div data-subcategory-id="${sub.id}" class="group flex-[1_1_160px] min-w-[160px] max-w-[220px] cursor-pointer">
+                <div data-subcategory-id="${sub.id}" class="group cursor-pointer" style="flex: 0 0 calc((100% - 48px) / 5); min-width: 160px; max-width: 220px;">
                   <div class="w-full aspect-square rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden shadow-sm group-hover:shadow-lg transition-all">
                     ${
                       image
@@ -292,6 +406,12 @@ class ProductsPage extends App {
       Array.isArray(this.categories) && this.categories.length
         ? this.categories
         : ["All"];
+    const pageContent = this.pageData?.content || "";
+    const pageContentAttr = pageContent.replace(/"/g, "&quot;");
+    const title = this.pageData?.title || "Premium Collection";
+    const subtitle =
+      this.pageData?.subtitle ||
+      "Browse our curated selection of high-quality products across all categories. Designed for excellence, built for you.";
 
     return `
       <div class="py-20 px-8 max-w-7xl mx-auto">
@@ -299,14 +419,28 @@ class ProductsPage extends App {
           <div class="flex items-center gap-3 text-indigo-600 font-semibold text-xs mb-2">
             <span class="w-8 h-px bg-indigo-600"></span> Vast Catalog
           </div>
-          <h1 class="text-6xl font-black text-slate-900 tracking-tighter">Premium <span class="text-indigo-600">Collection</span></h1>
-          <p class="text-slate-500 mt-4 text-lg font-medium max-w-2xl">Browse our curated selection of high-quality products across all categories. Designed for excellence, built for you.</p>
+          <h1 class="text-6xl font-black text-slate-900 tracking-tighter">${title}</h1>
+          <p class="text-slate-500 mt-4 text-lg font-medium max-w-2xl">${subtitle}</p>
         </header>
+
+        ${this.renderBanner()}
+
+        ${
+          pageContent
+            ? `
+            <div class="mb-12">
+              <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+                <content-display content="${pageContentAttr}" no-styles></content-display>
+              </div>
+            </div>
+          `
+            : ""
+        }
 
         ${this.renderSubcategoriesRow()}
 
         <!-- Products Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
           ${this.loading
             ? Array(8)
                 .fill(
