@@ -802,7 +802,15 @@ class ProductsPage extends App {
           </div>
         `,
         type: `<span class="capitalize text-xs px-2 py-0.5 rounded-full font-medium ${p.type === "physical" ? "bg-blue-50 text-blue-600" : p.type === "digital" ? "bg-purple-50 text-purple-600" : "bg-teal-50 text-teal-600"}">${p.type}</span>`,
-        price: this.fmt(p.base_price),
+        price: p.is_on_promotion 
+          ? `<div class="flex flex-col">
+               <span class="text-[10px] text-slate-400 line-through leading-none mb-1">${this.fmt(p.base_price)}</span>
+               <span class="text-sm font-bold text-rose-600 leading-none">${this.fmt(p.discounted_price)}</span>
+               <div class="mt-1 flex items-center gap-1">
+                 <span class="text-[8px] font-black bg-rose-500 text-white px-1 py-0.5 rounded leading-none uppercase tracking-tighter">-${p.promotion_details?.label || ''}</span>
+               </div>
+             </div>`
+          : `<span class="font-bold text-slate-700">${this.fmt(p.base_price)}</span>`,
         variants: p.variant_count,
         stock: p.total_stock,
         status: p.is_active
@@ -816,8 +824,9 @@ class ProductsPage extends App {
       { key: "image", label: "Image" },
       { key: "name", label: "Product & Identifiers" },
       { key: "type", label: "Type" },
-      { key: "price", label: "Price", html: false },
+      { key: "price", label: "Price", html: true },
       { key: "variants", label: "Variants", html: false },
+
       { key: "stock", label: "Stock", html: false },
       { key: "status", label: "Status" },
     ];

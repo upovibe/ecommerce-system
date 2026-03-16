@@ -21,7 +21,7 @@ return [
     'app_url' => 'http://localhost:8002',
 ]; 
 
-// cd ecommerce-system; php -S localhost:8081           # Run server
+// cd ecommerce-system; php -S localhost:8002         # Run server
 
 // cd ecommerce-system; php api/index.php --help       # Show help
 

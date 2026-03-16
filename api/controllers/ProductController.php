@@ -53,14 +53,31 @@ class ProductController
                     m.name  AS material_name,
                     p.created_by,
                     p.updated_by,
-                    COUNT(v.id)          AS variant_count,
-                    COALESCE(SUM(COALESCE(v.quantity, 0)), 0) AS total_stock
+                    v.variant_count,
+                    v.total_stock,
+                    promo.id AS promotion_id,
+                    promo.name AS promotion_name,
+                    promo.discount_type,
+                    promo.discount_value,
+                    promo.start_date AS promotion_start,
+                    promo.end_date AS promotion_end
                 FROM products p
                 LEFT JOIN categories c   ON c.id = p.category_id
                 LEFT JOIN brands b       ON b.id = p.brand_id
                 LEFT JOIN materials m    ON m.id = p.material_id
-                LEFT JOIN product_variants v ON v.product_id = p.id
-                GROUP BY p.id
+                LEFT JOIN (
+                    SELECT product_id, COUNT(id) AS variant_count, COALESCE(SUM(COALESCE(quantity, 0)), 0) AS total_stock
+                    FROM product_variants
+                    GROUP BY product_id
+                ) v ON v.product_id = p.id
+                LEFT JOIN (
+                    SELECT pp.product_id, pr.id, pr.name, pr.discount_type, pr.discount_value, pr.start_date, pr.end_date
+                    FROM product_promotions pp
+                    JOIN promotions pr ON pr.id = pp.promotion_id
+                    WHERE pr.status = 'active' 
+                      AND pr.start_date <= NOW() 
+                      AND pr.end_date >= NOW()
+                ) promo ON promo.product_id = p.id
                 ORDER BY p.created_at DESC
             ");
             $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -103,15 +120,32 @@ class ProductController
                     b.name  AS brand_name,
                     p.material_id,
                     m.name  AS material_name,
-                    COUNT(v.id)          AS variant_count,
-                    COALESCE(SUM(COALESCE(v.quantity, 0)), 0) AS total_stock
+                    v.variant_count,
+                    v.total_stock,
+                    promo.id AS promotion_id,
+                    promo.name AS promotion_name,
+                    promo.discount_type,
+                    promo.discount_value,
+                    promo.start_date AS promotion_start,
+                    promo.end_date AS promotion_end
                 FROM products p
                 LEFT JOIN categories c   ON c.id = p.category_id
                 LEFT JOIN brands b       ON b.id = p.brand_id
                 LEFT JOIN materials m    ON m.id = p.material_id
-                LEFT JOIN product_variants v ON v.product_id = p.id
+                LEFT JOIN (
+                    SELECT product_id, COUNT(id) AS variant_count, COALESCE(SUM(COALESCE(quantity, 0)), 0) AS total_stock
+                    FROM product_variants
+                    GROUP BY product_id
+                ) v ON v.product_id = p.id
+                LEFT JOIN (
+                    SELECT pp.product_id, pr.id, pr.name, pr.discount_type, pr.discount_value, pr.start_date, pr.end_date
+                    FROM product_promotions pp
+                    JOIN promotions pr ON pr.id = pp.promotion_id
+                    WHERE pr.status = 'active' 
+                      AND pr.start_date <= NOW() 
+                      AND pr.end_date >= NOW()
+                ) promo ON promo.product_id = p.id
                 WHERE p.is_active = 1 AND p.status = 'active'
-                GROUP BY p.id
                 ORDER BY p.created_at DESC
             ");
             $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -141,11 +175,25 @@ class ProductController
                     p.*,
                     c.name  AS category_name,
                     b.name  AS brand_name,
-                    m.name  AS material_name
+                    m.name  AS material_name,
+                    promo.id AS promotion_id,
+                    promo.name AS promotion_name,
+                    promo.discount_type,
+                    promo.discount_value,
+                    promo.start_date AS promotion_start,
+                    promo.end_date AS promotion_end
                 FROM products p
                 LEFT JOIN categories c ON c.id = p.category_id
                 LEFT JOIN brands b     ON b.id = p.brand_id
                 LEFT JOIN materials m  ON m.id = p.material_id
+                LEFT JOIN (
+                    SELECT pp.product_id, pr.id, pr.name, pr.discount_type, pr.discount_value, pr.start_date, pr.end_date
+                    FROM product_promotions pp
+                    JOIN promotions pr ON pr.id = pp.promotion_id
+                    WHERE pr.status = 'active' 
+                      AND pr.start_date <= NOW() 
+                      AND pr.end_date >= NOW()
+                ) promo ON promo.product_id = p.id
                 WHERE p.id = ?
             ");
             $stmt->execute([$id]);
@@ -606,6 +654,33 @@ class ProductController
         $p['sku']           = $p['sku'] ?? null;
         $p['variant_count'] = isset($p['variant_count']) ? (int) $p['variant_count'] : null;
         $p['total_stock']   = isset($p['total_stock'])   ? (int) $p['total_stock']   : null;
+        
+        // Promotion processing
+        $p['is_on_promotion'] = !empty($p['promotion_id']);
+        if ($p['is_on_promotion']) {
+            $p['discount_value'] = (float) $p['discount_value'];
+            $p['discounted_price'] = $p['base_price'];
+            
+            if ($p['discount_type'] === 'percentage') {
+                $p['discounted_price'] = $p['base_price'] * (1 - ($p['discount_value'] / 100));
+            } else if ($p['discount_type'] === 'fixed') {
+                $p['discounted_price'] = max(0, $p['base_price'] - $p['discount_value']);
+            }
+            
+            $p['promotion_details'] = [
+                'id' => (int) $p['promotion_id'],
+                'name' => $p['promotion_name'],
+                'type' => $p['discount_type'],
+                'value' => $p['discount_value'],
+                'start_date' => $p['promotion_start'],
+                'end_date' => $p['promotion_end'],
+                'label' => $p['discount_type'] === 'percentage' ? $p['discount_value'] . '%' : '$' . $p['discount_value']
+            ];
+        } else {
+            $p['discounted_price'] = $p['base_price'];
+            $p['promotion_details'] = null;
+        }
+
         foreach (['brand_id', 'material_id', 'category_id', 'created_by', 'updated_by'] as $col) {
             if (isset($p[$col])) $p[$col] = $p[$col] ? (int)$p[$col] : null;
         }

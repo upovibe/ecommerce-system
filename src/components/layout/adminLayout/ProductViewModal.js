@@ -193,12 +193,32 @@ class ProductViewModal extends HTMLElement {
             </div>
             <div class="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
               <h2 class="text-3xl font-extrabold text-white tracking-tight">${p.name || "Product"}</h2>
+              ${p.is_on_promotion ? `
+                <div class="bg-rose-600 text-white px-3 py-1.5 rounded-xl font-black text-sm shadow-lg border border-rose-400/50 animate-bounce">
+                  -${p.promotion_details?.label}
+                </div>
+              ` : ''}
             </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="size-10 rounded-xl bg-slate-50 flex items-center justify-center">
+                  <i class="fas fa-tag ${p.is_on_promotion ? "text-rose-500" : "text-emerald-500"} text-base"></i>
+                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Price</span>
+              </div>
+              ${p.is_on_promotion ? `
+                <div class="flex flex-col">
+                  <span class="text-sm text-slate-400 line-through leading-none mb-1">${this.formatCurrency(p.base_price)}</span>
+                  <p class="text-2xl font-black text-rose-600 tracking-tight leading-none">${this.formatCurrency(p.discounted_price)}</p>
+                </div>
+              ` : `
+                <p class="text-2xl font-black text-slate-900 tracking-tight">${this.formatCurrency(p.base_price)}</p>
+              `}
+            </div>
             ${[
-              { label: "Price", value: this.formatCurrency(p.base_price), icon: "fa-tag", color: "text-emerald-500" },
               { label: "Total Stock", value: p.total_stock ?? 0, icon: "fa-cubes", color: "text-blue-500" },
               { label: "Variants", value: p.variant_count ?? (Array.isArray(p.variants) ? p.variants.length : 0), icon: "fa-layer-group", color: "text-purple-500" },
               { label: "Product Type", value: p.type || "Physical", icon: "fa-shapes", color: "text-indigo-500" },
@@ -214,6 +234,31 @@ class ProductViewModal extends HTMLElement {
               </div>
             `).join("")}
           </div>
+
+          ${p.is_on_promotion ? `
+            <div class="bg-rose-50 rounded-2xl border border-rose-100 p-4 shadow-sm relative overflow-hidden">
+              <div class="absolute -right-4 -top-4 size-24 bg-rose-200/20 rounded-full blur-2xl"></div>
+              <div class="flex items-center gap-3 mb-4 relative">
+                <div class="size-10 rounded-xl bg-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                  <i class="fas fa-fire text-lg"></i>
+                </div>
+                <div>
+                  <h3 class="font-bold text-rose-900 text-lg leading-tight">Active Promotion</h3>
+                  <p class="text-xs text-rose-600 font-medium">Extra savings applied automatically</p>
+                </div>
+              </div>
+              <div class="bg-white/60 backdrop-blur rounded-xl p-3 border border-rose-100 flex items-center justify-between">
+                <div>
+                  <div class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-0.5">Campaign Name</div>
+                  <div class="text-sm font-bold text-rose-900">${p.promotion_details?.name}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-0.5">Offer</div>
+                  <div class="text-sm font-black text-rose-600">${p.promotion_details?.label} OFF</div>
+                </div>
+              </div>
+            </div>
+          ` : ''}
 
           <div class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
             <div class="flex items-center gap-3 mb-4">
