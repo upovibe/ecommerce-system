@@ -56,6 +56,12 @@ class CustomerLoginPage extends App {
       });
 
       setTimeout(() => {
+        const redirect = localStorage.getItem("post_login_redirect");
+        if (redirect) {
+          localStorage.removeItem("post_login_redirect");
+          window.location.href = redirect;
+          return;
+        }
         window.location.href = "/profile";
       }, 600);
     } catch (error) {

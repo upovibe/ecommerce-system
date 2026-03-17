@@ -115,6 +115,7 @@ Router::post('/orders', 'OrderController@createFromCart');
 Router::get('/orders', 'OrderController@index');
 Router::get('/orders/{id}', 'OrderController@show');
 Router::put('/orders/{id}', 'OrderController@update');
+Router::post('/orders/guest', 'OrderController@createGuestOrder');
 
 // Settings Management Routes (admin only for create/update/delete, public for view)
 Router::get('/settings', 'SettingController@index');

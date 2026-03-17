@@ -37,4 +37,10 @@ class EmailService
         error_log("Email to $to: Hello $name, your verification code is: $code (expires in 15 minutes).");
         return true;
     }
+
+    public function sendOrderReceipt($to, $name, $orderId, $totalAmount)
+    {
+        error_log("Email to $to: Hello $name, your order #$orderId has been received. Total: $totalAmount.");
+        return true;
+    }
 }

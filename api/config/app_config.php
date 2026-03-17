@@ -16,9 +16,15 @@ return [
         'from_address' => 'info@piwcfranklincitytn.org',
         'from_name' => 'PIWC-FC',
     ],
+    'paystack' => [
+        'secret_key' => 'sk_test_2fce1f3cb5afe10c9245611c792e0ff557ec6f90',
+        'public_key' => 'pk_test_241d946866cc647b13f3263c8ee149ea844aa995',
+        'api_url' => 'https://api.paystack.co',
+    ],
     'client_url' => 'http://localhost:8002',
     'api_url' => 'http://localhost:8002/api',
     'app_url' => 'http://localhost:8002',
+
 ]; 
 
 // cd ecommerce-system; php -S localhost:8002         # Run server

@@ -1,6 +1,10 @@
 import App from "@/core/App.js";
 import api from "@/services/api.js";
 import "@/components/ui/ContentDisplay.js";
+import "@/components/ui/Modal.js";
+import "@/components/ui/Input.js";
+import "@/components/ui/Dropdown.js";
+import "@/components/ui/Textarea.js";
 import "@/components/ui/Toast.js";
 
 class PublicProductDetailsPage extends App {
@@ -17,6 +21,19 @@ class PublicProductDetailsPage extends App {
     this.allowedPaymentModes = [];
     this._checkoutLoading = false;
     this.allowLogin = true;
+    this.guestCheckoutOpen = false;
+    this.guestCheckoutSubmitting = false;
+    this.guestOrderItems = [];
+    this.guestCheckoutSource = "single";
+    this.guestOrderType = "";
+    this.guestPaymentMode = "";
+    this.guestForm = {
+      name: "",
+      email: "",
+      phone: "",
+      address: "",
+      note: "",
+    };
     this._lastRendered = "";
     this._routeRetries = 0;
     this.routeParams = {};
@@ -214,6 +231,13 @@ class PublicProductDetailsPage extends App {
     if (addBtn) addBtn.addEventListener("click", () => this.handleAddToCart());
     if (buyBtn) buyBtn.addEventListener("click", () => this.handleBuyNow());
     if (wishBtn) wishBtn.addEventListener("click", () => this.handleWishlist());
+
+    const guestCancel = this.querySelector("[data-guest-checkout-cancel]");
+    const guestSubmit = this.querySelector("[data-guest-checkout-submit]");
+    if (guestCancel)
+      guestCancel.addEventListener("click", () => this.closeGuestCheckout());
+    if (guestSubmit)
+      guestSubmit.addEventListener("click", () => this.submitGuestCheckout());
   }
 
   buildGallery(product) {
@@ -252,6 +276,7 @@ class PublicProductDetailsPage extends App {
   ensureAuth() {
     const token = localStorage.getItem("token");
     if (token) return true;
+    this.setPostLoginRedirect();
     window.Toast?.show?.({
       title: "Sign in required",
       message: "Please sign in to continue.",
@@ -263,16 +288,190 @@ class PublicProductDetailsPage extends App {
     return false;
   }
 
+  setPostLoginRedirect() {
+    const current = `${window.location.pathname}${window.location.search || ""}`;
+    localStorage.setItem("post_login_redirect", current);
+  }
+
+  handleGuestInputChange(field, value) {
+    this.guestForm[field] = value;
+  }
+
+  addToGuestWishlist(product) {
+    if (!product) return;
+    let list = [];
+    try {
+      list = JSON.parse(localStorage.getItem("guest_wishlist") || "[]");
+    } catch (_) {
+      list = [];
+    }
+    if (!Array.isArray(list)) list = [];
+    if (list.some((item) => Number(item.product_id) === Number(product.id))) {
+      return;
+    }
+    list.push({
+      product_id: product.id,
+      product_name: product.name,
+      main_image: product.main_image,
+      base_price: product.base_price,
+    });
+    localStorage.setItem("guest_wishlist", JSON.stringify(list));
+  }
+
+  openGuestCheckout(items = [], source = "single") {
+    this.guestOrderItems = Array.isArray(items) ? items : [];
+    this.guestCheckoutSource = source;
+    this.guestOrderType =
+      this.allowedOrderTypes[0] ||
+      (this.product?.type === "service" ? "service" : "delivery");
+    this.guestPaymentMode = this.allowedPaymentModes[0] || "pay_on_delivery";
+    this.guestCheckoutOpen = true;
+    this.updateView();
+  }
+
+  closeGuestCheckout() {
+    this.guestCheckoutOpen = false;
+    this.updateView();
+  }
+
+  async submitGuestCheckout() {
+    if (this.guestCheckoutSubmitting) return;
+    if (!this.guestOrderItems.length) {
+      window.Toast?.show?.({
+        title: "Cart empty",
+        message: "Please add an item before checking out.",
+        variant: "warning",
+      });
+      return;
+    }
+    const { name, email, phone, address } = this.guestForm;
+    if (!name || !email || !phone || !address) {
+      window.Toast?.show?.({
+        title: "Missing details",
+        message: "Please complete the required customer fields.",
+        variant: "error",
+      });
+      return;
+    }
+
+    this.guestCheckoutSubmitting = true;
+    this.updateView();
+    try {
+      await api.post("/orders/guest", {
+        customer: {
+          name,
+          email,
+          phone,
+          address,
+          note: this.guestForm.note || "",
+        },
+        items: this.guestOrderItems.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity || 1,
+          variant_id: item.variant_id || null,
+        })),
+        order_type:
+          this.guestOrderType ||
+          this.allowedOrderTypes[0] ||
+          (this.product?.type === "service" ? "service" : "delivery"),
+        payment_mode:
+          this.guestPaymentMode ||
+          this.allowedPaymentModes[0] ||
+          "pay_on_delivery",
+      });
+
+      if (this.guestCheckoutSource === "cart") {
+        localStorage.removeItem("guest_cart");
+        localStorage.setItem("cart_count", "0");
+      }
+      window.Toast?.show?.({
+        title: "Order placed",
+        message: "Your order has been received. A receipt was sent to your email.",
+        variant: "success",
+      });
+      this.guestCheckoutOpen = false;
+    } catch (e) {
+      window.Toast?.show?.({
+        title: "Checkout failed",
+        message: e.response?.data?.message || "Unable to place order.",
+        variant: "error",
+      });
+      this.guestCheckoutOpen = true;
+    } finally {
+      this.guestCheckoutSubmitting = false;
+      this.updateView();
+    }
+  }
+
+  addToGuestCart(product, quantity = 1) {
+    if (!product) return;
+    const raw = localStorage.getItem("guest_cart");
+    let items = [];
+    try {
+      items = raw ? JSON.parse(raw) : [];
+    } catch (_) {
+      items = [];
+    }
+    if (!Array.isArray(items)) items = [];
+
+    const existing = items.find(
+      (i) => Number(i.product_id) === Number(product.id),
+    );
+    if (existing) {
+      existing.quantity = Number(existing.quantity || 0) + Number(quantity || 1);
+    } else {
+      items.push({
+        id: `g_${product.id}`,
+        product_id: product.id,
+        product_name: product.name,
+        main_image: product.main_image,
+        category_name: product.category_name,
+        unit_price: product.discounted_price ?? product.base_price,
+        quantity: Number(quantity || 1),
+      });
+    }
+
+    localStorage.setItem("guest_cart", JSON.stringify(items));
+    localStorage.setItem(
+      "cart_count",
+      String(items.reduce((sum, i) => sum + (Number(i.quantity || 0) || 0), 0)),
+    );
+    this.emitCartUpdated();
+  }
+
+  emitCartUpdated() {
+    const evt = new CustomEvent("cart:updated");
+    window.dispatchEvent(evt);
+    document.dispatchEvent(evt);
+    const layout = document.querySelector("app-public-layout");
+    if (layout?.updateCartBadge) layout.updateCartBadge();
+  }
+
   async handleAddToCart() {
     if (!this.product) return;
-    if (!this.ensureAuth()) return;
     if (this._checkoutLoading) return;
     this._checkoutLoading = true;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      this.addToGuestCart(this.product, 1);
+      window.Toast?.show?.({
+        title: "Added",
+        message: "Item added to cart.",
+        variant: "success",
+      });
+      this._checkoutLoading = false;
+      return;
+    }
     try {
       await api.post("/cart/items", {
         product_id: this.product.id,
         quantity: 1,
       });
+      localStorage.setItem(
+        "cart_count",
+        String((parseInt(localStorage.getItem("cart_count") || "0", 10) || 0) + 1),
+      );
+      this.emitCartUpdated();
       window.Toast?.show?.({
         title: "Added",
         message: "Item added to cart.",
@@ -291,10 +490,36 @@ class PublicProductDetailsPage extends App {
 
   async handleBuyNow() {
     if (!this.product) return;
-    if (!this.ensureAuth()) return;
     if (this._checkoutLoading) return;
     this._checkoutLoading = true;
     try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        if (this.allowLogin) {
+          this.setPostLoginRedirect();
+          window.Toast?.show?.({
+            title: "Account required",
+            message: "Create an account to complete checkout.",
+            variant: "warning",
+          });
+          setTimeout(() => {
+            window.location.href = "/auth/customer-signup";
+          }, 600);
+        } else {
+          this.openGuestCheckout(
+            [
+              {
+                product_id: this.product.id,
+                quantity: 1,
+                variant_id: null,
+              },
+            ],
+            "single",
+          );
+        }
+        return;
+      }
+
       await api.post("/cart/items", {
         product_id: this.product.id,
         quantity: 1,
@@ -331,21 +556,43 @@ class PublicProductDetailsPage extends App {
 
   async handleWishlist() {
     if (!this.product) return;
-    if (!this.ensureAuth()) return;
-    try {
-      await api.post("/wishlist/items", { product_id: this.product.id });
-      window.Toast?.show?.({
-        title: "Saved",
-        message: "Added to wishlist.",
-        variant: "success",
-      });
-    } catch (e) {
-      window.Toast?.show?.({
-        title: "Error",
-        message: e.response?.data?.message || "Failed to add to wishlist.",
-        variant: "error",
-      });
+    if (this.allowLogin) {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        this.setPostLoginRedirect();
+        window.Toast?.show?.({
+          title: "Sign in required",
+          message: "Please sign in to save items.",
+          variant: "warning",
+        });
+        setTimeout(() => {
+          window.location.href = "/auth/customer-login";
+        }, 600);
+        return;
+      }
+      try {
+        await api.post("/wishlist/items", { product_id: this.product.id });
+        window.Toast?.show?.({
+          title: "Saved",
+          message: "Added to wishlist.",
+          variant: "success",
+        });
+      } catch (e) {
+        window.Toast?.show?.({
+          title: "Error",
+          message: e.response?.data?.message || "Failed to add to wishlist.",
+          variant: "error",
+        });
+      }
+      return;
     }
+
+    this.addToGuestWishlist(this.product);
+    window.Toast?.show?.({
+      title: "Saved",
+      message: "Added to wishlist.",
+      variant: "success",
+    });
   }
 
   renderVariants() {
@@ -487,6 +734,61 @@ class PublicProductDetailsPage extends App {
     `;
   }
 
+  renderGuestCheckoutModal() {
+    const orderTypes = this.allowedOrderTypes.length
+      ? this.allowedOrderTypes
+      : ["delivery", "service"];
+    const paymentModes = this.allowedPaymentModes.length
+      ? this.allowedPaymentModes
+      : ["pay_on_delivery", "pay_before_delivery", "in_person"];
+    return `
+      <ui-modal id="guest-checkout-modal" ${this.guestCheckoutOpen ? "open" : ""} position="right" size="md">
+        <div slot="title">Guest checkout</div>
+        <div class="space-y-4">
+          <p class="text-xs text-slate-500">Complete your order without signing in. A receipt will be emailed to you.</p>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Full name</label>
+            <ui-input value="${this.guestForm.name}" placeholder="Jane Doe" oninput="this.closest('app-public-product-details-page').handleGuestInputChange('name', this.value)"></ui-input>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Email</label>
+            <ui-input type="email" value="${this.guestForm.email}" placeholder="you@email.com" oninput="this.closest('app-public-product-details-page').handleGuestInputChange('email', this.value)"></ui-input>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Phone</label>
+            <ui-input value="${this.guestForm.phone}" placeholder="+1 555 000 000" oninput="this.closest('app-public-product-details-page').handleGuestInputChange('phone', this.value)"></ui-input>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Delivery address</label>
+            <ui-textarea rows="3" value="${this.guestForm.address}" placeholder="Street, City, State" oninput="this.closest('app-public-product-details-page').handleGuestInputChange('address', this.value)"></ui-textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1">Order type</label>
+              <ui-dropdown value="${this.guestOrderType || orderTypes[0]}" onchange="this.closest('app-public-product-details-page').guestOrderType = event.detail.value">
+                ${orderTypes.map((t) => `<ui-option value="${t}">${t}</ui-option>`).join("")}
+              </ui-dropdown>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1">Payment mode</label>
+              <ui-dropdown value="${this.guestPaymentMode || paymentModes[0]}" onchange="this.closest('app-public-product-details-page').guestPaymentMode = event.detail.value">
+                ${paymentModes.map((m) => `<ui-option value="${m}">${m}</ui-option>`).join("")}
+              </ui-dropdown>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">Notes (optional)</label>
+            <ui-textarea rows="2" value="${this.guestForm.note}" placeholder="Add delivery instructions" oninput="this.closest('app-public-product-details-page').handleGuestInputChange('note', this.value)"></ui-textarea>
+          </div>
+        </div>
+        <button slot="footer" class="secondary" data-guest-checkout-cancel>Cancel</button>
+        <button slot="footer" class="primary" data-guest-checkout-submit ${this.guestCheckoutSubmitting ? "disabled" : ""}>
+          ${this.guestCheckoutSubmitting ? "Placing..." : "Place order"}
+        </button>
+      </ui-modal>
+    `;
+  }
+
   render() {
     if (this.loading) {
       return `
@@ -609,21 +911,11 @@ class PublicProductDetailsPage extends App {
               ${this.renderVariants()}
             </div>
 
-            ${
-              this.allowLogin
-                ? `
-              <div class="flex flex-wrap items-center gap-3">
-                <button data-add-to-cart class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Add to cart</button>
-                <button data-buy-now class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900 transition">Buy now</button>
-                <button data-save-wishlist class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition">Save to wishlist</button>
-              </div>
-            `
-                : `
-              <div class="p-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm text-slate-500">
-                Customer login is disabled. Cart and wishlist actions are unavailable.
-              </div>
-            `
-            }
+            <div class="flex flex-wrap items-center gap-3">
+              <button data-add-to-cart class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Add to cart</button>
+              <button data-buy-now class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900 transition">Buy now</button>
+              <button data-save-wishlist class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition">Save to wishlist</button>
+            </div>
           </div>
         </div>
 
@@ -673,6 +965,7 @@ class PublicProductDetailsPage extends App {
           </div>
         </div>
       </section>
+      ${this.renderGuestCheckoutModal()}
     `;
   }
 }
