@@ -6,6 +6,8 @@ require_once __DIR__ . '/../core/Router.php';
 // Authentication routes (public - no middleware needed)
 Router::post('/auth/login', 'AuthController@login');
 Router::post('/auth/logout', 'AuthController@logout');
+Router::post('/auth/register', 'AuthController@register');
+Router::post('/auth/verify-registration', 'AuthController@verifyRegistration');
 Router::post('/auth/refresh', 'AuthController@refresh');
 Router::post('/auth/forgot-password', 'AuthController@forgotPassword');
 Router::post('/auth/reset-password', 'AuthController@resetPassword');
@@ -96,6 +98,23 @@ Router::delete('/products/{id}', 'ProductController@destroy');
 Router::post('/products/{id}/upload-image', 'ProductController@uploadImage');
 Router::post('/products/{id}/upload-gallery', 'ProductController@uploadGallery');
 Router::put('/products/{id}/toggle-active', 'ProductController@toggleActive');
+
+// Cart & Wishlist (user)
+Router::get('/cart', 'CartController@index');
+Router::post('/cart/items', 'CartController@addItem');
+Router::put('/cart/items/{id}', 'CartController@updateItem');
+Router::delete('/cart/items/{id}', 'CartController@removeItem');
+Router::delete('/cart/clear', 'CartController@clear');
+
+Router::get('/wishlist', 'WishlistController@index');
+Router::post('/wishlist/items', 'WishlistController@addItem');
+Router::delete('/wishlist/items/{id}', 'WishlistController@removeItem');
+
+// Orders (user)
+Router::post('/orders', 'OrderController@createFromCart');
+Router::get('/orders', 'OrderController@index');
+Router::get('/orders/{id}', 'OrderController@show');
+Router::put('/orders/{id}', 'OrderController@update');
 
 // Settings Management Routes (admin only for create/update/delete, public for view)
 Router::get('/settings', 'SettingController@index');

@@ -9,6 +9,8 @@ class Migration_20260302000005createorderstable {
             total_amount DECIMAL(15, 2) NOT NULL,
             status VARCHAR(50) DEFAULT 'pending',
             payment_method VARCHAR(50) DEFAULT 'delivery',
+            order_type VARCHAR(50) DEFAULT 'delivery',
+            payment_mode VARCHAR(50) DEFAULT 'pay_on_delivery',
             metadata JSON NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

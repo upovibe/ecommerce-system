@@ -21,6 +21,7 @@ class ProductsPage extends App {
     this.currencyCode = "USD";
     this.pageData = null;
     this.pageLoading = true;
+    this.allowLogin = true;
     this.bannerImages = [];
     this.bannerIndex = 0;
     this.bannerTimer = null;
@@ -53,6 +54,7 @@ class ProductsPage extends App {
       this.loadCategoriesMeta(),
       this.loadCurrency(),
       this.loadPage(),
+      this.loadLoginSetting(),
     ]);
   }
 
@@ -107,6 +109,16 @@ class ProductsPage extends App {
       if (value) this.currencyCode = String(value).toUpperCase();
     } catch (_) {
       // keep default
+    }
+  }
+
+  async loadLoginSetting() {
+    try {
+      const res = await api.get("/settings/key/enable_user_login");
+      const raw = String(res?.data?.data?.setting_value ?? "1").toLowerCase();
+      this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
+    } catch (_) {
+      this.allowLogin = true;
     }
   }
 
@@ -241,6 +253,16 @@ class ProductsPage extends App {
 
     this.initCarousel("product-subcategories");
 
+    this.querySelectorAll("[data-wishlist-id]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.dataset.wishlistId;
+        if (!id) return;
+        this.addToWishlist(id);
+      });
+    });
+
     const search = this.querySelector("#product-search");
     if (search) {
       search.addEventListener("input", (e) => {
@@ -330,6 +352,35 @@ class ProductsPage extends App {
         const maxEl = this.querySelector("#price-max");
         if (maxEl) maxEl.setAttribute("value", "");
         this.updateView();
+      });
+    }
+  }
+
+  async addToWishlist(productId) {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.Toast?.show?.({
+        title: "Sign in required",
+        message: "Please sign in to save items.",
+        variant: "warning",
+      });
+      setTimeout(() => {
+        window.location.href = "/auth/customer-login";
+      }, 600);
+      return;
+    }
+    try {
+      await api.post("/wishlist/items", { product_id: Number(productId) });
+      window.Toast?.show?.({
+        title: "Saved",
+        message: "Added to wishlist.",
+        variant: "success",
+      });
+    } catch (e) {
+      window.Toast?.show?.({
+        title: "Error",
+        message: e.response?.data?.message || "Failed to add to wishlist.",
+        variant: "error",
       });
     }
   }
@@ -726,11 +777,15 @@ class ProductsPage extends App {
           <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
             <button class="w-full py-3 bg-white text-slate-900 rounded-xl font-semibold text-xs hover:bg-indigo-600 hover:text-white transition-colors">Quick View</button>
           </div>
-          <div class="absolute top-6 right-6">
-            <button class="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm">
-              <i class="far fa-heart"></i>
-            </button>
-          </div>
+          ${
+            this.allowLogin
+              ? `<div class="absolute top-6 right-6">
+                  <button data-wishlist-id="${product.id}" class="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm">
+                    <i class="far fa-heart"></i>
+                  </button>
+                </div>`
+              : ""
+          }
         </div>
         <div class="px-2 min-w-0">
           <p class="text-xs font-semibold text-indigo-600 mb-1">${category}</p>

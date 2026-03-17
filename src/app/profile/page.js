@@ -6,17 +6,33 @@ class ProfilePage extends App {
   constructor() {
     super();
     this.userData = JSON.parse(localStorage.getItem("userData")) || {};
+    this.loginEnabled = true;
   }
 
-  connectedCallback() {
+  async connectedCallback() {
     super.connectedCallback();
     document.title = "Your Profile | VastCommerce";
+    await this.loadLoginSetting();
+    if (!this.loginEnabled) {
+      window.location.href = "/";
+    }
+  }
+
+  async loadLoginSetting() {
+    try {
+      const res = await fetch("/api/settings/key/enable_user_login");
+      const data = await res.json();
+      const raw = String(data?.data?.setting_value ?? "1").toLowerCase();
+      this.loginEnabled = !(raw === "0" || raw === "false" || raw === "no");
+    } catch (_) {
+      this.loginEnabled = true;
+    }
   }
 
   handleLogout() {
     localStorage.removeItem("token");
     localStorage.removeItem("userData");
-    window.location.href = "/auth/login";
+    window.location.href = "/auth/customer-login";
   }
 
   render() {

@@ -18,7 +18,7 @@ export default {
   },
   profile: {
     requireAuth: true,
-    redirectTo: "/auth/login",
+    redirectTo: "/auth/customer-login",
   },
   public: {
     requireAuth: false,

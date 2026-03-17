@@ -31,4 +31,10 @@ class EmailService
         error_log("Email to $to: Hello $name, your verification code for changing to $newEmail is: $code (expires in 15 minutes).");
         return true;
     }
+
+    public function sendSignupVerificationCode($to, $name, $code)
+    {
+        error_log("Email to $to: Hello $name, your verification code is: $code (expires in 15 minutes).");
+        return true;
+    }
 }

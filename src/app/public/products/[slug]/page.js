@@ -1,6 +1,7 @@
 import App from "@/core/App.js";
 import api from "@/services/api.js";
 import "@/components/ui/ContentDisplay.js";
+import "@/components/ui/Toast.js";
 
 class PublicProductDetailsPage extends App {
   constructor() {
@@ -12,6 +13,10 @@ class PublicProductDetailsPage extends App {
     this.gallery = [];
     this.activeImageIndex = 0;
     this.autoSlideTimer = null;
+    this.allowedOrderTypes = [];
+    this.allowedPaymentModes = [];
+    this._checkoutLoading = false;
+    this.allowLogin = true;
     this._lastRendered = "";
     this._routeRetries = 0;
     this.routeParams = {};
@@ -38,6 +43,8 @@ class PublicProductDetailsPage extends App {
   async connectedCallback() {
     super.connectedCallback();
     await this.loadCurrency();
+    await this.loadCheckoutSettings();
+    await this.loadLoginSetting();
     if (this.dataset.route) {
       try {
         this.routeParams = JSON.parse(decodeURIComponent(this.dataset.route));
@@ -62,6 +69,47 @@ class PublicProductDetailsPage extends App {
       if (value) this.currencyCode = String(value).toUpperCase();
     } catch (_) {
       // keep default
+    }
+  }
+
+  async loadCheckoutSettings() {
+    try {
+      const [typesRes, modesRes] = await Promise.all([
+        api.get("/settings/key/allowed_order_types").catch(() => null),
+        api.get("/settings/key/allowed_payment_modes").catch(() => null),
+      ]);
+      this.allowedOrderTypes = this.parseSettingList(
+        typesRes?.data?.data?.setting_value,
+      );
+      this.allowedPaymentModes = this.parseSettingList(
+        modesRes?.data?.data?.setting_value,
+      );
+    } catch (_) {
+      this.allowedOrderTypes = [];
+      this.allowedPaymentModes = [];
+    }
+  }
+
+  async loadLoginSetting() {
+    try {
+      const res = await api.get("/settings/key/enable_user_login");
+      const raw = String(res?.data?.data?.setting_value ?? "1").toLowerCase();
+      this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
+    } catch (_) {
+      this.allowLogin = true;
+    }
+  }
+
+  parseSettingList(value) {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return String(value)
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
     }
   }
 
@@ -159,6 +207,13 @@ class PublicProductDetailsPage extends App {
         this.updateView();
       });
     });
+
+    const addBtn = this.querySelector("[data-add-to-cart]");
+    const buyBtn = this.querySelector("[data-buy-now]");
+    const wishBtn = this.querySelector("[data-save-wishlist]");
+    if (addBtn) addBtn.addEventListener("click", () => this.handleAddToCart());
+    if (buyBtn) buyBtn.addEventListener("click", () => this.handleBuyNow());
+    if (wishBtn) wishBtn.addEventListener("click", () => this.handleWishlist());
   }
 
   buildGallery(product) {
@@ -192,6 +247,105 @@ class PublicProductDetailsPage extends App {
       style: "currency",
       currency: this.currencyCode || "USD",
     }).format(val);
+  }
+
+  ensureAuth() {
+    const token = localStorage.getItem("token");
+    if (token) return true;
+    window.Toast?.show?.({
+      title: "Sign in required",
+      message: "Please sign in to continue.",
+      variant: "warning",
+    });
+    setTimeout(() => {
+      window.location.href = "/auth/customer-login";
+    }, 600);
+    return false;
+  }
+
+  async handleAddToCart() {
+    if (!this.product) return;
+    if (!this.ensureAuth()) return;
+    if (this._checkoutLoading) return;
+    this._checkoutLoading = true;
+    try {
+      await api.post("/cart/items", {
+        product_id: this.product.id,
+        quantity: 1,
+      });
+      window.Toast?.show?.({
+        title: "Added",
+        message: "Item added to cart.",
+        variant: "success",
+      });
+    } catch (e) {
+      window.Toast?.show?.({
+        title: "Error",
+        message: e.response?.data?.message || "Failed to add to cart.",
+        variant: "error",
+      });
+    } finally {
+      this._checkoutLoading = false;
+    }
+  }
+
+  async handleBuyNow() {
+    if (!this.product) return;
+    if (!this.ensureAuth()) return;
+    if (this._checkoutLoading) return;
+    this._checkoutLoading = true;
+    try {
+      await api.post("/cart/items", {
+        product_id: this.product.id,
+        quantity: 1,
+      });
+
+      const orderType =
+        this.allowedOrderTypes[0] ||
+        (this.product.type === "service" ? "service" : "delivery");
+      const paymentMode =
+        this.allowedPaymentModes[0] || "pay_on_delivery";
+
+      const res = await api.post("/orders", {
+        order_type: orderType,
+        payment_mode: paymentMode,
+      });
+      const orderId = res?.data?.order_id;
+      window.Toast?.show?.({
+        title: "Order created",
+        message: orderId
+          ? `Order #${orderId} created successfully.`
+          : "Order created successfully.",
+        variant: "success",
+      });
+    } catch (e) {
+      window.Toast?.show?.({
+        title: "Error",
+        message: e.response?.data?.message || "Failed to create order.",
+        variant: "error",
+      });
+    } finally {
+      this._checkoutLoading = false;
+    }
+  }
+
+  async handleWishlist() {
+    if (!this.product) return;
+    if (!this.ensureAuth()) return;
+    try {
+      await api.post("/wishlist/items", { product_id: this.product.id });
+      window.Toast?.show?.({
+        title: "Saved",
+        message: "Added to wishlist.",
+        variant: "success",
+      });
+    } catch (e) {
+      window.Toast?.show?.({
+        title: "Error",
+        message: e.response?.data?.message || "Failed to add to wishlist.",
+        variant: "error",
+      });
+    }
   }
 
   renderVariants() {
@@ -455,10 +609,21 @@ class PublicProductDetailsPage extends App {
               ${this.renderVariants()}
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
-              <button class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Add to cart</button>
-              <button class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900 transition">Save for later</button>
-            </div>
+            ${
+              this.allowLogin
+                ? `
+              <div class="flex flex-wrap items-center gap-3">
+                <button data-add-to-cart class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Add to cart</button>
+                <button data-buy-now class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900 transition">Buy now</button>
+                <button data-save-wishlist class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition">Save to wishlist</button>
+              </div>
+            `
+                : `
+              <div class="p-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm text-slate-500">
+                Customer login is disabled. Cart and wishlist actions are unavailable.
+              </div>
+            `
+            }
           </div>
         </div>
 

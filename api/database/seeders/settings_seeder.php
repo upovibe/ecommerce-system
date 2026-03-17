@@ -21,6 +21,8 @@ class SettingsSeeder
             ['application_favicon', '/src/assets/logo.png', 'image', 'general', 'Browser favicon / site icon'],
             ['enable_user_login', '1', 'boolean', 'general', 'Allow user login/profile on public site'],
             ['currency', 'NGN', 'text', 'localization', 'Base currency code'],
+            ['allowed_order_types', '["delivery","service"]', 'array', 'commerce', 'Allowed order fulfillment types for checkout'],
+            ['allowed_payment_modes', '["pay_on_delivery","pay_before_delivery","in_person"]', 'array', 'commerce', 'Allowed payment modes for checkout'],
             ['contact_email', 'info@vastcommerce.com', 'text', 'contact', 'Primary support email'],
             ['phone_number', '+234 800 VAST', 'text', 'contact', 'Customer service line'],
             ['social_facebook', 'https://facebook.com/vastcommerce', 'text', 'social', 'Official Facebook link'],

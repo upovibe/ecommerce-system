@@ -125,14 +125,16 @@ class PublicLayout extends App {
             </div>
             
             <div class="flex items-center gap-3">
-              <button class="w-11 h-11 flex items-center justify-center text-slate-600 hover:text-[var(--primary)] hover:bg-indigo-50 rounded-xl transition-all relative">
-                <i class="fas fa-shopping-cart text-lg"></i>
-                <span class="absolute top-2 right-2 w-4 h-4 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white" style="background:${primary}">0</span>
-              </button>
-              <div class="w-px h-6 bg-slate-100 mx-2"></div>
               ${
                 this.allowLogin
-                  ? `<a href="/profile" class="text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-slate-100" style="background:${primary}">Sign In</a>`
+                  ? `
+                <a href="/public/cart" class="w-11 h-11 flex items-center justify-center text-slate-600 hover:text-[var(--primary)] hover:bg-indigo-50 rounded-xl transition-all relative">
+                  <i class="fas fa-shopping-cart text-lg"></i>
+                  <span class="absolute top-2 right-2 w-4 h-4 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white" style="background:${primary}">0</span>
+                </a>
+                <div class="w-px h-6 bg-slate-100 mx-2"></div>
+                <a href="/auth/customer-login" class="text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-slate-100" style="background:${primary}">Sign In</a>
+              `
                   : ""
               }
             </div>

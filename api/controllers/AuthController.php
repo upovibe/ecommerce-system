@@ -127,6 +127,115 @@ class AuthController
         }
     }
 
+    public function register()
+    {
+        try {
+            $data = json_decode(file_get_contents('php://input'), true);
+
+            $firstName = trim($data['first_name'] ?? '');
+            $lastName = trim($data['last_name'] ?? '');
+            $email = trim($data['email'] ?? '');
+            $gender = $data['gender'] ?? null;
+            $dob = $data['date_of_birth'] ?? null;
+            $password = $data['password'] ?? null;
+
+            if (!$firstName || !$lastName || !$email || !$password) {
+                http_response_code(400);
+                echo json_encode(['error' => 'First name, last name, email, and password are required']);
+                return;
+            }
+
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid email address']);
+                return;
+            }
+
+            $existing = $this->userModel->findByEmail($email);
+            if ($existing) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Email already registered']);
+                return;
+            }
+
+            $name = trim($firstName . ' ' . $lastName);
+            $hashed = password_hash($password, PASSWORD_BCRYPT);
+
+            $userId = $this->userModel->create([
+                'name' => $name,
+                'email' => $email,
+                'password' => $hashed,
+                'gender' => $gender,
+                'date_of_birth' => $dob,
+                'status' => 'inactive',
+                'is_guest' => 0,
+            ]);
+
+            $code = str_pad(strval(random_int(0, 999999)), 6, '0', STR_PAD_LEFT);
+            $expires = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+            $this->pdo->prepare("DELETE FROM email_verifications WHERE user_id = ?")->execute([$userId]);
+            $stmt = $this->pdo->prepare("
+                INSERT INTO email_verifications (user_id, user_type, email, code, expires_at, created_at)
+                VALUES (?, 'customer', ?, ?, ?, NOW())
+            ");
+            $stmt->execute([$userId, $email, $code, $expires]);
+
+            $this->emailService->sendSignupVerificationCode($email, $name, $code);
+
+            echo json_encode([
+                'message' => 'Registration successful. Verification code sent.',
+                'user_id' => $userId
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    public function verifyRegistration()
+    {
+        try {
+            $data = json_decode(file_get_contents('php://input'), true);
+            $email = trim($data['email'] ?? '');
+            $code = trim($data['code'] ?? '');
+
+            if (!$email || !$code) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Email and code are required']);
+                return;
+            }
+
+            $user = $this->userModel->findByEmail($email);
+            if (!$user) {
+                http_response_code(404);
+                echo json_encode(['error' => 'User not found']);
+                return;
+            }
+
+            $stmt = $this->pdo->prepare("
+                SELECT * FROM email_verifications
+                WHERE user_id = ? AND user_type = 'customer' AND email = ? AND code = ? AND expires_at > NOW()
+                LIMIT 1
+            ");
+            $stmt->execute([$user['id'], $email, $code]);
+            $verification = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$verification) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid or expired verification code']);
+                return;
+            }
+
+            $this->userModel->update($user['id'], ['status' => 'active']);
+            $this->pdo->prepare("DELETE FROM email_verifications WHERE id = ?")->execute([$verification['id']]);
+
+            echo json_encode(['message' => 'Email verified successfully']);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
     private function generateJWT($user)
     {
         $header = base64_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));

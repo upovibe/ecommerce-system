@@ -12,6 +12,8 @@ class OrderModel extends BaseModel
         'total_amount',
         'status',
         'payment_method',
+        'order_type',
+        'payment_mode',
         'metadata'
     ];
 

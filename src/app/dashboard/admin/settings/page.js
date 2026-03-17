@@ -2,6 +2,7 @@ import App from "@/core/App.js";
 import "@/components/ui/Input.js";
 import "@/components/ui/Textarea.js";
 import "@/components/ui/Switch.js";
+import "@/components/ui/Checkbox.js";
 import "@/components/ui/FileUpload.js";
 import "@/components/ui/Button.js";
 import "@/components/ui/Skeleton.js";
@@ -119,6 +120,41 @@ class SettingsPage extends App {
     return map[cat] || cat.charAt(0).toUpperCase() + cat.slice(1);
   }
 
+  getArrayOptions(setting) {
+    if (!setting) return null;
+    const key = setting.setting_key;
+    if (key === "allowed_order_types") {
+      return [
+        { value: "delivery", label: "Delivery" },
+        { value: "service", label: "Service" },
+        { value: "pickup", label: "Pickup" },
+      ];
+    }
+    if (key === "allowed_payment_modes") {
+      return [
+        { value: "pay_on_delivery", label: "Pay on delivery" },
+        { value: "pay_before_delivery", label: "Pay before delivery" },
+        { value: "in_person", label: "Pay in person" },
+      ];
+    }
+    return null;
+  }
+
+  getArrayValue(setting) {
+    if (!setting) return [];
+    const raw = setting.setting_value;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return raw.split(",").map((v) => v.trim()).filter(Boolean);
+      }
+    }
+    return [];
+  }
+
   async saveSetting(id) {
     const setting = this.settings.find((s) => String(s.id) === String(id));
     if (!setting) return;
@@ -149,23 +185,35 @@ class SettingsPage extends App {
           });
         }
       } else if (setting.setting_type === "array") {
-        const input = card.querySelector("ui-textarea");
-        const raw = input?.getValue ? input.getValue() : input?.value;
-        let parsed;
-        try {
-          parsed = raw ? JSON.parse(raw) : [];
-        } catch (e) {
-          window.Toast?.show?.({
-            title: "Invalid JSON",
-            message: "Array settings must be valid JSON",
-            variant: "error",
+        const options = this.getArrayOptions(setting);
+        if (options) {
+          const selected = Array.from(card.querySelectorAll("ui-checkbox"))
+            .filter((el) => el.hasAttribute("checked"))
+            .map((el) => el.dataset.value)
+            .filter(Boolean);
+          await api.put(`/settings/${id}`, {
+            setting_value: JSON.stringify(selected),
+            is_active,
           });
-          return;
+        } else {
+          const input = card.querySelector("ui-textarea");
+          const raw = input?.getValue ? input.getValue() : input?.value;
+          let parsed;
+          try {
+            parsed = raw ? JSON.parse(raw) : [];
+          } catch (e) {
+            window.Toast?.show?.({
+              title: "Invalid JSON",
+              message: "Array settings must be valid JSON",
+              variant: "error",
+            });
+            return;
+          }
+          await api.put(`/settings/${id}`, {
+            setting_value: JSON.stringify(parsed),
+            is_active,
+          });
         }
-        await api.put(`/settings/${id}`, {
-          setting_value: JSON.stringify(parsed),
-          is_active,
-        });
       } else if (setting.setting_type === "boolean") {
         const toggle = card.querySelector("ui-switch");
         const isEnabled = toggle?.checked ? "1" : "0";
@@ -205,6 +253,8 @@ class SettingsPage extends App {
     const isArray = setting.setting_type === "array";
     const isColor = setting.setting_type === "color";
     const isBoolean = setting.setting_type === "boolean";
+    const arrayOptions = isArray ? this.getArrayOptions(setting) : null;
+    const arrayValue = isArray ? this.getArrayValue(setting) : [];
 
     return `
       <div class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm" data-setting-id="${setting.id}">
@@ -237,8 +287,20 @@ class SettingsPage extends App {
                 ? `
             <ui-file-upload accept="image/*" max-size="5242880" max-files="1" ${setting.setting_value ? `value="${this.getImageUrl(setting.setting_value)}"` : ""}></ui-file-upload>
           `
-                : isArray
+                : isArray && arrayOptions
                   ? `
+            <div class="grid grid-cols-1 gap-2">
+              ${arrayOptions
+                .map(
+                  (opt) => `
+                  <ui-checkbox data-value="${opt.value}" label="${opt.label}" ${arrayValue.includes(opt.value) ? "checked" : ""}></ui-checkbox>
+                `,
+                )
+                .join("")}
+            </div>
+          `
+                  : isArray
+                    ? `
             <ui-textarea rows="3" placeholder="Enter JSON array..." class="w-full" value="${String(value).replace(/"/g, "&quot;")}"></ui-textarea>
           `
                   : `
