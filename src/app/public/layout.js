@@ -10,6 +10,7 @@ class PublicLayout extends App {
     this.primaryColor = "#4f46e5";
     this.accentColor = "#4f46e5";
     this.allowLogin = true;
+    this.settingsLoaded = false;
     this._loaded = false;
     this._pageContent = "";
   }
@@ -19,6 +20,7 @@ class PublicLayout extends App {
     if (this._loaded) return;
     this._loaded = true;
     window.addEventListener("cart:updated", () => this.updateCartBadge());
+    this.bindNav();
     await this.loadSettings();
   }
 
@@ -49,6 +51,7 @@ class PublicLayout extends App {
         const raw = String(loginRes.data.data.setting_value || "1").toLowerCase();
         this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
       }
+      this.settingsLoaded = true;
       const latestContent =
         this.querySelector("#page-content")?.innerHTML || this._pageContent || existingContent || "";
       this.innerHTML = this.render();
@@ -57,6 +60,7 @@ class PublicLayout extends App {
     } catch (_) {
       const latestContent =
         this.querySelector("#page-content")?.innerHTML || this._pageContent || existingContent || "";
+      this.settingsLoaded = true;
       this.innerHTML = this.render();
       this.setPageContent(latestContent);
       this.bindNav();
@@ -169,17 +173,28 @@ class PublicLayout extends App {
             </div>
             
             <div class="flex items-center gap-3">
-              <a data-cart-link href="/public/cart" class="w-11 h-11 flex items-center justify-center text-slate-600 hover:text-[var(--primary)] hover:bg-indigo-50 rounded-xl transition-all relative">
-                <i class="fas fa-shopping-cart text-lg"></i>
-                <span data-cart-count class="absolute top-2 right-2 w-4 h-4 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white" style="background:${primary}">${this.getCartCount()}</span>
-              </a>
               ${
-                this.allowLogin
+                this.settingsLoaded
                   ? `
-                <div class="w-px h-6 bg-slate-100 mx-2"></div>
-                <a href="/auth/customer-login" class="text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-slate-100" style="background:${primary}">Sign In</a>
+                <a data-cart-link href="/public/cart" onclick="if(window.router){event.preventDefault(); window.router.navigate('/public/cart');}" class="w-11 h-11 flex items-center justify-center text-slate-600 hover:text-[var(--primary)] hover:bg-indigo-50 rounded-xl transition-all relative">
+                  <i class="fas fa-shopping-cart text-lg"></i>
+                  <span data-cart-count class="absolute top-2 right-2 w-4 h-4 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white" style="background:${primary}">${this.getCartCount()}</span>
+                </a>
+                ${
+                  this.allowLogin
+                    ? `
+                  <div class="w-px h-6 bg-slate-100 mx-2"></div>
+                  <a href="/auth/customer-login" class="text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-slate-100" style="background:${primary}">Sign In</a>
+                `
+                    : ""
+                }
               `
-                  : ""
+                  : `
+                <div class="flex items-center gap-3">
+                  <div class="w-11 h-11 rounded-xl bg-slate-100 animate-pulse"></div>
+                  <div class="w-20 h-10 rounded-xl bg-slate-100 animate-pulse"></div>
+                </div>
+              `
               }
             </div>
           </div>

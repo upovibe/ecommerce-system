@@ -21,6 +21,8 @@ class MaterialSeeder
             ['Denim', 'denim', 'Classic denim fabric for timeless style.', 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=800&q=80'],
             ['Wool', 'wool', 'Warm natural wool for colder seasons.', 'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?w=800&q=80'],
             ['Synthetic', 'synthetic', 'Performance blends for active use.', 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80'],
+            ['Metal', 'metal', 'Durable metal materials for hardware and appliances.', 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800&q=80'],
+            ['Wood', 'wood', 'Natural wood finishes for furniture and decor.', 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=800&q=80'],
         ];
 
         foreach ($materials as $m) {
@@ -42,4 +44,3 @@ class MaterialSeeder
         }
     }
 }
-

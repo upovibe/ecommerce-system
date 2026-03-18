@@ -121,18 +121,50 @@ class ProductCreateModal extends HTMLElement {
               </div>
             </div>
 
-            <!-- 7. Variations -->
-            <div class="pt-2 border-t border-slate-100">
-              <div class="flex items-center justify-between mb-3">
-                <label class="block text-sm font-medium text-slate-700">Product Variations</label>
+            <!-- 7a. Variations -->
+            <div id="create-variant-section" class="pt-2 border-t border-slate-100">
+              <div class="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                <div class="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700">Product Variations</label>
+                    <p class="text-[11px] text-slate-400 mt-1">Add sizes, colors, or direct stock entries.</p>
+                  </div>
+                  <ui-switch id="create-has-variants" checked onchange="this.closest('app-products-page').toggleVariantSection('create')">
+                    <span slot="label">Enable</span>
+                  </ui-switch>
+                </div>
+                <div id="create-variant-body" class="space-y-3 overflow-hidden transition-all duration-300" style="max-height: 1000px; opacity: 1;">
+                  <div id="variant-list" class="space-y-3"></div>
+                </div>
+                <div id="create-variant-actions" class="flex justify-end mt-3 transition-opacity duration-200">
+                  <button type="button" onclick="this.closest('app-products-page').addVariantRow(null, this.closest('ui-modal').querySelector('#variant-list'))" class="px-4 py-2 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                    <i class="fas fa-plus text-[10px]"></i> Add variant
+                  </button>
+                </div>
               </div>
-              <div id="variant-list" class="space-y-3"></div>
-              <div class="flex justify-end mt-3">
-                <button type="button" onclick="this.closest('app-products-page').addVariantRow(null, this.closest('ui-modal').querySelector('#variant-list'))" class="px-4 py-2 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                  <i class="fas fa-plus text-[10px]"></i> Add variant
-                </button>
+            </div>
+
+            <!-- 7b. Attributes -->
+            <div id="create-attribute-section" class="pt-2 border-t border-slate-100">
+              <div class="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                <div class="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700">Product Attributes</label>
+                    <p class="text-[11px] text-slate-400 mt-1">Use attributes for details like property size, storage, or warranty.</p>
+                  </div>
+                  <ui-switch id="create-has-attributes" checked onchange="this.closest('app-products-page').toggleAttributeSection('create')">
+                    <span slot="label">Enable</span>
+                  </ui-switch>
+                </div>
+                <div id="create-attribute-body" class="space-y-3 overflow-hidden transition-all duration-300" style="max-height: 1000px; opacity: 1;">
+                  <div id="attribute-list" class="space-y-3"></div>
+                </div>
+                <div id="create-attribute-actions" class="flex justify-end mt-3 transition-opacity duration-200">
+                  <button type="button" onclick="this.closest('app-products-page').addAttributeRow(null, this.closest('ui-modal').querySelector('#attribute-list'))" class="px-4 py-2 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                    <i class="fas fa-plus text-[10px]"></i> Add attribute
+                  </button>
+                </div>
               </div>
-              <p class="text-[10px] text-slate-400 mt-2 italic">Add sizes, colors, or direct stock entries. Leave empty for single item.</p>
             </div>
 
             <!-- Images Section -->

@@ -635,30 +635,115 @@ class ProductsPage extends App {
   }
 
   render() {
+    if (this.pageLoading) {
+      return `
+        <div class="py-20 px-8 max-w-7xl mx-auto">
+          <header class="mb-16">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="h-2 w-8 bg-slate-100 rounded-full animate-pulse"></div>
+              <div class="h-2 w-20 bg-slate-100 rounded-full animate-pulse"></div>
+            </div>
+            <div class="h-12 w-[420px] bg-slate-100 rounded-3xl animate-pulse"></div>
+            <div class="h-4 w-[520px] bg-slate-100 rounded-2xl animate-pulse mt-4"></div>
+          </header>
+
+          <div class="mb-12">
+            <div class="h-[280px] sm:h-[360px] rounded-[2.5rem] bg-slate-100 animate-pulse"></div>
+          </div>
+
+          <div class="mb-12">
+            <div class="h-32 rounded-2xl bg-slate-100 animate-pulse"></div>
+          </div>
+
+          <div class="mb-10">
+            <div class="flex items-center gap-4 overflow-x-auto pb-2 no-scrollbar -mx-2 px-2">
+              ${Array(6)
+                .fill(
+                  `<div class="animate-pulse min-w-[140px]">
+                    <div class="h-24 w-24 rounded-2xl bg-slate-100 mb-3"></div>
+                    <div class="h-3 w-20 bg-slate-100 rounded"></div>
+                  </div>`,
+                )
+                .join("")}
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
+            <aside class="bg-white border border-slate-200 rounded-3xl p-6 h-fit">
+              ${Array(6)
+                .fill('<div class="h-10 bg-slate-100 rounded-2xl animate-pulse mb-4"></div>')
+                .join("")}
+            </aside>
+            <section>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                ${Array(10)
+                  .fill(
+                    `<div class="animate-pulse">
+                      <div class="aspect-[4/5] bg-slate-100 rounded-[2.5rem] mb-6"></div>
+                      <div class="h-3 w-20 bg-slate-100 rounded mb-2"></div>
+                      <div class="h-4 w-36 bg-slate-100 rounded mb-2"></div>
+                      <div class="h-4 w-24 bg-slate-100 rounded"></div>
+                    </div>`,
+                  )
+                  .join("")}
+              </div>
+            </section>
+          </div>
+        </div>
+      `;
+    }
     const filtered = this.getFilteredProducts();
     const pageContent = this.pageData?.content || "";
     const pageContentAttr = pageContent.replace(/"/g, "&quot;");
-    const title = this.pageData?.title || "Premium Collection";
-    const subtitle =
-      this.pageData?.subtitle ||
-      "Browse our curated selection of high-quality products across all categories. Designed for excellence, built for you.";
+    const title = this.pageLoading ? "" : this.pageData?.title || "Premium Collection";
+    const subtitle = this.pageLoading
+      ? ""
+      : this.pageData?.subtitle ||
+        "Browse our curated selection of high-quality products across all categories. Designed for excellence, built for you.";
     const filterOptions = this.getFilterOptions();
     const priceBounds = this.getPriceBounds();
 
     return `
       <div class="py-20 px-8 max-w-7xl mx-auto">
         <header class="mb-16">
-          <div class="flex items-center gap-3 text-indigo-600 font-semibold text-xs mb-2">
-            <span class="w-8 h-px bg-indigo-600"></span> Vast Catalog
-          </div>
-          <h1 class="text-6xl font-black text-slate-900 tracking-tighter">${title}</h1>
-          <p class="text-slate-500 mt-4 text-lg font-medium max-w-2xl">${subtitle}</p>
+          ${
+            this.pageLoading
+              ? `
+            <div class="flex items-center gap-3 mb-2">
+              <div class="h-2 w-8 bg-slate-100 rounded-full animate-pulse"></div>
+              <div class="h-2 w-20 bg-slate-100 rounded-full animate-pulse"></div>
+            </div>
+            <div class="h-12 w-[420px] bg-slate-100 rounded-3xl animate-pulse"></div>
+            <div class="h-4 w-[520px] bg-slate-100 rounded-2xl animate-pulse mt-4"></div>
+          `
+              : `
+            <div class="flex items-center gap-3 text-indigo-600 font-semibold text-xs mb-2">
+              <span class="w-8 h-px bg-indigo-600"></span> Vast Catalog
+            </div>
+            <h1 class="text-6xl font-black text-slate-900 tracking-tighter">${title}</h1>
+            <p class="text-slate-500 mt-4 text-lg font-medium max-w-2xl">${subtitle}</p>
+          `
+          }
         </header>
 
-        ${this.renderBanner()}
+        ${
+          this.pageLoading
+            ? `
+            <div class="mb-12">
+              <div class="h-[280px] sm:h-[360px] rounded-[2.5rem] bg-slate-100 animate-pulse"></div>
+            </div>
+          `
+            : this.renderBanner()
+        }
 
         ${
-          pageContent
+          this.pageLoading
+            ? `
+            <div class="mb-12">
+              <div class="h-32 rounded-2xl bg-slate-100 animate-pulse"></div>
+            </div>
+          `
+            : pageContent
             ? `
             <div class="mb-12">
               <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
@@ -738,7 +823,7 @@ class ProductsPage extends App {
             <div class="flex items-center justify-between mb-6">
               <p class="text-sm text-slate-500">Showing <span class="text-slate-900 font-semibold">${filtered.length}</span> items</p>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               ${this.loading
                 ? Array(10)
                     .fill(

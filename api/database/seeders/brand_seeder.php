@@ -21,6 +21,8 @@ class BrandSeeder
             ['ApexTech', 'apextech', 'Modern electronics built for performance and reliability.', 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80'],
             ['TerraHome', 'terrahome', 'Home and living goods with a natural touch.', 'https://images.unsplash.com/photo-1501045661006-fcebe0257c3f?w=800&q=80'],
             ['UrbanForge', 'urbanforge', 'Urban lifestyle brand for active city living.', 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80'],
+            ['PulseActive', 'pulseactive', 'Performance-driven fitness apparel and gear.', 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80'],
+            ['LuxeMaison', 'luxemaison', 'Luxury home accents and decor collections.', 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=800&q=80'],
         ];
 
         foreach ($brands as $b) {
@@ -42,4 +44,3 @@ class BrandSeeder
         }
     }
 }
-

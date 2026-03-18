@@ -836,6 +836,7 @@ class PublicProductDetailsPage extends App {
         : product.stock_status === "low_stock"
         ? "bg-amber-100 text-amber-700"
         : "bg-rose-100 text-rose-700";
+    const showVariants = product.has_variants !== false;
 
     const description = product.description || "";
     const descriptionAttr = description.replace(/"/g, "&quot;");
@@ -906,14 +907,19 @@ class PublicProductDetailsPage extends App {
               </div>
             </div>
 
+            ${
+              showVariants
+                ? `
             <div class="p-5 rounded-2xl border border-slate-100 bg-white shadow-sm">
               <p class="text-xs font-semibold text-slate-500 mb-3">Available variations</p>
               ${this.renderVariants()}
             </div>
+            `
+                : ""
+            }
 
             <div class="flex flex-wrap items-center gap-3">
               <button data-add-to-cart class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Add to cart</button>
-              <button data-buy-now class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900 transition">Buy now</button>
               <button data-save-wishlist class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition">Save to wishlist</button>
             </div>
           </div>

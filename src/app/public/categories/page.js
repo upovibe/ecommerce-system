@@ -130,25 +130,87 @@ class CategoriesPage extends App {
   }
 
   render() {
+    if (this.pageLoading) {
+      return `
+        <div class="py-20 px-8 max-w-7xl mx-auto">
+          <header class="mb-16 text-center">
+            <div class="flex items-center justify-center mb-3">
+              <div class="h-3 w-28 rounded-full bg-slate-100 animate-pulse"></div>
+            </div>
+            <div class="flex items-center justify-center">
+              <div class="h-12 w-80 rounded-3xl bg-slate-100 animate-pulse"></div>
+            </div>
+            <div class="flex items-center justify-center mt-4">
+              <div class="h-4 w-96 rounded-2xl bg-slate-100 animate-pulse"></div>
+            </div>
+          </header>
+
+          <div class="mb-12">
+            <div class="h-[280px] sm:h-[360px] rounded-[2.5rem] bg-slate-100 animate-pulse"></div>
+          </div>
+
+          <div class="mb-12">
+            <div class="h-32 rounded-2xl bg-slate-100 animate-pulse"></div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+            ${Array(4)
+              .fill('<div class="animate-pulse h-96 rounded-[3rem] bg-slate-100"></div>')
+              .join("")}
+          </div>
+        </div>
+      `;
+    }
     const pageContent = this.pageData?.content || "";
     const pageContentAttr = pageContent.replace(/"/g, "&quot;");
-    const title = this.pageData?.title || "Shop by Category";
-    const subtitle =
-      this.pageData?.subtitle ||
-      "Discover our diverse range of premium collections, each curated to bring you the best in quality and style.";
+    const title = this.pageLoading ? "" : this.pageData?.title || "Shop by Category";
+    const subtitle = this.pageLoading
+      ? ""
+      : this.pageData?.subtitle ||
+        "Discover our diverse range of premium collections, each curated to bring you the best in quality and style.";
 
     return `
       <div class="py-20 px-8 max-w-7xl mx-auto">
         <header class="mb-16 text-center">
-          <p class="text-indigo-600 font-semibold text-xs mb-3">Store Collections</p>
-          <h1 class="text-6xl font-black text-slate-900 tracking-tighter">${title}</h1>
-          <p class="text-slate-500 mt-4 text-lg font-medium max-w-xl mx-auto">${subtitle}</p>
+          ${
+            this.pageLoading
+              ? `
+            <div class="flex items-center justify-center mb-3">
+              <div class="h-3 w-28 rounded-full bg-slate-100 animate-pulse"></div>
+            </div>
+            <div class="flex items-center justify-center">
+              <div class="h-12 w-80 rounded-3xl bg-slate-100 animate-pulse"></div>
+            </div>
+            <div class="flex items-center justify-center mt-4">
+              <div class="h-4 w-96 rounded-2xl bg-slate-100 animate-pulse"></div>
+            </div>
+          `
+              : `
+            <p class="text-indigo-600 font-semibold text-xs mb-3">Store Collections</p>
+            <h1 class="text-6xl font-black text-slate-900 tracking-tighter">${title}</h1>
+            <p class="text-slate-500 mt-4 text-lg font-medium max-w-xl mx-auto">${subtitle}</p>
+          `
+          }
         </header>
 
-        ${this.renderBanner()}
+        ${
+          this.pageLoading
+            ? `
+            <div class="mb-12">
+              <div class="h-[280px] sm:h-[360px] rounded-[2.5rem] bg-slate-100 animate-pulse"></div>
+            </div>
+          `
+            : this.renderBanner()
+        }
 
         ${
-          pageContent
+          this.pageLoading
+            ? `
+            <div class="mb-12">
+              <div class="h-32 rounded-2xl bg-slate-100 animate-pulse"></div>
+            </div>
+          `
+            : pageContent
             ? `
             <div class="mb-12">
               <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">

@@ -16,6 +16,8 @@ class PageSeeder
 
         $splash = "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1600&auto=format&fit=crop";
         $splashAlt = "https://images.unsplash.com/photo-1521334884684-d80222895322?q=80&w=1600&auto=format&fit=crop";
+        $splashAlt2 = "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1600&auto=format&fit=crop";
+        $defaultImages = [$splashAlt, $splashAlt2];
 
         $pages = [
             [
@@ -155,10 +157,49 @@ class PageSeeder
                 'slug' => 'cookie-policy',
                 'content' => '<h2>Cookie Policy</h2><p>This website uses cookies to enhance your browsing experience and provide personalised services.</p><h3>What Are Cookies?</h3><p>Cookies are small text files stored on your device when you visit a website. They help us recognise you on return visits and understand how you use our site.</p><h3>Types of Cookies We Use</h3><ul><li><strong>Essential Cookies</strong> - Required for the site to function (login sessions, cart contents)</li><li><strong>Analytics Cookies</strong> - Help us understand traffic and usage patterns (e.g. Google Analytics)</li><li><strong>Marketing Cookies</strong> - Used to show relevant ads across the web (opt-in only)</li></ul><h3>Managing Cookies</h3><p>You can control cookies through your browser settings. Disabling cookies may affect some functionality of the site.</p><h3>Your Consent</h3><p>By continuing to use our site, you consent to our use of cookies in accordance with this policy.</p>',
                 'banner' => $splash,
-                'images' => [$splashAlt],
+                'images' => $defaultImages,
                 'meta' => [
                     'keywords' => 'cookie, gdpr, tracking, analytics, consent',
                     'description' => 'How we use cookies on VastCommerce and how you can manage your preferences.'
+                ],
+            ],
+            [
+                'title' => 'Selling Policy',
+                'subtitle' => 'Guidelines for sellers and marketplace conduct.',
+                'name' => 'Selling Policy',
+                'slug' => 'selling-policy',
+                'content' => '<h2>Selling Policy</h2><p>This policy outlines the standards for listing, pricing, and fulfillment on our marketplace.</p><h3>Listings</h3><p>All listings must be accurate, with clear photos and honest descriptions.</p><h3>Pricing</h3><p>Pricing must be transparent and include all mandatory fees.</p><h3>Fulfillment</h3><p>Sellers must fulfill orders within stated timelines and communicate any delays.</p><h3>Prohibited Items</h3><p>Items that violate laws or platform rules are strictly prohibited.</p>',
+                'banner' => $splash,
+                'images' => $defaultImages,
+                'meta' => [
+                    'keywords' => 'selling, policy, marketplace, seller rules',
+                    'description' => 'Selling policy and marketplace guidelines for vendors.'
+                ],
+            ],
+            [
+                'title' => 'Returns Policy',
+                'subtitle' => 'Simple, transparent returns for peace of mind.',
+                'name' => 'Returns Policy',
+                'slug' => 'returns-policy',
+                'content' => '<h2>Returns Policy</h2><p>We accept returns within 30 days of delivery for most items.</p><h3>Eligibility</h3><ul><li>Items must be unused and in original packaging</li><li>Returns must be initiated within 30 days</li></ul><h3>How to Return</h3><ol><li>Contact support with your order number</li><li>Receive a return label</li><li>Drop off at your nearest courier location</li></ol><h3>Refunds</h3><p>Refunds are processed within 5-7 business days after inspection.</p>',
+                'banner' => $splash,
+                'images' => $defaultImages,
+                'meta' => [
+                    'keywords' => 'returns, policy, refunds, exchanges',
+                    'description' => 'Returns policy and refund process.'
+                ],
+            ],
+            [
+                'title' => "Faq's",
+                'subtitle' => 'Quick answers to common questions.',
+                'name' => "Faq's",
+                'slug' => 'faqs',
+                'content' => '<h2>FAQs</h2><h3>How do I place an order?</h3><p>Add items to your cart and complete checkout.</p><h3>Can I pay on delivery?</h3><p>Payment modes depend on the store settings and product type.</p><h3>How do I contact support?</h3><p>Email support@vastcommerce.com or use the live chat widget.</p>',
+                'banner' => $splash,
+                'images' => $defaultImages,
+                'meta' => [
+                    'keywords' => 'faqs, questions, help',
+                    'description' => 'Frequently asked questions and quick help.'
                 ],
             ],
         ];
@@ -190,3 +231,4 @@ class PageSeeder
         }
     }
 }
+

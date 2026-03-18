@@ -1,6 +1,6 @@
 import App from "@/core/App.js";
 import "@/components/ui/Dropdown.js";
-import "@/components/ui/Modal.js";
+import "@/components/ui/Dialog.js";
 import "@/components/ui/Input.js";
 import "@/components/ui/Textarea.js";
 import "@/components/ui/Toast.js";
@@ -17,6 +17,7 @@ class PublicCartPage extends App {
     this.allowedOrderTypes = [];
     this.allowedPaymentModes = [];
     this.userLoginEnabled = true;
+    this.settingsLoaded = false;
     this.guestCheckoutOpen = false;
     this.guestCheckoutSubmitting = false;
     this.guestForm = {
@@ -61,8 +62,12 @@ class PublicCartPage extends App {
       );
       const raw = String(loginRes?.data?.data?.setting_value ?? "1").toLowerCase();
       this.userLoginEnabled = !(raw === "0" || raw === "false" || raw === "no");
+      this.settingsLoaded = true;
+      this.updateView();
     } catch (_) {
       // keep defaults
+      this.settingsLoaded = true;
+      this.updateView();
     }
   }
 
@@ -379,32 +384,50 @@ class PublicCartPage extends App {
   }
 
   async checkout() {
+    if (!this.settingsLoaded) {
+      window.Toast?.show?.({
+        title: "Loading settings",
+        message: "Please wait a moment and try again.",
+        variant: "warning",
+      });
+      return;
+    }
     const token = localStorage.getItem("token");
-    if (!token) {
+    let user = null;
+    try {
+      user = JSON.parse(localStorage.getItem("userData") || "null");
+    } catch (_) {
+      user = null;
+    }
+    const isCustomer = !!(user && user.user_type === "customer");
+    console.log("[Cart] checkout", {
+      settingsLoaded: this.settingsLoaded,
+      userLoginEnabled: this.userLoginEnabled,
+      hasToken: !!token,
+      isCustomer,
+    });
+    if (!token || !isCustomer) {
       if (this.userLoginEnabled) {
         localStorage.setItem("post_login_redirect", "/public/cart");
         window.Toast?.show?.({
-          title: "Account required",
-          message: "Create an account to complete checkout.",
+          title: "Sign in required",
+          message: "Please sign in to place your order.",
           variant: "warning",
         });
         setTimeout(() => {
-          window.location.href = "/auth/customer-signup";
+          window.location.href = "/auth/customer-login";
         }, 600);
         return;
       }
+      console.log("[Cart] guest checkout modal open");
       this.openGuestCheckout();
       return;
     }
     try {
-      const orderTypeEl = this.querySelector("#checkout-order-type");
-      const paymentModeEl = this.querySelector("#checkout-payment-mode");
       const orderType =
-        orderTypeEl?.value ||
-        (this.allowedOrderTypes[0] || "delivery");
+        this.allowedOrderTypes[0] || "delivery";
       const paymentMode =
-        paymentModeEl?.value ||
-        (this.allowedPaymentModes[0] || "pay_on_delivery");
+        this.allowedPaymentModes[0] || "pay_on_delivery";
 
       const res = await api.post("/orders", {
         order_type: orderType,
@@ -436,9 +459,8 @@ class PublicCartPage extends App {
       ? this.allowedPaymentModes
       : ["pay_on_delivery", "pay_before_delivery", "in_person"];
     return `
-      <ui-modal id="guest-checkout-modal" ${this.guestCheckoutOpen ? "open" : ""} position="right" size="md">
-        <div slot="title">Guest checkout</div>
-        <div class="space-y-4">
+      <ui-dialog id="guest-checkout-dialog" ${this.guestCheckoutOpen ? "open" : ""} title="Guest checkout" position="center" no-footer>
+        <div slot="content" class="space-y-4">
           <p class="text-xs text-slate-500">Enter your details to receive a receipt and delivery updates.</p>
           <div>
             <label class="block text-xs font-semibold text-slate-500 mb-1">Full name</label>
@@ -475,11 +497,13 @@ class PublicCartPage extends App {
             <ui-textarea rows="2" value="${this.guestForm.note}" placeholder="Add delivery instructions" oninput="this.closest('app-public-cart-page').handleGuestInputChange('note', this.value)"></ui-textarea>
           </div>
         </div>
-        <button slot="footer" class="secondary" data-guest-checkout-cancel>Cancel</button>
-        <button slot="footer" class="primary" data-guest-checkout-submit ${this.guestCheckoutSubmitting ? "disabled" : ""}>
-          ${this.guestCheckoutSubmitting ? "Placing..." : "Place order"}
-        </button>
-      </ui-modal>
+        <div slot="footer" class="flex items-center justify-end gap-3">
+          <button class="secondary" data-guest-checkout-cancel>Cancel</button>
+          <button class="primary" data-guest-checkout-submit ${this.guestCheckoutSubmitting ? "disabled" : ""}>
+            ${this.guestCheckoutSubmitting ? "Placing..." : "Place order"}
+          </button>
+        </div>
+      </ui-dialog>
     `;
   }
 
@@ -551,31 +575,14 @@ class PublicCartPage extends App {
                     <span>Subtotal</span>
                     <span class="font-semibold" data-cart-subtotal>${this.fmt(this.total)}</span>
                   </div>
-                  <div class="border-t border-slate-100 pt-4 space-y-3">
-                    <div>
-                      <label class="block text-xs font-semibold text-slate-500 mb-1">Order type</label>
-                      <ui-dropdown id="checkout-order-type" class="w-full" value="${this.allowedOrderTypes[0] || "delivery"}">
-                        ${(this.allowedOrderTypes.length ? this.allowedOrderTypes : ["delivery", "service"])
-                          .map((t) => `<ui-option value="${t}">${t}</ui-option>`)
-                          .join("")}
-                      </ui-dropdown>
+                  <div class="border-t border-slate-100 pt-4 space-y-4">
+                    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                      <p class="text-xs font-semibold text-slate-500 mb-2">Ready to place your order?</p>
+                      <p class="text-sm text-slate-600">We will confirm your order details and send a receipt to your email.</p>
                     </div>
-                    <div>
-                      <label class="block text-xs font-semibold text-slate-500 mb-1">Payment mode</label>
-                      <ui-dropdown id="checkout-payment-mode" class="w-full" value="${this.allowedPaymentModes[0] || "pay_on_delivery"}">
-                        ${(this.allowedPaymentModes.length ? this.allowedPaymentModes : ["pay_on_delivery", "pay_before_delivery", "in_person"])
-                          .map((t) => `<ui-option value="${t}">${t}</ui-option>`)
-                          .join("")}
-                      </ui-dropdown>
-                    </div>
-                    <button data-checkout class="w-full mt-3 px-4 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">
-                      Place order
+                    <button data-checkout class="w-full px-4 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition ${this.settingsLoaded ? "" : "opacity-60 cursor-not-allowed"}" ${this.settingsLoaded ? "" : "disabled"}>
+                      ${this.settingsLoaded ? "Place order" : "Loading..."}
                     </button>
-                    ${
-                      !localStorage.getItem("token") && this.userLoginEnabled
-                        ? `<p class="text-[11px] text-slate-400 mt-2">Sign in is required to complete checkout.</p>`
-                        : ""
-                    }
                   </div>
                 </div>
               </div>

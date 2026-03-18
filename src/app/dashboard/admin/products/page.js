@@ -25,6 +25,7 @@ class ProductsPage extends App {
     this.brands = [];
     this.materials = [];
     this.productAttributes = []; // Global attributes
+    this.attributeTypes = []; // Product attribute types
     this.loading = true;
     this.selectedProduct = null;
     this.filters = { type: "", category: "", status: "", brand: "" };
@@ -118,18 +119,20 @@ class ProductsPage extends App {
     this.loading = true;
     this.updateView();
     try {
-      const [prodRes, catRes, brandRes, materialRes, attrRes] = await Promise.all([
+      const [prodRes, catRes, brandRes, materialRes, attrRes, attrTypeRes] = await Promise.all([
         api.get("/products"),
         api.get("/categories"),
         api.get("/brands"),
         api.get("/materials"),
         api.get("/attributes"),
+        api.get("/product-attribute-types"),
       ]);
       this.products   = prodRes.data?.data || [];
       this.categories = catRes.data?.data  || [];
       this.brands     = brandRes.data?.data || [];
       this.materials  = materialRes.data?.data || [];
       this.productAttributes = attrRes.data?.data || [];
+      this.attributeTypes = attrTypeRes?.data?.data || [];
     } catch (e) {
       Toast.show({ title: "Error", message: "Failed to load products", variant: "error" });
     } finally {
@@ -192,6 +195,14 @@ class ProductsPage extends App {
     ) || null;
   }
 
+  getAttributeTypeByName(name) {
+    if (!name) return null;
+    const target = String(name).toLowerCase();
+    return (this.attributeTypes || []).find(
+      (a) => String(a.name || "").toLowerCase() === target,
+    ) || null;
+  }
+
   buildTypeOptionsHtml() {
     const attrs = (this.productAttributes || [])
       .slice()
@@ -201,6 +212,18 @@ class ProductsPage extends App {
       <ui-option value="">Select type...</ui-option>
       ${opts}
       <ui-option value="Other">Other (Custom)</ui-option>
+    `;
+  }
+
+  buildAttributeTypeOptionsHtml() {
+    const attrs = (this.attributeTypes || [])
+      .slice()
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    const opts = attrs.map(a => `<ui-option value="${a.name}">${a.name}</ui-option>`).join("");
+    return `
+      <ui-option value="">Select attribute...</ui-option>
+      ${opts}
+      <ui-option value="Other">Other</ui-option>
     `;
   }
 
@@ -277,6 +300,21 @@ class ProductsPage extends App {
       }
       const variants = m.querySelector("#variant-list");
       if (variants) variants.innerHTML = "";
+      const attrs = m.querySelector("#attribute-list");
+      if (attrs) attrs.innerHTML = "";
+      const hasVariants = m.querySelector("#create-has-variants");
+      if (hasVariants) {
+        hasVariants.checked = true;
+        hasVariants.setAttribute("checked", "");
+      }
+      const hasAttributes = m.querySelector("#create-has-attributes");
+      if (hasAttributes) {
+        hasAttributes.checked = true;
+        hasAttributes.setAttribute("checked", "");
+      }
+      this.bindToggleHandlers(m, "create");
+      this.toggleVariantSection("create");
+      this.toggleAttributeSection("create");
       m.open();
     }
   }
@@ -303,7 +341,12 @@ class ProductsPage extends App {
     const brand_id       = form.querySelector("#create-brand")?.value;
     const material_id    = form.querySelector("#create-material")?.value;
     const is_active      = form.querySelector("#create-active")?.checked ? 1 : 0;
+    const hasVariantsEl  = form.querySelector("#create-has-variants");
+    const hasAttributesEl = form.querySelector("#create-has-attributes");
+    const hasVariants    = hasVariantsEl ? !!hasVariantsEl.checked : true;
+    const hasAttributes  = hasAttributesEl ? !!hasAttributesEl.checked : true;
     const variants       = this.collectVariants(form.querySelector("#variant-list"));
+    const attributes     = this.collectAttributes(form.querySelector("#attribute-list"));
 
     if (!name) { Toast.show({ title: "Required", message: "Product name is required", variant: "error" }); return; }
     if (!category_id) { Toast.show({ title: "Required", message: "Category is required", variant: "error" }); return; }
@@ -324,7 +367,10 @@ class ProductsPage extends App {
         brand_id,
         material_id,
         is_active,
+        has_variants: hasVariants ? 1 : 0,
+        has_attributes: hasAttributes ? 1 : 0,
         variants,
+        attributes,
       };
 
       const res = await api.post("/products", payload);
@@ -426,6 +472,87 @@ class ProductsPage extends App {
     this.updateTotalStock();
   }
 
+  addAttributeRow(data = null, targetList = null) {
+    const list = targetList || this.getActiveAttributeList();
+    if (!list) return;
+
+    const row = document.createElement("div");
+    row.className = "p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3 attribute-row";
+
+    row.innerHTML = `
+      <div class="flex flex-col gap-4">
+        <div class="space-y-2">
+          <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Attribute Type</label>
+          <ui-dropdown data-field="type" placeholder="Select type..." class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleAttributeTypeChange(event)">
+            ${this.buildAttributeTypeOptionsHtml()}
+          </ui-dropdown>
+          <div class="mt-2 hidden custom-attribute-container animate-in fade-in slide-in-from-top-1 duration-200">
+            <ui-input data-field="custom_type" placeholder="Type name (e.g. Property Size)" class="w-full bg-white border-slate-200"></ui-input>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Value</label>
+          <ui-input data-field="value" placeholder="Enter value (e.g. 1200 sqft)" class="w-full bg-white border-slate-200"></ui-input>
+        </div>
+      </div>
+      <div class="flex items-center justify-end pt-3 border-t border-slate-200/60">
+        <button type="button" onclick="this.closest('app-products-page').removeAttributeRow(this)" class="px-4 py-2 rounded-xl text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+          <i class="fas fa-trash-alt text-[10px]"></i> Remove attribute
+        </button>
+      </div>
+    `;
+    list.appendChild(row);
+
+    if (data && typeof data === "object" && !data.nodeType) {
+      const typeDrop = row.querySelector('[data-field="type"]');
+      const customTypeEl = row.querySelector('[data-field="custom_type"]');
+      const rawType = data.type || data.name || "Attribute";
+      const attr = this.getAttributeTypeByName(rawType);
+      const isOther = !attr;
+
+      if (isOther) {
+        typeDrop.value = "Other";
+        const container = row.querySelector(".custom-attribute-container");
+        if (container) container.classList.remove("hidden");
+        if (customTypeEl) customTypeEl.value = rawType;
+      } else {
+        typeDrop.value = attr.name;
+      }
+
+      row.querySelector('[data-field="value"]').value = data.value || "";
+    }
+  }
+
+  getActiveAttributeList() {
+    const editModal = this.querySelector("#product-edit-modal");
+    const createModal = this.querySelector("#product-create-modal");
+    if (editModal?.hasAttribute("open")) {
+      return editModal.querySelector("#attribute-list");
+    }
+    if (createModal?.hasAttribute("open")) {
+      return createModal.querySelector("#attribute-list");
+    }
+    return this.querySelector("#attribute-list");
+  }
+
+  handleAttributeTypeChange(e) {
+    const dropdown = e.target;
+    const value = e.detail?.value || dropdown?.value;
+    const row = dropdown.closest(".attribute-row");
+    if (!row) return;
+    const container = row.querySelector(".custom-attribute-container");
+    if (value === "Other") {
+      container?.classList.remove("hidden");
+    } else {
+      container?.classList.add("hidden");
+    }
+  }
+
+  removeAttributeRow(button) {
+    const row = button?.closest(".attribute-row");
+    if (row) row.remove();
+  }
+
   getActiveVariantList() {
     const editModal = this.querySelector("#product-edit-modal");
     const createModal = this.querySelector("#product-create-modal");
@@ -451,16 +578,100 @@ class ProductsPage extends App {
     }
   }
 
+  toggleVariantSection(prefix = "create") {
+    console.debug("[VariantsToggle] start", { prefix });
+    const modal =
+      prefix === "edit"
+        ? this.querySelector("#product-edit-modal")
+        : this.querySelector("#product-create-modal");
+    if (!modal) return;
+    const toggle = modal.querySelector(`#${prefix}-has-variants`);
+    const body = modal.querySelector(`#${prefix}-variant-body`);
+    const actions = modal.querySelector(`#${prefix}-variant-actions`);
+    if (!toggle) return;
+    const enabled = toggle.checked ?? toggle.hasAttribute("checked");
+    console.debug("[VariantsToggle] state", {
+      enabled,
+      hasCheckedAttr: toggle.hasAttribute("checked"),
+      checkedProp: toggle.checked,
+      bodyFound: !!body,
+      actionsFound: !!actions,
+    });
+    if (body) {
+      body.style.display = "block";
+      body.style.maxHeight = enabled ? `${body.scrollHeight}px` : "0px";
+      body.style.opacity = enabled ? "1" : "0";
+      body.style.pointerEvents = enabled ? "auto" : "none";
+    }
+    if (actions) {
+      actions.style.display = enabled ? "flex" : "none";
+      actions.style.opacity = enabled ? "1" : "0";
+      actions.style.pointerEvents = enabled ? "auto" : "none";
+    }
+    if (body) {
+      const fields = body.querySelectorAll("ui-input, ui-dropdown, ui-textarea");
+      fields.forEach((el) => {
+        if (enabled) el.removeAttribute("disabled");
+        else el.setAttribute("disabled", "");
+      });
+    }
+    this.updateTotalStock();
+    console.debug("[VariantsToggle] end");
+  }
+
+  toggleAttributeSection(prefix = "create") {
+    console.debug("[AttributesToggle] start", { prefix });
+    const modal =
+      prefix === "edit"
+        ? this.querySelector("#product-edit-modal")
+        : this.querySelector("#product-create-modal");
+    if (!modal) return;
+    const toggle = modal.querySelector(`#${prefix}-has-attributes`);
+    const body = modal.querySelector(`#${prefix}-attribute-body`);
+    const actions = modal.querySelector(`#${prefix}-attribute-actions`);
+    if (!toggle) return;
+    const enabled = toggle.checked ?? toggle.hasAttribute("checked");
+    console.debug("[AttributesToggle] state", {
+      enabled,
+      hasCheckedAttr: toggle.hasAttribute("checked"),
+      checkedProp: toggle.checked,
+      bodyFound: !!body,
+      actionsFound: !!actions,
+    });
+    if (body) {
+      body.style.display = "block";
+      body.style.maxHeight = enabled ? `${body.scrollHeight}px` : "0px";
+      body.style.opacity = enabled ? "1" : "0";
+      body.style.pointerEvents = enabled ? "auto" : "none";
+    }
+    if (actions) {
+      actions.style.display = enabled ? "flex" : "none";
+      actions.style.opacity = enabled ? "1" : "0";
+      actions.style.pointerEvents = enabled ? "auto" : "none";
+    }
+    if (body) {
+      const fields = body.querySelectorAll("ui-input, ui-dropdown, ui-textarea");
+      fields.forEach((el) => {
+        if (enabled) el.removeAttribute("disabled");
+        else el.setAttribute("disabled", "");
+      });
+    }
+    console.debug("[AttributesToggle] end");
+  }
+
   updateTotalStock() {
     const isCreate = this.querySelector("#product-create-modal").hasAttribute("open");
     const m = isCreate ? this.querySelector("#product-create-modal") : this.querySelector("#product-edit-modal");
     
     if (!m) return;
+
+    const toggle = m.querySelector("#create-has-variants") || m.querySelector("#edit-has-variants");
+    const variantsEnabled = toggle ? !!toggle.checked : true;
     
     const rows = Array.from(m.querySelectorAll(".variant-row"));
     const stockField = m.querySelector("#create-stock-total") || m.querySelector("#edit-stock-total");
     
-    if (rows.length === 0) {
+    if (!variantsEnabled || rows.length === 0) {
       if (stockField) {
         stockField.removeAttribute("readonly");
         stockField.classList.remove("bg-slate-50");
@@ -527,6 +738,23 @@ class ProductsPage extends App {
     return variants.filter((v) => v.value || v.quantity);
   }
 
+  collectAttributes(list) {
+    if (!list) return [];
+    const rows = Array.from(list.querySelectorAll(".attribute-row"));
+    const attrs = rows.map((row) => {
+      const typeDrop = row.querySelector('[data-field="type"]');
+      const customTypeEl = row.querySelector('[data-field="custom_type"]');
+      const valueEl = row.querySelector('[data-field="value"]');
+      let type = typeDrop?.value || "";
+      if (type === "Other" || type === "") {
+        type = customTypeEl?.value?.trim() || "";
+      }
+      const value = valueEl?.value?.trim() || "";
+      return { type, value };
+    });
+    return attrs.filter((a) => a.type && a.value);
+  }
+
   // ── EDIT ────────────────────────────────────────────
   async openEditModal(product) {
     if (!product?.id) return;
@@ -583,6 +811,35 @@ class ProductsPage extends App {
         }
       }
       this.updateTotalStock();
+
+      const aList = m.querySelector("#attribute-list");
+      if (aList) {
+        aList.innerHTML = "";
+        if (p.attributes && Array.isArray(p.attributes)) {
+          p.attributes.forEach((a) => {
+            this.addAttributeRow(
+              { type: a.type || a.name || "Attribute", value: a.value || "" },
+              aList,
+            );
+          });
+        }
+      }
+
+      const hasVariants = m.querySelector("#edit-has-variants");
+      if (hasVariants) {
+        hasVariants.checked = p.has_variants !== false;
+        if (hasVariants.checked) hasVariants.setAttribute("checked", "");
+        else hasVariants.removeAttribute("checked");
+      }
+      const hasAttributes = m.querySelector("#edit-has-attributes");
+      if (hasAttributes) {
+        hasAttributes.checked = p.has_attributes !== false;
+        if (hasAttributes.checked) hasAttributes.setAttribute("checked", "");
+        else hasAttributes.removeAttribute("checked");
+      }
+      this.bindToggleHandlers(m, "edit");
+      this.toggleVariantSection("edit");
+      this.toggleAttributeSection("edit");
 
       const editDesc = m.querySelector("#edit-description");
       if (editDesc?.setValue) {
@@ -654,6 +911,10 @@ class ProductsPage extends App {
     const brand_id       = m.querySelector("#edit-brand")?.value;
     const material_id    = m.querySelector("#edit-material")?.value;
     const is_active      = m.querySelector("#edit-active")?.checked ? 1 : 0;
+    const hasVariantsEl  = m.querySelector("#edit-has-variants");
+    const hasAttributesEl = m.querySelector("#edit-has-attributes");
+    const hasVariants    = hasVariantsEl ? !!hasVariantsEl.checked : true;
+    const hasAttributes  = hasAttributesEl ? !!hasAttributesEl.checked : true;
 
     if (!name) { Toast.show({ title: "Required", message: "Name is required", variant: "error" }); return; }
     const oldBtnText = saveBtn?.textContent;
@@ -700,8 +961,16 @@ class ProductsPage extends App {
         brand_id,
         material_id,
         is_active,
-        variants: this.collectVariants(m.querySelector("#variant-list")),
+        has_variants: hasVariants ? 1 : 0,
+        has_attributes: hasAttributes ? 1 : 0,
       };
+
+      if (hasVariants) {
+        payload.variants = this.collectVariants(m.querySelector("#variant-list"));
+      }
+      if (hasAttributes) {
+        payload.attributes = this.collectAttributes(m.querySelector("#attribute-list"));
+      }
 
       await api.put(`/products/${this.selectedProduct.id}`, payload);
       Toast.show({ title: "Updated", message: "Product updated successfully", variant: "success" });
@@ -732,6 +1001,26 @@ class ProductsPage extends App {
     } catch (e) {
       console.error(e);
       Toast.show({ title: "Error", message: "Failed to load product details", variant: "error" });
+    }
+  }
+
+  bindToggleHandlers(modal, prefix) {
+    if (!modal) return;
+    const variantToggle = modal.querySelector(`#${prefix}-has-variants`);
+    const attributeToggle = modal.querySelector(`#${prefix}-has-attributes`);
+    if (variantToggle && !variantToggle.dataset.bound) {
+      variantToggle.addEventListener("switch-change", () => {
+        console.debug("[VariantsToggle] switch-change event", { prefix });
+        this.toggleVariantSection(prefix);
+      });
+      variantToggle.dataset.bound = "1";
+    }
+    if (attributeToggle && !attributeToggle.dataset.bound) {
+      attributeToggle.addEventListener("switch-change", () => {
+        console.debug("[AttributesToggle] switch-change event", { prefix });
+        this.toggleAttributeSection(prefix);
+      });
+      attributeToggle.dataset.bound = "1";
     }
   }
 

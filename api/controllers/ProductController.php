@@ -43,6 +43,8 @@ class ProductController
                     p.images,
                     p.base_price,
                     p.is_active,
+                    p.has_variants,
+                    p.has_attributes,
                     p.created_at,
                     p.updated_at,
                     p.category_id,
@@ -112,6 +114,8 @@ class ProductController
                     p.images,
                     p.base_price,
                     p.is_active,
+                    p.has_variants,
+                    p.has_attributes,
                     p.created_at,
                     p.updated_at,
                     p.category_id,
@@ -245,6 +249,23 @@ class ProductController
             $product['variant_count'] = $variantCount;
             $product['total_stock'] = $totalStock;
 
+            $stmt = $this->pdo->prepare("
+                SELECT a.id, a.value, t.name AS type_name
+                FROM product_attributes a
+                JOIN product_attribute_types t ON t.id = a.attribute_type_id
+                WHERE a.product_id = ?
+                ORDER BY a.id
+            ");
+            $stmt->execute([$product['id']]);
+            $attrs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $product['attributes'] = array_map(function ($row) {
+                return [
+                    'id' => (int)$row['id'],
+                    'type' => $row['type_name'],
+                    'value' => $row['value'],
+                ];
+            }, $attrs);
+
             // Re-calculate stock status now that we have total_stock
             $threshold = $this->getStockThreshold();
             if ($product['total_stock'] === null || $product['total_stock'] <= 0) {
@@ -336,6 +357,23 @@ class ProductController
             $product['variant_count'] = $variantCount;
             $product['total_stock'] = $totalStock;
 
+            $stmt = $this->pdo->prepare("
+                SELECT a.id, a.value, t.name AS type_name
+                FROM product_attributes a
+                JOIN product_attribute_types t ON t.id = a.attribute_type_id
+                WHERE a.product_id = ?
+                ORDER BY a.id
+            ");
+            $stmt->execute([$id]);
+            $attrs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $product['attributes'] = array_map(function ($row) {
+                return [
+                    'id' => (int)$row['id'],
+                    'type' => $row['type_name'],
+                    'value' => $row['value'],
+                ];
+            }, $attrs);
+
             // Re-calculate stock status now that we have total_stock
             $threshold = $this->getStockThreshold();
             if ($product['total_stock'] === null || $product['total_stock'] <= 0) {
@@ -421,6 +459,8 @@ class ProductController
                 'images'       => isset($data['images']) ? json_encode($data['images']) : null,
                 'base_price'   => (float) ($data['base_price'] ?? 0),
                 'is_active'    => isset($data['is_active']) ? (int)(bool)$data['is_active'] : 1,
+                'has_variants' => isset($data['has_variants']) ? (int)(bool)$data['has_variants'] : 1,
+                'has_attributes' => isset($data['has_attributes']) ? (int)(bool)$data['has_attributes'] : 1,
             ]);
 
             if (!$id) {
@@ -448,6 +488,20 @@ class ProductController
                         VALUES (?, ?, ?, ?, NOW(), NOW())
                     ");
                     $stmt->execute([$id, $typeId, $value, $quantity]);
+                }
+            }
+
+            if (isset($data['attributes'])) {
+                $this->pdo->prepare("DELETE FROM product_attributes WHERE product_id = ?")->execute([$id]);
+                foreach ((array)$data['attributes'] as $a) {
+                    $type = trim((string)($a['type'] ?? $a['name'] ?? 'Attribute')) ?: 'Attribute';
+                    $value = trim((string)($a['value'] ?? '')) ?: '';
+                    if ($value === '') continue;
+                    $typeId = $this->resolveAttributeTypeId($type);
+                    $this->pdo->prepare("
+                        INSERT INTO product_attributes (product_id, attribute_type_id, value, created_at, updated_at)
+                        VALUES (?, ?, ?, NOW(), NOW())
+                    ")->execute([$id, $typeId, $value]);
                 }
             }
 
@@ -503,6 +557,8 @@ class ProductController
             if (isset($data['images']))      $updateData['images']      = json_encode($data['images']);
             if (isset($data['base_price']))  $updateData['base_price']  = (float) $data['base_price'];
             if (isset($data['is_active']))   $updateData['is_active']   = (int)(bool)$data['is_active'];
+            if (isset($data['has_variants']))   $updateData['has_variants']   = (int)(bool)$data['has_variants'];
+            if (isset($data['has_attributes'])) $updateData['has_attributes'] = (int)(bool)$data['has_attributes'];
 
             // Regenerate slug only if name changed
             if (!empty($data['name'])) {
@@ -542,6 +598,20 @@ class ProductController
                 }
             }
 
+            if (isset($data['attributes'])) {
+                $this->pdo->prepare("DELETE FROM product_attributes WHERE product_id = ?")->execute([$id]);
+                foreach ((array)$data['attributes'] as $a) {
+                    $type = trim((string)($a['type'] ?? $a['name'] ?? 'Attribute')) ?: 'Attribute';
+                    $value = trim((string)($a['value'] ?? '')) ?: '';
+                    if ($value === '') continue;
+                    $typeId = $this->resolveAttributeTypeId($type);
+                    $this->pdo->prepare("
+                        INSERT INTO product_attributes (product_id, attribute_type_id, value, created_at, updated_at)
+                        VALUES (?, ?, ?, NOW(), NOW())
+                    ")->execute([$id, $typeId, $value]);
+                }
+            }
+
             http_response_code(200);
             echo json_encode(['success' => true, 'message' => 'Product updated']);
         } catch (Exception $e) {
@@ -573,6 +643,7 @@ class ProductController
             }
 
             $this->pdo->prepare("DELETE FROM product_variants WHERE product_id = ?")->execute([$id]);
+            $this->pdo->prepare("DELETE FROM product_attributes WHERE product_id = ?")->execute([$id]);
             $this->productModel->delete($id);
 
             http_response_code(200);
@@ -770,6 +841,21 @@ class ProductController
         return (int) $this->pdo->lastInsertId();
     }
 
+    private function resolveAttributeTypeId(string $name): int
+    {
+        $name = trim($name);
+        if ($name === '') $name = 'Attribute';
+
+        $stmt = $this->pdo->prepare("SELECT id FROM product_attribute_types WHERE LOWER(name) = LOWER(?) LIMIT 1");
+        $stmt->execute([$name]);
+        $id = $stmt->fetchColumn();
+        if ($id) return (int) $id;
+
+        $stmt = $this->pdo->prepare("INSERT INTO product_attribute_types (name) VALUES (?)");
+        $stmt->execute([$name]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
     private function castProduct(array $p): array
     {
         $p['base_price']    = (float) $p['base_price'];
@@ -778,6 +864,12 @@ class ProductController
         $p['sku']           = $p['sku'] ?? null;
         $p['variant_count'] = isset($p['variant_count']) ? (int) $p['variant_count'] : null;
         $p['total_stock']   = isset($p['total_stock'])   ? (int) $p['total_stock']   : null;
+        if (array_key_exists('has_variants', $p)) {
+            $p['has_variants'] = (bool) $p['has_variants'];
+        }
+        if (array_key_exists('has_attributes', $p)) {
+            $p['has_attributes'] = (bool) $p['has_attributes'];
+        }
 
         // Stock status processing
         $threshold = $this->getStockThreshold();

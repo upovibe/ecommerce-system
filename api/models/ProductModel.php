@@ -25,6 +25,8 @@ class ProductModel extends BaseModel
         'images',
         'base_price',
         'is_active',
+        'has_variants',
+        'has_attributes',
     ];
 
     protected static $casts = [
@@ -32,6 +34,8 @@ class ProductModel extends BaseModel
         'details'     => 'json',
         'images'      => 'json',
         'is_active'   => 'boolean',
+        'has_variants' => 'boolean',
+        'has_attributes' => 'boolean',
         'brand_id'    => 'integer',
         'material_id' => 'integer',
         'category_id' => 'integer',

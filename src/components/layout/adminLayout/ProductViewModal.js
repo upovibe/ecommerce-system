@@ -156,6 +156,27 @@ class ProductViewModal extends HTMLElement {
     `;
   }
 
+  renderAttributes(product) {
+    const attrs = Array.isArray(product?.attributes) ? product.attributes : [];
+    if (!attrs.length) {
+      return `<div class="p-4 text-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">No attributes provided</div>`;
+    }
+    return `
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        ${attrs
+          .map(
+            (a) => `
+            <div class="p-3 rounded-2xl bg-white border border-slate-100">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">${a.type || "Attribute"}</p>
+              <p class="text-sm font-semibold text-slate-700">${a.value || ""}</p>
+            </div>
+          `,
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
   renderGallery(product) {
     const images = this.getGalleryImages(product);
     if (!images.length) {
@@ -177,6 +198,8 @@ class ProductViewModal extends HTMLElement {
     const viewBrand = p.brand_name || "-";
     const viewMaterial = p.material_name || "-";
     const detailsText = this.getDetailsText(p.details);
+    const showVariants = p.has_variants !== false;
+    const showAttributes = p.has_attributes !== false;
 
     this.innerHTML = `
       <ui-modal ${this.hasAttribute("open") ? "open" : ""} position="right" size="lg" close-button="true">
@@ -249,7 +272,7 @@ class ProductViewModal extends HTMLElement {
                 icon: "fa-cubes", 
                 color: "text-blue-500" 
               },
-              { label: "Variants", value: p.variant_count ?? (Array.isArray(p.variants) ? p.variants.length : 0), icon: "fa-layer-group", color: "text-purple-500" },
+              { label: "Variants", value: showVariants ? (p.variant_count ?? (Array.isArray(p.variants) ? p.variants.length : 0)) : "Disabled", icon: "fa-layer-group", color: "text-purple-500" },
               { label: "Product Type", value: p.type || "Physical", icon: "fa-shapes", color: "text-indigo-500" },
             ].map((s) => `
               <div class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
@@ -362,6 +385,9 @@ class ProductViewModal extends HTMLElement {
             </div>
           </div>
 
+          ${
+            showVariants
+              ? `
           <div class="space-y-4">
             <div class="flex items-center gap-3">
               <div class="size-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
@@ -374,6 +400,28 @@ class ProductViewModal extends HTMLElement {
             </div>
             ${this.renderVariants(p)}
           </div>
+          `
+              : ""
+          }
+
+          ${
+            showAttributes
+              ? `
+          <div class="space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="size-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <i class="fas fa-tags text-lg"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-lg leading-tight">Product Attributes</h3>
+                <p class="text-xs text-slate-500 font-medium mt-0.5">Additional specifications</p>
+              </div>
+            </div>
+            ${this.renderAttributes(p)}
+          </div>
+          `
+              : ""
+          }
         </div>
       </ui-modal>
     `;

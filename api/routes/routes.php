@@ -86,6 +86,8 @@ Router::delete('/pages/{id}', 'PageController@destroy');
 // Attribute Management Routes (admin only)
 Router::get('/attributes', 'AttributeController@index');
 Router::post('/attributes', 'AttributeController@store');
+Router::get('/product-attribute-types', 'ProductAttributeTypeController@index');
+Router::post('/product-attribute-types', 'ProductAttributeTypeController@store');
 
 // Product Management Routes (admin only)
 Router::get('/products', 'ProductController@index');
