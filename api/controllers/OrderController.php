@@ -127,7 +127,7 @@ class OrderController
             $paymentMode = $data['payment_mode'] ?? 'pay_on_delivery';
 
             $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'pickup', 'service']);
-            $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery', 'in_person']);
+            $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery']);
 
             if (!in_array($orderType, $allowedOrderTypes, true)) {
                 http_response_code(400);
@@ -241,6 +241,18 @@ class OrderController
             foreach ($orders as &$o) {
                 $o['items_count'] = (int) ($o['items_count'] ?? 0);
                 $o['total_amount'] = (float) ($o['total_amount'] ?? 0);
+                if (isset($o['metadata']) && is_string($o['metadata'])) {
+                    $decoded = json_decode($o['metadata'], true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $o['metadata'] = $decoded;
+                    }
+                }
+                $metaCustomer = is_array($o['metadata'] ?? null) ? ($o['metadata']['customer'] ?? []) : [];
+                $o['customer_name'] = $o['user_name'] ?? $o['guest_name'] ?? ($metaCustomer['name'] ?? null);
+                $o['customer_email'] = $o['user_email'] ?? $o['guest_email'] ?? ($metaCustomer['email'] ?? null);
+                $o['customer_phone'] = $o['guest_phone'] ?? ($metaCustomer['phone'] ?? null);
+                $o['customer_address'] = $o['guest_address'] ?? ($metaCustomer['address'] ?? null);
+                $o['pickup_contact'] = is_array($o['metadata'] ?? null) ? ($o['metadata']['pickup_contact'] ?? null) : null;
             }
 
             echo json_encode(['success' => true, 'data' => $orders]);
@@ -355,7 +367,7 @@ class OrderController
             }
 
             if (isset($data['payment_mode'])) {
-                $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery', 'in_person']);
+                $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery']);
                 if (!in_array($data['payment_mode'], $allowedPaymentModes, true)) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'message' => 'Invalid payment mode']);
@@ -394,7 +406,19 @@ class OrderController
             $email = trim($customer['email'] ?? '');
             $name = trim($customer['name'] ?? '');
             $phone = trim($customer['phone'] ?? '');
-            $address = trim($customer['address'] ?? '');
+            $rawAddress = $customer['address'] ?? '';
+            if (is_array($rawAddress)) {
+                $address = trim(
+                    ($rawAddress['line1'] ?? '') . ' ' .
+                    ($rawAddress['line2'] ?? '') . ' ' .
+                    ($rawAddress['city'] ?? '') . ' ' .
+                    ($rawAddress['state'] ?? '') . ' ' .
+                    ($rawAddress['country'] ?? '') . ' ' .
+                    ($rawAddress['postal'] ?? '')
+                );
+            } else {
+                $address = trim((string)$rawAddress);
+            }
 
             if (!$email || !$name) {
                 http_response_code(400);
@@ -415,7 +439,7 @@ class OrderController
             $orderType = $data['order_type'] ?? 'delivery';
             $paymentMode = $data['payment_mode'] ?? 'pay_on_delivery';
             $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'pickup', 'service']);
-            $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery', 'in_person']);
+            $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery']);
             if (!in_array($orderType, $allowedOrderTypes, true)) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'message' => 'Invalid order type']);
@@ -476,7 +500,7 @@ class OrderController
                         'name' => $name,
                         'email' => $email,
                         'phone' => $phone,
-                        'address' => $address,
+                        'address' => $customer['address'] ?? $address,
                         'note' => $customer['note'] ?? ''
                     ],
                     'source' => 'guest',
@@ -532,4 +556,5 @@ class OrderController
     }
 }
 ?>
+
 

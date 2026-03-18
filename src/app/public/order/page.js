@@ -3,6 +3,7 @@ import "@/components/ui/Dropdown.js";
 import "@/components/ui/Input.js";
 import "@/components/ui/Textarea.js";
 import "@/components/ui/Toast.js";
+import "@/components/ui/Switch.js";
 import api from "@/services/api.js";
 
 class PublicOrderPage extends App {
@@ -21,9 +22,30 @@ class PublicOrderPage extends App {
       name: "",
       email: "",
       phone: "",
-      address: "",
       note: "",
     };
+    this.deliveryAddress = {
+      line1: "",
+      line2: "",
+      city: "",
+      state: "",
+      country: "Nigeria",
+      postal: "",
+    };
+    this.pickupContact = {
+      name: "",
+      phone: "",
+      note: "",
+    };
+    this.pickupMode = "self";
+    this.savedAddresses = [];
+    this.savedPickups = [];
+    this.selectedAddressId = "";
+    this.selectedPickupId = "";
+    this.saveAddress = false;
+    this.savePickup = false;
+    this.showAddressForm = false;
+    this.showPickupForm = false;
     this.orderType = "";
     this.paymentMode = "";
     this._lastRendered = "";
@@ -41,6 +63,7 @@ class PublicOrderPage extends App {
     super.connectedCallback();
     await this.loadSettings();
     this.hydrateCustomerFromUser();
+    await this.loadSavedData();
     await this.loadCart();
   }
 
@@ -51,10 +74,63 @@ class PublicOrderPage extends App {
       if (!this.customer.name) this.customer.name = user.name || "";
       if (!this.customer.email) this.customer.email = user.email || "";
       if (!this.customer.phone) this.customer.phone = user.phone || user.phone_number || "";
-      if (!this.customer.address) this.customer.address = user.address || "";
+      if (!this.deliveryAddress.line1) this.deliveryAddress.line1 = user.address || "";
     } catch (_) {
       // ignore
     }
+  }
+
+  async loadSavedData() {
+    if (!this.isCustomerLoggedIn()) return;
+    try {
+      const [addrRes, pickupRes] = await Promise.all([
+        api.get("/addresses").catch(() => null),
+        api.get("/pickup-contacts").catch(() => null),
+      ]);
+      this.savedAddresses = addrRes?.data?.data || [];
+      this.savedPickups = pickupRes?.data?.data || [];
+      if (!this.savedAddresses.length) {
+        this.showAddressForm = true;
+        this.saveAddress = true;
+      }
+      if (!this.selectedAddressId) {
+        const def = this.savedAddresses.find((a) => Number(a.is_default) === 1);
+        if (def) this.applySavedAddress(def);
+      }
+      if (!this.selectedPickupId) {
+        const def = this.savedPickups.find((p) => Number(p.is_default) === 1);
+        if (def) this.applySavedPickup(def);
+      }
+      this.updateView();
+    } catch (_) {
+      this.savedAddresses = [];
+      this.savedPickups = [];
+    }
+  }
+
+  applySavedAddress(address) {
+    if (!address) return;
+    this.selectedAddressId = String(address.id || "");
+    this.deliveryAddress = {
+      line1: address.address_line1 || "",
+      line2: address.address_line2 || "",
+      city: address.city || "",
+      state: address.state || "",
+      country: address.country || "Nigeria",
+      postal: address.postal_code || "",
+    };
+  }
+
+  applySavedPickup(pickup) {
+    if (!pickup) return;
+    this.selectedPickupId = String(pickup.id || "");
+    this.pickupContact = {
+      name: pickup.name || "",
+      phone: pickup.phone || "",
+      note: pickup.note || "",
+    };
+    this.pickupMode = "someone";
+    this.showPickupForm = false;
   }
 
   async loadSettings() {
@@ -72,6 +148,9 @@ class PublicOrderPage extends App {
       );
       this.allowedPaymentModes = this.parseSettingList(
         modesRes?.data?.data?.setting_value,
+      );
+      this.allowedPaymentModes = this.allowedPaymentModes.filter(
+        (m) => String(m).toLowerCase() !== "in_person",
       );
       const raw = String(loginRes?.data?.data?.setting_value ?? "1").toLowerCase();
       this.userLoginEnabled = !(raw === "0" || raw === "false" || raw === "no");
@@ -233,6 +312,32 @@ class PublicOrderPage extends App {
     this.customer[field] = value;
   }
 
+  handleAddressInput(field, value) {
+    this.deliveryAddress[field] = value;
+  }
+
+  handlePickupInput(field, value) {
+    this.pickupContact[field] = value;
+  }
+
+  async removePickupContact(id) {
+    if (!id) return;
+    try {
+      await api.delete(`/pickup-contacts/${id}`);
+      this.savedPickups = this.savedPickups.filter((p) => String(p.id) !== String(id));
+      if (String(this.selectedPickupId) === String(id)) {
+        this.selectedPickupId = "";
+      }
+      this.updateView();
+    } catch (_) {
+      window.Toast?.show?.({
+        title: "Error",
+        message: "Failed to remove pickup contact.",
+        variant: "error",
+      });
+    }
+  }
+
   isCustomerLoggedIn() {
     const token = localStorage.getItem("token");
     if (!token) return false;
@@ -255,9 +360,11 @@ class PublicOrderPage extends App {
       return;
     }
     const isLoggedIn = this.isCustomerLoggedIn();
-    const { name, email, phone, address } = this.customer;
+    const { name, email, phone } = this.customer;
+    const { line1, line2, city, state, country, postal } = this.deliveryAddress;
+    const { name: pickerName, phone: pickerPhone, note: pickerNote } = this.pickupContact;
     const requiresAddress = this.orderType === "delivery";
-    if (!name || !email || !phone || (requiresAddress && !address)) {
+    if (!name || !email || !phone || (requiresAddress && (!line1 || !city))) {
       window.Toast?.show?.({
         title: "Missing details",
         message: requiresAddress
@@ -267,10 +374,49 @@ class PublicOrderPage extends App {
       });
       return;
     }
+    if (this.orderType === "pickup" && this.pickupMode === "someone" && (!pickerName || !pickerPhone)) {
+      window.Toast?.show?.({
+        title: "Missing pickup contact",
+        message: "Please provide the pickup person's name and phone.",
+        variant: "error",
+      });
+      return;
+    }
 
     this.submitting = true;
     this.updateView();
     try {
+      if (isLoggedIn) {
+        if (requiresAddress && this.saveAddress) {
+          const res = await api.post("/addresses", {
+            address_line1: line1,
+            address_line2: line2,
+            city,
+            state,
+            country,
+            postal_code: postal,
+            type: "shipping",
+            is_default: this.savedAddresses.length === 0 ? 1 : 0,
+          });
+          if (res?.data?.data) {
+            this.savedAddresses = [res.data.data, ...this.savedAddresses];
+            this.selectedAddressId = String(res.data.data.id || "");
+          }
+        }
+        if (this.orderType === "pickup" && this.savePickup) {
+          const res = await api.post("/pickup-contacts", {
+            name: pickerName,
+            phone: pickerPhone,
+            note: pickerNote || "",
+            is_default: this.savedPickups.length === 0 ? 1 : 0,
+          });
+          if (res?.data?.data) {
+            this.savedPickups = [res.data.data, ...this.savedPickups];
+            this.selectedPickupId = String(res.data.data.id || "");
+          }
+        }
+      }
+
       if (isLoggedIn) {
         const res = await api.post("/orders", {
           order_type: this.orderType || this.allowedOrderTypes[0] || "delivery",
@@ -280,9 +426,27 @@ class PublicOrderPage extends App {
               name,
               email,
               phone,
-              address: address || "",
+              address: requiresAddress
+                ? {
+                    line1,
+                    line2,
+                    city,
+                    state,
+                    country,
+                    postal,
+                  }
+                : "",
               note: this.customer.note || "",
             },
+            pickup_contact:
+              this.orderType === "pickup"
+                ? {
+                    mode: this.pickupMode,
+                    name: pickerName,
+                    phone: pickerPhone,
+                    note: pickerNote || "",
+                  }
+                : null,
             source: "customer",
           },
         });
@@ -300,8 +464,26 @@ class PublicOrderPage extends App {
             name,
             email,
             phone,
-            address: address || "",
+            address: requiresAddress
+              ? {
+                  line1,
+                  line2,
+                  city,
+                  state,
+                  country,
+                  postal,
+                }
+              : "",
             note: this.customer.note || "",
+            pickup_contact:
+              this.orderType === "pickup"
+                ? {
+                    mode: this.pickupMode,
+                    name: pickerName,
+                    phone: pickerPhone,
+                    note: pickerNote || "",
+                  }
+                : null,
           },
           items: this.items.map((item) => ({
             product_id: item.product_id,
@@ -379,7 +561,7 @@ class PublicOrderPage extends App {
     const orderTypes = this.getOrderTypeOptions();
     const paymentModes = this.allowedPaymentModes.length
       ? this.allowedPaymentModes
-      : ["pay_on_delivery", "pay_before_delivery", "in_person"];
+      : ["pay_on_delivery", "pay_before_delivery"];
     const isService = this.hasServiceItems();
     const hasSelection = !!this.orderType;
     const isDelivery = this.orderType === "delivery";
@@ -433,48 +615,12 @@ class PublicOrderPage extends App {
             ${
               hasSelection
                 ? `
-                <div class="bg-white border border-slate-100 rounded-3xl p-6 space-y-4">
-                  <h2 class="text-lg font-black text-slate-900">Payment</h2>
-                  <div class="grid sm:grid-cols-2 gap-4">
-                    ${paymentModes
-                      .map((mode) => {
-                        const active = this.paymentMode === mode;
-                        const label =
-                          mode === "pay_before_delivery"
-                            ? "Pay before delivery"
-                            : mode === "in_person"
-                              ? "Pay in person"
-                              : "Pay on delivery";
-                        const subtitle =
-                          mode === "pay_before_delivery"
-                            ? "Pay now to confirm the order."
-                            : mode === "in_person"
-                              ? "Settle when you arrive."
-                              : "Pay when your order arrives.";
-                        return `
-                          <button type="button" class="text-left border ${active ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-100"} rounded-2xl p-4 flex items-start gap-3 hover:border-slate-300 transition" onclick="this.closest('app-public-order-page').paymentMode='${mode}'; this.closest('app-public-order-page').updateView();">
-                            <div class="mt-1 w-5 h-5 rounded-full border ${active ? "border-slate-900" : "border-slate-300"} flex items-center justify-center">
-                              ${active ? `<span class="w-2.5 h-2.5 bg-slate-900 rounded-full"></span>` : ""}
-                            </div>
-                            <div>
-                              <p class="text-sm font-semibold text-slate-900">${label}</p>
-                              <p class="text-xs text-slate-500 mt-1">${subtitle}</p>
-                            </div>
-                          </button>
-                        `;
-                      })
-                      .join("")}
-                  </div>
-                  ${
-                    isPickup
-                      ? `<p class="text-xs text-slate-500">We will notify you when your order is ready for pickup.</p>`
-                      : isService
-                        ? `<p class="text-xs text-slate-500">We will contact you to confirm service time and delivery.</p>`
-                        : `<p class="text-xs text-slate-500">Delivery timelines will be confirmed after payment.</p>`
-                  }
-                </div>
+                <!-- payment moved to order summary -->
                 <div class="bg-white border border-slate-100 rounded-3xl p-6 space-y-4">
                   <h2 class="text-lg font-black text-slate-900">Customer details</h2>
+                  <p class="text-xs text-slate-500">
+                    ${isPickup ? "Pickup requires customer details and pickup person." : "Delivery requires customer details and delivery address."}
+                  </p>
                   <div>
                     <label class="block text-xs font-semibold text-slate-500 mb-1">Full name</label>
                     <ui-input value="${this.customer.name}" placeholder="Jane Doe" oninput="this.closest('app-public-order-page').handleCustomerInput('name', this.value)"></ui-input>
@@ -490,9 +636,172 @@ class PublicOrderPage extends App {
                   ${
                     isDelivery
                       ? `
-                    <div>
-                      <label class="block text-xs font-semibold text-slate-500 mb-1">Delivery address</label>
-                      <ui-textarea rows="3" value="${this.customer.address}" placeholder="Street, City, State" oninput="this.closest('app-public-order-page').handleCustomerInput('address', this.value)"></ui-textarea>
+                    <div class="space-y-3">
+                      <h3 class="text-sm font-semibold text-slate-700">Delivery address</h3>
+                      ${this.isCustomerLoggedIn()
+                        ? `
+                      <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                          <label class="block text-xs font-semibold text-slate-500">Saved addresses</label>
+                          ${this.showAddressForm ? "" : `
+                            <button type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 border border-slate-200 rounded-full px-3 py-1 hover:bg-slate-50" onclick="const page=this.closest('app-public-order-page'); page.showAddressForm = true; page.updateView();">
+                              <i class="fas fa-plus text-[9px]"></i>
+                              Add
+                            </button>
+                          `}
+                        </div>
+                        ${this.showAddressForm ? "" : `
+                        <div class="grid sm:grid-cols-2 gap-3">
+                          ${this.savedAddresses.map((a) => `
+                            <div class="relative border ${this.selectedAddressId === String(a.id) ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-100"} rounded-2xl p-4 hover:border-slate-300 transition">
+                              <button type="button" class="absolute top-2 right-2 text-slate-400 hover:text-rose-500" onclick="event.stopPropagation(); this.closest('app-public-order-page').removeAddress(${a.id});">
+                                <i class="fas fa-times text-[10px]"></i>
+                              </button>
+                              <button type="button" class="text-left w-full" onclick="const page=this.closest('app-public-order-page'); page.applySavedAddress(${JSON.stringify(a).replace(/"/g, '&quot;')}); page.updateView();">
+                                <p class="text-sm font-semibold text-slate-900">${a.address_line1}</p>
+                                <p class="text-xs text-slate-500 mt-1">${a.city}${a.state ? `, ${a.state}` : ""}</p>
+                              </button>
+                            </div>
+                          `).join("")}
+                        </div>
+                        `}
+                      </div>
+                      `
+                        : ""}
+                      ${this.isCustomerLoggedIn() && !this.showAddressForm ? "" : `
+                      <div class="relative rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                        <button type="button" class="absolute top-3 right-3 text-slate-400 hover:text-slate-700" onclick="const page=this.closest('app-public-order-page'); page.showAddressForm=false; page.updateView();">
+                          <i class="fas fa-times"></i>
+                        </button>
+                        <div>
+                          <label class="block text-xs font-semibold text-slate-500 mb-1">Address line 1</label>
+                          <ui-input value="${this.deliveryAddress.line1}" placeholder="Street address" oninput="this.closest('app-public-order-page').handleAddressInput('line1', this.value)"></ui-input>
+                        </div>
+                        <div>
+                          <label class="block text-xs font-semibold text-slate-500 mb-1">Address line 2</label>
+                          <ui-input value="${this.deliveryAddress.line2}" placeholder="Apartment, suite, etc." oninput="this.closest('app-public-order-page').handleAddressInput('line2', this.value)"></ui-input>
+                        </div>
+                        <div class="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">City</label>
+                            <ui-input value="${this.deliveryAddress.city}" placeholder="City" oninput="this.closest('app-public-order-page').handleAddressInput('city', this.value)"></ui-input>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">State</label>
+                            <ui-input value="${this.deliveryAddress.state}" placeholder="State" oninput="this.closest('app-public-order-page').handleAddressInput('state', this.value)"></ui-input>
+                          </div>
+                        </div>
+                        <div class="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Country</label>
+                            <ui-input value="${this.deliveryAddress.country}" placeholder="Country" oninput="this.closest('app-public-order-page').handleAddressInput('country', this.value)"></ui-input>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Postal code</label>
+                            <ui-input value="${this.deliveryAddress.postal}" placeholder="Postal code" oninput="this.closest('app-public-order-page').handleAddressInput('postal', this.value)"></ui-input>
+                          </div>
+                        </div>
+                        ${this.isCustomerLoggedIn()
+                          ? `<div class="flex items-center justify-between">
+                              <span class="text-xs text-slate-500">Save this address for next time</span>
+                              <ui-switch ${this.saveAddress ? "checked" : ""} onchange="this.closest('app-public-order-page').saveAddress = event.detail.checked"></ui-switch>
+                             </div>`
+                          : ""
+                        }
+                      </div>
+                      `}
+                      
+                    </div>
+                  `
+                      : ""
+                  }
+                  ${
+                    isPickup
+                      ? `
+                    <div class="space-y-3">
+                      <h3 class="text-sm font-semibold text-slate-700">Pickup details</h3>
+                      <p class="text-xs text-slate-500">Who will be picking up the order?</p>
+                      <div class="grid sm:grid-cols-2 gap-3">
+                        <button type="button" class="text-left border ${this.pickupMode === "self" ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-100"} rounded-2xl p-4 flex items-start gap-3 hover:border-slate-300 transition" onclick="const page=this.closest('app-public-order-page'); page.pickupMode='self'; page.updateView();">
+                          <div class="mt-1 w-5 h-5 rounded-full border ${this.pickupMode === "self" ? "border-slate-900" : "border-slate-300"} flex items-center justify-center">
+                            ${this.pickupMode === "self" ? `<span class="w-2.5 h-2.5 bg-slate-900 rounded-full"></span>` : ""}
+                          </div>
+                          <div>
+                            <p class="text-sm font-semibold text-slate-900">Myself</p>
+                            <p class="text-xs text-slate-500 mt-1">I will pick up the order.</p>
+                          </div>
+                        </button>
+                        <button type="button" class="text-left border ${this.pickupMode === "someone" ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-100"} rounded-2xl p-4 flex items-start gap-3 hover:border-slate-300 transition" onclick="const page=this.closest('app-public-order-page'); page.pickupMode='someone'; page.updateView();">
+                          <div class="mt-1 w-5 h-5 rounded-full border ${this.pickupMode === "someone" ? "border-slate-900" : "border-slate-300"} flex items-center justify-center">
+                            ${this.pickupMode === "someone" ? `<span class="w-2.5 h-2.5 bg-slate-900 rounded-full"></span>` : ""}
+                          </div>
+                          <div>
+                            <p class="text-sm font-semibold text-slate-900">Someone else</p>
+                            <p class="text-xs text-slate-500 mt-1">I will send another person.</p>
+                          </div>
+                        </button>
+                      </div>
+                      ${this.isCustomerLoggedIn() && this.pickupMode === "someone"
+                        ? `
+                      <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                          <label class="block text-xs font-semibold text-slate-500">Saved pickup contacts</label>
+                          ${this.showPickupForm ? "" : `
+                            <button type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 border border-slate-200 rounded-full px-3 py-1 hover:bg-slate-50" onclick="const page=this.closest('app-public-order-page'); page.showPickupForm = true; page.updateView();">
+                              <i class="fas fa-plus text-[9px]"></i>
+                              Add
+                            </button>
+                          `}
+                        </div>
+                        ${this.showPickupForm ? "" : `
+                        <div class="grid sm:grid-cols-2 gap-3">
+                          ${this.savedPickups.map((p) => `
+                            <div class="relative border ${this.selectedPickupId === String(p.id) ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-100"} rounded-2xl p-4 hover:border-slate-300 transition">
+                              <button type="button" class="absolute top-2 right-2 text-slate-400 hover:text-rose-500" onclick="event.stopPropagation(); this.closest('app-public-order-page').removePickupContact(${p.id});">
+                                <i class="fas fa-times text-[10px]"></i>
+                              </button>
+                              <button type="button" class="text-left w-full" onclick="const page=this.closest('app-public-order-page'); page.applySavedPickup(${JSON.stringify(p).replace(/"/g, '&quot;')}); page.updateView();">
+                                <p class="text-sm font-semibold text-slate-900">${p.name}</p>
+                                <p class="text-xs text-slate-500 mt-1">${p.phone}</p>
+                              </button>
+                            </div>
+                          `).join("")}
+                        </div>
+                        `}
+                      </div>
+                      `
+                        : ""}
+                      ${
+                        this.pickupMode === "someone" && (this.showPickupForm || !this.isCustomerLoggedIn())
+                          ? `
+                        <div class="relative rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                          <button type="button" class="absolute top-3 right-3 text-slate-400 hover:text-slate-700" onclick="const page=this.closest('app-public-order-page'); page.showPickupForm=false; page.updateView();">
+                            <i class="fas fa-times"></i>
+                          </button>
+                          <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Pickup person</label>
+                            <ui-input value="${this.pickupContact.name}" placeholder="Full name" oninput="this.closest('app-public-order-page').handlePickupInput('name', this.value)"></ui-input>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Phone</label>
+                            <ui-input value="${this.pickupContact.phone}" placeholder="+1 555 000 000" oninput="this.closest('app-public-order-page').handlePickupInput('phone', this.value)"></ui-input>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Notes (optional)</label>
+                            <ui-textarea rows="2" value="${this.pickupContact.note}" placeholder="Any pickup notes" oninput="this.closest('app-public-order-page').handlePickupInput('note', this.value)"></ui-textarea>
+                          </div>
+                        ${
+                          this.isCustomerLoggedIn()
+                            ? `<div class="flex items-center justify-between">
+                                <span class="text-xs text-slate-500">Save pickup person for next time</span>
+                                <ui-switch ${this.savePickup ? "checked" : ""} onchange="this.closest('app-public-order-page').savePickup = event.detail.checked"></ui-switch>
+                               </div>`
+                            : ""
+                        }
+                        </div>
+                      `
+                          : ""
+                      }
                     </div>
                   `
                       : ""
@@ -531,6 +840,33 @@ class PublicOrderPage extends App {
                   `;
                 })
                 .join("")}
+            </div>
+            <div class="mt-6">
+              <h4 class="text-sm font-bold text-slate-900 mb-3">Payment type</h4>
+              <div class="space-y-3">
+                ${paymentModes
+                  .map((mode) => {
+                    const active = this.paymentMode === mode;
+                    const isPickupMode = this.orderType === "pickup";
+                    const label =
+                      mode === "pay_before_delivery"
+                        ? isPickupMode
+                          ? "Pay before pickup"
+                          : "Pay before delivery"
+                        : isPickupMode
+                          ? "Pay on pickup"
+                          : "Pay on delivery";
+                    return `
+                      <button type="button" class="w-full text-left border ${active ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-100"} rounded-2xl px-4 py-3 flex items-center gap-3 hover:border-slate-300 transition" onclick="this.closest('app-public-order-page').paymentMode='${mode}'; this.closest('app-public-order-page').updateView();">
+                        <div class="w-4 h-4 rounded-full border ${active ? "border-slate-900" : "border-slate-300"} flex items-center justify-center">
+                          ${active ? `<span class="w-2 h-2 bg-slate-900 rounded-full"></span>` : ""}
+                        </div>
+                        <span class="text-sm font-semibold text-slate-900">${label}</span>
+                      </button>
+                    `;
+                  })
+                  .join("")}
+              </div>
             </div>
             <div class="border-t border-slate-100 mt-6 pt-4 flex items-center justify-between text-sm text-slate-600">
               <span>Total</span>

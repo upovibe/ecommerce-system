@@ -204,6 +204,15 @@ class OrdersPage extends App {
               ? "bg-blue-100 text-blue-700"
               : "bg-amber-100 text-amber-700";
 
+      const customerType = o.user_id ? "Customer" : "Guest";
+      const pickup = o.pickup_contact || {};
+      const address =
+        o.customer_address && typeof o.customer_address === "object"
+          ? [o.customer_address.line1, o.customer_address.line2, o.customer_address.city, o.customer_address.state, o.customer_address.country, o.customer_address.postal]
+              .filter(Boolean)
+              .join(", ")
+          : o.customer_address || "";
+
       return {
         id: o.id,
         no: i + 1,
@@ -211,12 +220,14 @@ class OrdersPage extends App {
           <div class="flex flex-col gap-1">
             <div class="text-sm font-bold text-slate-800">#${o.id}</div>
             <div class="text-[10px] text-slate-400">${new Date(o.created_at).toLocaleString()}</div>
+            <div class="text-[10px] text-slate-400 truncate">${o.customer_phone || "—"}</div>
           </div>
         `,
         customer: `
           <div class="min-w-0">
-            <div class="text-sm font-semibold text-slate-800 truncate">${o.user_name || o.guest_name || "Guest"}</div>
-            <div class="text-[10px] text-slate-400 truncate">${o.user_email || o.guest_email || "—"}</div>
+            <div class="text-sm font-semibold text-slate-800 truncate">${o.customer_name || "Guest"}</div>
+            <div class="text-[10px] text-slate-400 truncate">${o.customer_email || "—"}</div>
+            <div class="text-[10px] text-slate-400 truncate">${o.customer_phone || "—"}</div>
           </div>
         `,
         items: `<span class="text-sm font-semibold text-slate-700">${o.items_count || 0}</span>`,
@@ -224,6 +235,16 @@ class OrdersPage extends App {
         status: `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${statusBadge}">${o.status || "pending"}</span>`,
         payment: `<span class="text-xs font-semibold text-slate-600">${o.payment_mode || o.payment_method || "—"}</span>`,
         type: `<span class="text-xs font-semibold text-slate-600 capitalize">${o.order_type || "delivery"}</span>`,
+        customer_type: `<span class="text-[10px] font-bold uppercase tracking-widest ${o.user_id ? "text-emerald-700 bg-emerald-50" : "text-slate-600 bg-slate-100"} px-2 py-0.5 rounded-full">${customerType}</span>`,
+        fulfillment: `
+          <div class="text-[10px] text-slate-500">
+            ${o.order_type === "pickup"
+              ? `Pickup: ${pickup?.name || "—"} ${pickup?.phone ? `(${pickup.phone})` : ""}`
+              : o.order_type === "service"
+                ? "Service booking"
+                : address || "Delivery"}
+          </div>
+        `,
       };
     });
 
@@ -231,11 +252,13 @@ class OrdersPage extends App {
       { key: "no", label: "#", html: false },
       { key: "order", label: "Order", html: true },
       { key: "customer", label: "Customer", html: true },
+      { key: "customer_type", label: "Type", html: true },
       { key: "items", label: "Items", html: true },
       { key: "total", label: "Total", html: true },
       { key: "status", label: "Status", html: true },
       { key: "payment", label: "Payment", html: true },
       { key: "type", label: "Type", html: true },
+      { key: "fulfillment", label: "Fulfillment", html: true },
     ];
 
     const safeData = JSON.stringify(rows).replace(/"/g, "&quot;");
@@ -342,4 +365,12 @@ class OrdersPage extends App {
 
 customElements.define("app-orders-page", OrdersPage);
 export default OrdersPage;
+
+
+
+
+
+
+
+
 

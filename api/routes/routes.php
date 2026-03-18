@@ -112,6 +112,14 @@ Router::get('/wishlist', 'WishlistController@index');
 Router::post('/wishlist/items', 'WishlistController@addItem');
 Router::delete('/wishlist/items/{id}', 'WishlistController@removeItem');
 
+// Customer saved info
+Router::get('/addresses', 'AddressController@index');
+Router::post('/addresses', 'AddressController@store');
+Router::delete('/addresses/{id}', 'AddressController@destroy');
+Router::get('/pickup-contacts', 'PickupContactController@index');
+Router::post('/pickup-contacts', 'PickupContactController@store');
+Router::delete('/pickup-contacts/{id}', 'PickupContactController@destroy');
+
 // Orders (user)
 Router::post('/orders', 'OrderController@createFromCart');
 Router::get('/orders', 'OrderController@index');

@@ -14,7 +14,21 @@ class CustomerLoginPage extends App {
   async connectedCallback() {
     super.connectedCallback();
     document.title = "Customer Sign In";
+    this.ensureBackToHome();
     await this.loadLoginSetting();
+  }
+
+  ensureBackToHome() {
+    if (sessionStorage.getItem("customer_login_backfix") === "1") return;
+    try {
+      const current = window.location.pathname;
+      if (current !== "/auth/customer-login") return;
+      history.replaceState({ fromCustomerLogin: true }, "", "/");
+      history.pushState({ fromCustomerLogin: true }, "", current);
+      sessionStorage.setItem("customer_login_backfix", "1");
+    } catch (_) {
+      // ignore
+    }
   }
 
   async loadLoginSetting() {

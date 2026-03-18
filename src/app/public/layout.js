@@ -70,6 +70,7 @@ class PublicLayout extends App {
       this.innerHTML = this.render();
       this.setPageContent(latestContent);
       this.bindNav();
+      await this.syncGuestCartToUser();
     } catch (_) {
       const latestContent =
         this.querySelector("#page-content")?.innerHTML || this._pageContent || existingContent || "";
@@ -77,6 +78,7 @@ class PublicLayout extends App {
       this.innerHTML = this.render();
       this.setPageContent(latestContent);
       this.bindNav();
+      await this.syncGuestCartToUser();
     }
   }
 
@@ -148,6 +150,52 @@ class PublicLayout extends App {
     }
   }
 
+  getCustomerSession() {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    try {
+      const user = JSON.parse(localStorage.getItem("userData") || "null");
+      if (user && user.user_type === "customer") return user;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async syncGuestCartToUser() {
+    const user = this.getCustomerSession();
+    if (!user) return;
+    if (localStorage.getItem("guest_cart_synced") === "1") return;
+    let guestItems = [];
+    try {
+      const raw = localStorage.getItem("guest_cart");
+      guestItems = raw ? JSON.parse(raw) : [];
+    } catch (_) {
+      guestItems = [];
+    }
+    if (!Array.isArray(guestItems) || guestItems.length === 0) return;
+
+    const guestCount = guestItems.reduce(
+      (sum, item) => sum + (Number(item.quantity || 0) || 0),
+      0,
+    );
+    try {
+      for (const item of guestItems) {
+        await api.post("/cart/items", {
+          product_id: item.product_id,
+          quantity: item.quantity || 1,
+          variant_id: item.variant_id || null,
+        });
+      }
+      localStorage.removeItem("guest_cart");
+      localStorage.setItem("guest_cart_synced", "1");
+      localStorage.setItem("cart_count", String(guestCount));
+      this.updateCartBadge();
+    } catch (_) {
+      // ignore sync failures
+    }
+  }
+
   render() {
     const siteName = this.siteName || "VastCommerce";
     const logo = this.logoUrl ? this.getImageUrl(this.logoUrl) : this.fallbackLogo;
@@ -197,10 +245,22 @@ class PublicLayout extends App {
                 </a>
                 ${
                   this.allowLogin
-                    ? `
-                  <div class="w-px h-6 bg-slate-100 mx-2"></div>
-                  <a href="/auth/customer-login" class="text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-slate-100" style="background:${primary}">Sign In</a>
-                `
+                    ? (() => {
+                        const user = this.getCustomerSession();
+                        if (user) {
+                          return `
+                            <div class="w-px h-6 bg-slate-100 mx-2"></div>
+                            <a href="/profile" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all">
+                              <i class="fas fa-user text-xs"></i>
+                              ${user.name ? user.name.split(" ")[0] : "Profile"}
+                            </a>
+                          `;
+                        }
+                        return `
+                          <div class="w-px h-6 bg-slate-100 mx-2"></div>
+                          <a href="/auth/customer-login" class="text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-slate-100" style="background:${primary}">Sign In</a>
+                        `;
+                      })()
                     : ""
                 }
               `

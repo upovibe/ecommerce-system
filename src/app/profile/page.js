@@ -1,12 +1,16 @@
 import App from "@/core/App.js";
 import "@/components/ui/Card.js";
 import "@/components/ui/Button.js";
+import api from "@/services/api.js";
 
 class ProfilePage extends App {
   constructor() {
     super();
     this.userData = JSON.parse(localStorage.getItem("userData")) || {};
     this.loginEnabled = true;
+    this.addresses = [];
+    this.pickups = [];
+    this.loading = true;
   }
 
   async connectedCallback() {
@@ -16,6 +20,7 @@ class ProfilePage extends App {
     if (!this.loginEnabled) {
       window.location.href = "/";
     }
+    await this.loadSavedInfo();
   }
 
   async loadLoginSetting() {
@@ -33,6 +38,23 @@ class ProfilePage extends App {
     localStorage.removeItem("token");
     localStorage.removeItem("userData");
     window.location.href = "/auth/customer-login";
+  }
+
+  async loadSavedInfo() {
+    try {
+      const [addrRes, pickupRes] = await Promise.all([
+        api.get("/addresses").catch(() => null),
+        api.get("/pickup-contacts").catch(() => null),
+      ]);
+      this.addresses = addrRes?.data?.data || [];
+      this.pickups = pickupRes?.data?.data || [];
+    } catch (_) {
+      this.addresses = [];
+      this.pickups = [];
+    } finally {
+      this.loading = false;
+      this.render();
+    }
   }
 
   render() {
@@ -87,6 +109,48 @@ class ProfilePage extends App {
                             </div>
                         </div>
                     </ui-card>
+                </div>
+
+                <div class="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <ui-card class="p-8 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm">
+                    <h3 class="text-lg font-black text-slate-900 mb-4">Saved Addresses</h3>
+                    ${this.loading
+                      ? `<div class="space-y-3">${Array(3).fill('<div class="h-12 bg-slate-100 rounded-2xl animate-pulse"></div>').join("")}</div>`
+                      : this.addresses.length
+                        ? `<div class="grid gap-3">
+                            ${this.addresses
+                              .map(
+                                (a) => `
+                                <div class="p-4 rounded-2xl border border-slate-100 bg-slate-50">
+                                  <p class="text-sm font-semibold text-slate-900">${a.address_line1}</p>
+                                  <p class="text-xs text-slate-500">${a.city}${a.state ? `, ${a.state}` : ""}</p>
+                                </div>
+                              `,
+                              )
+                              .join("")}
+                          </div>`
+                        : `<p class="text-sm text-slate-500">No saved addresses yet.</p>`}
+                  </ui-card>
+
+                  <ui-card class="p-8 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm">
+                    <h3 class="text-lg font-black text-slate-900 mb-4">Pickup Contacts</h3>
+                    ${this.loading
+                      ? `<div class="space-y-3">${Array(3).fill('<div class="h-12 bg-slate-100 rounded-2xl animate-pulse"></div>').join("")}</div>`
+                      : this.pickups.length
+                        ? `<div class="grid gap-3">
+                            ${this.pickups
+                              .map(
+                                (p) => `
+                                <div class="p-4 rounded-2xl border border-slate-100 bg-slate-50">
+                                  <p class="text-sm font-semibold text-slate-900">${p.name}</p>
+                                  <p class="text-xs text-slate-500">${p.phone}</p>
+                                </div>
+                              `,
+                              )
+                              .join("")}
+                          </div>`
+                        : `<p class="text-sm text-slate-500">No pickup contacts yet.</p>`}
+                  </ui-card>
                 </div>
             </div>
         `;

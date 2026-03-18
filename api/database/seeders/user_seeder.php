@@ -26,14 +26,16 @@ class UserSeeder
 
     public function run()
     {
-        echo "🌱 Seeding default users...\n";
+        echo "🌱 Seeding default users...
+";
         $this->seedAdminUser();
         $this->seedCustomerUsers();
     }
 
     private function seedAdminUser()
     {
-        echo "📝 Seeding admin users...\n";
+        echo "📝 Seeding admin users...
+";
 
         $roles = ['super_admin', 'manager', 'accountant'];
         foreach ($roles as $index => $roleSlug) {
@@ -42,7 +44,8 @@ class UserSeeder
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$role) {
-                echo "❌ Role '{$roleSlug}' not found.\n";
+                echo "❌ Role '{$roleSlug}' not found.
+";
                 continue;
             }
 
@@ -51,7 +54,8 @@ class UserSeeder
             $stmt = $this->pdo->prepare('SELECT id FROM admins WHERE email = ?');
             $stmt->execute([$email]);
             if ($stmt->fetch()) {
-                echo "⚠️  Admin user '{$email}' already exists\n";
+                echo "⚠️  Admin user '{$email}' already exists
+";
                 continue;
             }
 
@@ -73,13 +77,15 @@ class UserSeeder
                 'active'
             ]);
 
-            echo "✅ Seeded admin user: {$email} / admin123\n";
+            echo "✅ Seeded admin user: {$email} / admin123
+";
         }
     }
  
     private function seedCustomerUsers()
     {
-        echo "📝 Seeding customer users...\n";
+        echo "📝 Seeding customer users...
+";
 
         $customers = [
             ['James Carter',    'customer@vastcommerce.com',    'customer123',  $this->customerAvatars[0]],
@@ -89,11 +95,12 @@ class UserSeeder
             ['Daniel Brown',    'daniel@vastcommerce.com',      'daniel123',    $this->customerAvatars[4]],
         ];
 
-        foreach ($customers as $c) {
+        foreach ($customers as $index => $c) {
             $stmt = $this->pdo->prepare('SELECT id FROM users WHERE email = ?');
             $stmt->execute([$c[1]]);
             if ($stmt->fetch()) {
-                echo "⚠️  User already exists: {$c[1]}\n";
+                echo "⚠️  User already exists: {$c[1]}
+";
                 continue;
             }
 
@@ -109,7 +116,42 @@ class UserSeeder
                 0,
                 'active'
             ]);
-            echo "✅ Seeded customer: {$c[1]}\n";
+            echo "✅ Seeded customer: {$c[1]}\\n";
+            $userId = $this->pdo->lastInsertId();
+
+            $addrStmt = $this->pdo->prepare('
+                INSERT INTO addresses (user_id, type, address_line1, address_line2, city, state, country, postal_code, is_default, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ');
+            $addrStmt->execute([
+                $userId,
+                'shipping',
+                '12 Market Street',
+                'Suite ' . ($index + 1),
+                'Lagos',
+                'Lagos',
+                'Nigeria',
+                '100001',
+                1
+            ]);
+
+            $pickupStmt = $this->pdo->prepare('
+                INSERT INTO pickup_contacts (user_id, name, phone, note, is_default, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+            ');
+            $pickupStmt->execute([
+                $userId,
+                'Pickup Contact ' . ($index + 1),
+                '+23480100000' . ($index + 1),
+                'Default pickup person',
+                1
+            ]);
         }
     }
 }
+
+
+
+
+
+

@@ -40,11 +40,21 @@ class OrderViewModal extends HTMLElement {
     const displayEmail =
       this.order.user_email || this.order.guest_email || metaCustomer.email || "â€”";
     const displayPhone = this.order.guest_phone || metaCustomer.phone || "";
-    const displayAddress = this.order.guest_address || metaCustomer.address || "";
+    const rawAddress = this.order.guest_address || metaCustomer.address || "";
+    const displayAddress =
+      rawAddress && typeof rawAddress === "object"
+        ? [rawAddress.line1, rawAddress.line2, rawAddress.city, rawAddress.state, rawAddress.country, rawAddress.postal]
+            .filter(Boolean)
+            .join(", ")
+        : rawAddress;
     const whatsappUrl =
       this.order && this.order.metadata && this.order.metadata.admin_whatsapp
         ? this.order.metadata.admin_whatsapp.url
         : "";
+    const pickupContact =
+      this.order && this.order.metadata && this.order.metadata.pickup_contact
+        ? this.order.metadata.pickup_contact
+        : null;
 
     const items = this.order.items || [];
     const itemsHtml = items.map((item) => {
@@ -103,6 +113,15 @@ class OrderViewModal extends HTMLElement {
                 <div class="text-slate-700 font-semibold">${new Date(this.order.created_at).toLocaleString()}</div>
               </div>
             </div>
+            ${
+              pickupContact && (pickupContact.name || pickupContact.phone)
+                ? `<div class="mt-3 text-[11px]">
+                    <div class="text-slate-400 font-semibold uppercase tracking-widest">Pickup Person</div>
+                    <div class="text-slate-700 font-semibold">${pickupContact.name || "—"}</div>
+                    <div class="text-slate-400">${pickupContact.phone || "—"}</div>
+                  </div>`
+                : ""
+            }
           </div>
 
           <div class="grid grid-cols-3 gap-3">
