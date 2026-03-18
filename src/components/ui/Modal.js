@@ -152,6 +152,11 @@ class Modal extends HTMLElement {
       document.body.appendChild(this);
     }
 
+    if (!this._originalParent) {
+      this._originalParent = this.parentElement;
+      this._originalNextSibling = this.nextSibling;
+    }
+
     // Focus management
     this.focus();
 
@@ -164,6 +169,9 @@ class Modal extends HTMLElement {
 
   close() {
     if (!this.isOpen) return;
+    if (this.dataset && this.dataset.lockOpen === "1" && this.dataset.forceClose !== "1") {
+      return;
+    }
 
     this.isOpen = false;
     this.removeAttribute("open");
@@ -173,6 +181,26 @@ class Modal extends HTMLElement {
 
     // Trigger close event
     this.dispatchEvent(new CustomEvent("modal-close"));
+    if (this.dataset && this.dataset.forceClose === "1") {
+      delete this.dataset.forceClose;
+    }
+    if (this.dataset && this.dataset.lockOpen === "1") {
+      delete this.dataset.lockOpen;
+    }
+
+    if (this._originalParent) {
+      try {
+        if (this._originalNextSibling && this._originalParent.contains(this._originalNextSibling)) {
+          this._originalParent.insertBefore(this, this._originalNextSibling);
+        } else {
+          this._originalParent.appendChild(this);
+        }
+      } catch (_) {
+        // noop
+      }
+      this._originalParent = null;
+      this._originalNextSibling = null;
+    }
   }
 
   render() {
@@ -607,6 +635,7 @@ class Modal extends HTMLElement {
     if (closeBtn) {
       closeBtn.onclick = (e) => {
         e.stopPropagation();
+        this.dataset.forceClose = "1";
         this.close();
       };
     }
@@ -621,6 +650,7 @@ class Modal extends HTMLElement {
       cancelBtn.onclick = (e) => {
         e.stopPropagation();
         this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
+        this.dataset.forceClose = "1";
         this.close();
       };
       cancelBtn._handlerAdded = true;
@@ -631,6 +661,7 @@ class Modal extends HTMLElement {
       confirmBtn.onclick = (e) => {
         e.stopPropagation();
         this.dispatchEvent(new CustomEvent("confirm", { bubbles: true }));
+        this.dataset.forceClose = "1";
         this.close();
       };
       confirmBtn._handlerAdded = true;
@@ -655,10 +686,12 @@ class Modal extends HTMLElement {
           if (action === "cancel") {
             e.stopPropagation();
             this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
+            this.dataset.forceClose = "1";
             this.close();
           } else if (action === "confirm") {
             e.stopPropagation();
             this.dispatchEvent(new CustomEvent("confirm", { bubbles: true }));
+            this.dataset.forceClose = "1";
             this.close();
           }
         } catch (_) {

@@ -91,6 +91,7 @@ class CartController
                     ci.*,
                     p.name AS product_name,
                     p.slug AS product_slug,
+                    p.type AS product_type,
                     p.main_image,
                     p.category_id,
                     c.name AS category_name

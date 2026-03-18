@@ -9,6 +9,7 @@ class OrderModel extends BaseModel
 
     protected static $fillable = [
         'user_id',
+        'guest_customer_id',
         'total_amount',
         'status',
         'payment_method',

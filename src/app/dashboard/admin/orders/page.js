@@ -215,8 +215,8 @@ class OrdersPage extends App {
         `,
         customer: `
           <div class="min-w-0">
-            <div class="text-sm font-semibold text-slate-800 truncate">${o.user_name || "Guest"}</div>
-            <div class="text-[10px] text-slate-400 truncate">${o.user_email || "—"}</div>
+            <div class="text-sm font-semibold text-slate-800 truncate">${o.user_name || o.guest_name || "Guest"}</div>
+            <div class="text-[10px] text-slate-400 truncate">${o.user_email || o.guest_email || "—"}</div>
           </div>
         `,
         items: `<span class="text-sm font-semibold text-slate-700">${o.items_count || 0}</span>`,
@@ -342,3 +342,4 @@ class OrdersPage extends App {
 
 customElements.define("app-orders-page", OrdersPage);
 export default OrdersPage;
+

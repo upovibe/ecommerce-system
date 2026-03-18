@@ -7,6 +7,8 @@ require_once __DIR__ . '/../models/OrderModel.php';
 require_once __DIR__ . '/../models/OrderItemModel.php';
 require_once __DIR__ . '/../models/CartModel.php';
 require_once __DIR__ . '/../models/SettingModel.php';
+require_once __DIR__ . '/../models/GuestCustomerModel.php';
+require_once __DIR__ . '/../services/EmailService.php';
 
 class OrderController
 {
@@ -15,6 +17,8 @@ class OrderController
     private $orderItemModel;
     private $cartModel;
     private $settingModel;
+    private $guestCustomerModel;
+    private $emailService;
 
     public function __construct($pdo)
     {
@@ -23,6 +27,8 @@ class OrderController
         $this->orderItemModel = new OrderItemModel($pdo);
         $this->cartModel = new CartModel($pdo);
         $this->settingModel = new SettingModel($pdo);
+        $this->guestCustomerModel = new GuestCustomerModel($pdo);
+        $this->emailService = new EmailService();
     }
 
     private function getUser()
@@ -85,6 +91,32 @@ class OrderController
         return $base;
     }
 
+    private function notifyAdminWhatsApp($orderId, $payload = [])
+    {
+        $setting = $this->settingModel->findByKey('admin_whatsapp');
+        $number = trim($setting['setting_value'] ?? '');
+        if (!$number) return null;
+        $digits = preg_replace('/\D+/', '', $number);
+        if (!$digits) return null;
+
+        $name = $payload['name'] ?? 'Guest';
+        $email = $payload['email'] ?? '';
+        $phone = $payload['phone'] ?? '';
+        $total = $payload['total'] ?? 0;
+        $orderType = $payload['order_type'] ?? 'delivery';
+        $paymentMode = $payload['payment_mode'] ?? 'pay_on_delivery';
+
+        $message = "New order #{$orderId}\nName: {$name}\nEmail: {$email}\nPhone: {$phone}\nTotal: {$total}\nType: {$orderType}\nPayment: {$paymentMode}";
+        $url = "https://wa.me/{$digits}?text=" . urlencode($message);
+
+        error_log("Admin WhatsApp order notification: " . $url);
+        return [
+            'number' => $digits,
+            'message' => $message,
+            'url' => $url
+        ];
+    }
+
     public function createFromCart()
     {
         try {
@@ -94,7 +126,7 @@ class OrderController
             $orderType = $data['order_type'] ?? 'delivery';
             $paymentMode = $data['payment_mode'] ?? 'pay_on_delivery';
 
-            $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'service']);
+            $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'pickup', 'service']);
             $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery', 'in_person']);
 
             if (!in_array($orderType, $allowedOrderTypes, true)) {
@@ -133,14 +165,16 @@ class OrderController
                 $total += $qty * $price;
             }
 
+            $metadata = $data['metadata'] ?? null;
             $orderId = $this->orderModel->create([
                 'user_id' => $user['id'],
+                'guest_customer_id' => null,
                 'total_amount' => $total,
                 'status' => 'pending',
                 'payment_method' => $paymentMode,
                 'order_type' => $orderType,
                 'payment_mode' => $paymentMode,
-                'metadata' => $data['metadata'] ?? null,
+                'metadata' => $metadata,
             ]);
 
             foreach ($items as $item) {
@@ -156,6 +190,21 @@ class OrderController
 
             // Mark cart as ordered
             $this->cartModel->update($cart['id'], ['status' => 'ordered']);
+
+            $customerMeta = is_array($metadata) ? ($metadata['customer'] ?? []) : [];
+            $whatsapp = $this->notifyAdminWhatsApp($orderId, [
+                'name' => $customerMeta['name'] ?? $user['name'] ?? 'Customer',
+                'email' => $customerMeta['email'] ?? $user['email'] ?? '',
+                'phone' => $customerMeta['phone'] ?? '',
+                'total' => $total,
+                'order_type' => $orderType,
+                'payment_mode' => $paymentMode
+            ]);
+            if ($whatsapp) {
+                $meta = is_array($metadata) ? $metadata : [];
+                $meta['admin_whatsapp'] = $whatsapp;
+                $this->orderModel->update($orderId, ['metadata' => $meta]);
+            }
 
             echo json_encode(['success' => true, 'message' => 'Order created', 'order_id' => $orderId]);
         } catch (Exception $e) {
@@ -176,9 +225,13 @@ class OrderController
                     o.*,
                     u.name AS user_name,
                     u.email AS user_email,
+                    gc.name AS guest_name,
+                    gc.email AS guest_email,
+                    gc.phone AS guest_phone,
                     COUNT(oi.id) AS items_count
                 FROM orders o
                 LEFT JOIN users u ON u.id = o.user_id
+                LEFT JOIN guest_customers gc ON gc.id = o.guest_customer_id
                 LEFT JOIN order_items oi ON oi.order_id = o.id
                 GROUP BY o.id
                 ORDER BY o.created_at DESC
@@ -208,9 +261,15 @@ class OrderController
                 SELECT
                     o.*,
                     u.name AS user_name,
-                    u.email AS user_email
+                    u.email AS user_email,
+                    gc.name AS guest_name,
+                    gc.email AS guest_email,
+                    gc.phone AS guest_phone,
+                    gc.address AS guest_address,
+                    gc.note AS guest_note
                 FROM orders o
                 LEFT JOIN users u ON u.id = o.user_id
+                LEFT JOIN guest_customers gc ON gc.id = o.guest_customer_id
                 WHERE o.id = ?
             ");
             $stmt->execute([$id]);
@@ -219,6 +278,13 @@ class OrderController
                 http_response_code(404);
                 echo json_encode(['success' => false, 'message' => 'Order not found']);
                 return;
+            }
+
+            if (isset($order['metadata']) && is_string($order['metadata'])) {
+                $decoded = json_decode($order['metadata'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $order['metadata'] = $decoded;
+                }
             }
 
             $itemsStmt = $this->pdo->prepare("
@@ -279,7 +345,7 @@ class OrderController
             if (isset($data['payment_method'])) $updateData['payment_method'] = $data['payment_method'];
 
             if (isset($data['order_type'])) {
-                $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'service']);
+                $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'pickup', 'service']);
                 if (!in_array($data['order_type'], $allowedOrderTypes, true)) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'message' => 'Invalid order type']);
@@ -348,7 +414,7 @@ class OrderController
 
             $orderType = $data['order_type'] ?? 'delivery';
             $paymentMode = $data['payment_mode'] ?? 'pay_on_delivery';
-            $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'service']);
+            $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'pickup', 'service']);
             $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery', 'in_person']);
             if (!in_array($orderType, $allowedOrderTypes, true)) {
                 http_response_code(400);
@@ -389,8 +455,17 @@ class OrderController
                 return;
             }
 
+            $guestId = $this->guestCustomerModel->create([
+                'name' => $name,
+                'email' => $email,
+                'phone' => $phone,
+                'address' => $address,
+                'note' => $customer['note'] ?? null
+            ]);
+
             $orderId = $this->orderModel->create([
                 'user_id' => null,
+                'guest_customer_id' => $guestId,
                 'total_amount' => $total,
                 'status' => 'pending',
                 'payment_method' => $paymentMode,
@@ -402,6 +477,7 @@ class OrderController
                         'email' => $email,
                         'phone' => $phone,
                         'address' => $address,
+                        'note' => $customer['note'] ?? ''
                     ],
                     'source' => 'guest',
                 ],
@@ -418,7 +494,35 @@ class OrderController
                 ]);
             }
 
-            $this->emailService->sendOrderReceipt($email, $name, $orderId, $total);
+            $whatsapp = $this->notifyAdminWhatsApp($orderId, [
+                'name' => $name,
+                'email' => $email,
+                'phone' => $phone,
+                'total' => $total,
+                'order_type' => $orderType,
+                'payment_mode' => $paymentMode
+            ]);
+            if ($whatsapp) {
+                $this->orderModel->update($orderId, [
+                    'metadata' => [
+                        'customer' => [
+                            'name' => $name,
+                            'email' => $email,
+                            'phone' => $phone,
+                            'address' => $address,
+                            'note' => $customer['note'] ?? ''
+                        ],
+                        'source' => 'guest',
+                        'admin_whatsapp' => $whatsapp
+                    ]
+                ]);
+            }
+
+            try {
+                $this->emailService->sendOrderReceipt($email, $name, $orderId, $total);
+            } catch (Exception $e) {
+                // ignore email failures
+            }
 
             echo json_encode(['success' => true, 'message' => 'Order created', 'order_id' => $orderId]);
         } catch (Exception $e) {
@@ -428,3 +532,4 @@ class OrderController
     }
 }
 ?>
+

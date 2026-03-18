@@ -31,6 +31,21 @@ class OrderViewModal extends HTMLElement {
   render() {
     if (!this.order) return;
 
+    const metaCustomer =
+      this.order && this.order.metadata && this.order.metadata.customer
+        ? this.order.metadata.customer
+        : {};
+    const displayName =
+      this.order.user_name || this.order.guest_name || metaCustomer.name || "Guest";
+    const displayEmail =
+      this.order.user_email || this.order.guest_email || metaCustomer.email || "â€”";
+    const displayPhone = this.order.guest_phone || metaCustomer.phone || "";
+    const displayAddress = this.order.guest_address || metaCustomer.address || "";
+    const whatsappUrl =
+      this.order && this.order.metadata && this.order.metadata.admin_whatsapp
+        ? this.order.metadata.admin_whatsapp.url
+        : "";
+
     const items = this.order.items || [];
     const itemsHtml = items.map((item) => {
       const image = item.main_image ? this.getImageUrl(item.main_image) : "";
@@ -79,8 +94,9 @@ class OrderViewModal extends HTMLElement {
             <div class="grid grid-cols-2 gap-4 mt-4 text-[11px]">
               <div>
                 <div class="text-slate-400 font-semibold uppercase tracking-widest">Customer</div>
-                <div class="text-slate-700 font-semibold">${this.order.user_name || "Guest"}</div>
-                <div class="text-slate-400">${this.order.user_email || "—"}</div>
+                <div class="text-slate-700 font-semibold">${displayName}</div>
+                <div class="text-slate-400">${displayEmail}</div>
+                ${displayPhone || displayAddress ? `<div class="text-slate-400 mt-1">${displayPhone}${displayPhone && displayAddress ? " • " : ""}${displayAddress}</div>` : ""}
               </div>
               <div>
                 <div class="text-slate-400 font-semibold uppercase tracking-widest">Placed</div>
@@ -103,6 +119,13 @@ class OrderViewModal extends HTMLElement {
               <div class="text-sm font-semibold text-slate-900">${Number(this.order.total_amount || this.order.items_total || 0).toFixed(2)}</div>
             </div>
           </div>
+          ${
+            whatsappUrl
+              ? `<a href="${whatsappUrl}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold">
+                  <i class="fab fa-whatsapp"></i> Message on WhatsApp
+                </a>`
+              : ""
+          }
 
           <div class="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
             <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
@@ -134,3 +157,9 @@ class OrderViewModal extends HTMLElement {
 
 customElements.define("order-view-modal", OrderViewModal);
 export default OrderViewModal;
+
+
+
+
+
+

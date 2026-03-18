@@ -831,6 +831,7 @@ class Dropdown extends HTMLElement {
         const term = (this.searchInput.value || '').trim();
         if (!term) return;
         if (this.addButton.classList.contains('loading')) return;
+        console.log('[Dropdown] option-add click', { term });
         const exists = (this._options || []).some(opt => {
             const val = (opt.getAttribute('value') || '').toLowerCase();
             const text = (opt.textContent || '').trim().toLowerCase();

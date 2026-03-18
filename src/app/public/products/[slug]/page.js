@@ -520,6 +520,7 @@ class PublicProductDetailsPage extends App {
         quantity: Number(quantity || 1),
         variant_id: variantId,
         variant_label: variantLabel,
+        product_type: product.type || "physical",
       });
     }
 
@@ -576,11 +577,22 @@ class PublicProductDetailsPage extends App {
         variant: "success",
       });
     } catch (e) {
-      window.Toast?.show?.({
-        title: "Error",
-        message: e.response?.data?.message || "Failed to add to cart.",
-        variant: "error",
-      });
+      if (e?.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        this.addToGuestCart(this.product, 1, variantId, this.selectedVariantLabel);
+        window.Toast?.show?.({
+          title: "Added",
+          message: "Item added to cart.",
+          variant: "success",
+        });
+      } else {
+        window.Toast?.show?.({
+          title: "Error",
+          message: e.response?.data?.message || "Failed to add to cart.",
+          variant: "error",
+        });
+      }
     } finally {
       this._checkoutLoading = false;
     }
@@ -608,16 +620,13 @@ class PublicProductDetailsPage extends App {
             window.location.href = "/auth/customer-signup";
           }, 600);
         } else {
-          this.openGuestCheckout(
-            [
-              {
-                product_id: this.product.id,
-                quantity: 1,
-                variant_id: this.selectedVariantId || null,
-              },
-            ],
-            "single",
+          this.addToGuestCart(
+            this.product,
+            1,
+            this.selectedVariantId || null,
+            this.selectedVariantLabel,
           );
+          window.location.href = "/public/order";
         }
         return;
       }
@@ -627,31 +636,25 @@ class PublicProductDetailsPage extends App {
         quantity: 1,
         variant_id: this.selectedVariantId || null,
       });
-
-      const orderType =
-        this.allowedOrderTypes[0] ||
-        (this.product.type === "service" ? "service" : "delivery");
-      const paymentMode =
-        this.allowedPaymentModes[0] || "pay_on_delivery";
-
-      const res = await api.post("/orders", {
-        order_type: orderType,
-        payment_mode: paymentMode,
-      });
-      const orderId = res?.data?.order_id;
-      window.Toast?.show?.({
-        title: "Order created",
-        message: orderId
-          ? `Order #${orderId} created successfully.`
-          : "Order created successfully.",
-        variant: "success",
-      });
+      window.location.href = "/public/order";
     } catch (e) {
-      window.Toast?.show?.({
-        title: "Error",
-        message: e.response?.data?.message || "Failed to create order.",
-        variant: "error",
-      });
+      if (e?.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        this.addToGuestCart(
+          this.product,
+          1,
+          this.selectedVariantId || null,
+          this.selectedVariantLabel,
+        );
+        window.location.href = "/public/order";
+      } else {
+        window.Toast?.show?.({
+          title: "Error",
+          message: e.response?.data?.message || "Failed to create order.",
+          variant: "error",
+        });
+      }
     } finally {
       this._checkoutLoading = false;
     }

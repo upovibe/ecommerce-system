@@ -42,7 +42,7 @@ class OrderUpdateModal extends HTMLElement {
         <div class="space-y-4">
           <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4">
             <div class="text-xs font-semibold text-slate-500">Order #${this.order.id}</div>
-            <div class="text-sm font-bold text-slate-800">${this.order.user_name || "Guest"}</div>
+            <div class="text-sm font-bold text-slate-800">${this.order.user_name || this.order.guest_name || "Guest"}</div>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-500 mb-1">Status</label>
@@ -82,3 +82,4 @@ class OrderUpdateModal extends HTMLElement {
 
 customElements.define("order-update-modal", OrderUpdateModal);
 export default OrderUpdateModal;
+

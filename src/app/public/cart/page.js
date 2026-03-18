@@ -1,8 +1,4 @@
 import App from "@/core/App.js";
-import "@/components/ui/Dropdown.js";
-import "@/components/ui/Dialog.js";
-import "@/components/ui/Input.js";
-import "@/components/ui/Textarea.js";
 import "@/components/ui/Toast.js";
 import api from "@/services/api.js";
 
@@ -18,15 +14,6 @@ class PublicCartPage extends App {
     this.allowedPaymentModes = [];
     this.userLoginEnabled = true;
     this.settingsLoaded = false;
-    this.guestCheckoutOpen = false;
-    this.guestCheckoutSubmitting = false;
-    this.guestForm = {
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      note: "",
-    };
     this._lastRendered = "";
   }
 
@@ -133,6 +120,16 @@ class PublicCartPage extends App {
       );
       this.emitCartUpdated();
     } catch (e) {
+      if (e?.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        this.cart = null;
+        this.items = [];
+        this.total = 0;
+        this.loading = false;
+        this.loadGuestCart();
+        return;
+      }
       window.Toast?.show?.({
         title: "Error",
         message: "Failed to load cart",
@@ -146,6 +143,7 @@ class PublicCartPage extends App {
       this.updateView();
     }
   }
+
 
   loadGuestCart() {
     try {
@@ -175,94 +173,6 @@ class PublicCartPage extends App {
     }
   }
 
-  handleGuestInputChange(field, value) {
-    this.guestForm[field] = value;
-  }
-
-  openGuestCheckout() {
-    if (!this.items.length) {
-      window.Toast?.show?.({
-        title: "Cart empty",
-        message: "Please add an item before checking out.",
-        variant: "warning",
-      });
-      return;
-    }
-    this.guestCheckoutOpen = true;
-    this.updateView();
-  }
-
-  closeGuestCheckout() {
-    this.guestCheckoutOpen = false;
-    this.updateView();
-  }
-
-  async submitGuestCheckout() {
-    if (this.guestCheckoutSubmitting) return;
-    const { name, email, phone, address } = this.guestForm;
-    if (!name || !email || !phone || !address) {
-      window.Toast?.show?.({
-        title: "Missing details",
-        message: "Please complete the required customer fields.",
-        variant: "error",
-      });
-      return;
-    }
-    this.guestCheckoutSubmitting = true;
-    this.updateView();
-    try {
-      const orderTypeEl =
-        this.querySelector("#guest-order-type") ||
-        this.querySelector("#checkout-order-type");
-      const paymentModeEl =
-        this.querySelector("#guest-payment-mode") ||
-        this.querySelector("#checkout-payment-mode");
-      const orderType =
-        orderTypeEl?.value ||
-        (this.allowedOrderTypes[0] || "delivery");
-      const paymentMode =
-        paymentModeEl?.value ||
-        (this.allowedPaymentModes[0] || "pay_on_delivery");
-
-      await api.post("/orders/guest", {
-        customer: {
-          name,
-          email,
-          phone,
-          address,
-          note: this.guestForm.note || "",
-        },
-        items: this.items.map((item) => ({
-          product_id: item.product_id,
-          quantity: item.quantity || 1,
-          variant_id: item.variant_id || null,
-        })),
-        order_type: orderType,
-        payment_mode: paymentMode,
-      });
-
-      localStorage.removeItem("guest_cart");
-      localStorage.setItem("cart_count", "0");
-      this.items = [];
-      this.total = 0;
-      this.guestCheckoutOpen = false;
-      window.Toast?.show?.({
-        title: "Order placed",
-        message: "Your order has been received. A receipt was sent to your email.",
-        variant: "success",
-      });
-    } catch (e) {
-      window.Toast?.show?.({
-        title: "Checkout failed",
-        message: e.response?.data?.message || "Unable to place order.",
-        variant: "error",
-      });
-      this.guestCheckoutOpen = true;
-    } finally {
-      this.guestCheckoutSubmitting = false;
-      this.updateView();
-    }
-  }
 
   attachEvents() {
     this.querySelectorAll("[data-cart-remove]").forEach((btn) => {
@@ -314,12 +224,6 @@ class PublicCartPage extends App {
       checkoutBtn.addEventListener("click", () => this.checkout());
     }
 
-    const guestCancel = this.querySelector("[data-guest-checkout-cancel]");
-    const guestSubmit = this.querySelector("[data-guest-checkout-submit]");
-    if (guestCancel)
-      guestCancel.addEventListener("click", () => this.closeGuestCheckout());
-    if (guestSubmit)
-      guestSubmit.addEventListener("click", () => this.submitGuestCheckout());
   }
 
   updateQtyUI(id, qty) {
@@ -419,92 +323,10 @@ class PublicCartPage extends App {
         }, 600);
         return;
       }
-      console.log("[Cart] guest checkout modal open");
-      this.openGuestCheckout();
+      window.location.href = "/public/order";
       return;
     }
-    try {
-      const orderType =
-        this.allowedOrderTypes[0] || "delivery";
-      const paymentMode =
-        this.allowedPaymentModes[0] || "pay_on_delivery";
-
-      const res = await api.post("/orders", {
-        order_type: orderType,
-        payment_mode: paymentMode,
-      });
-      const orderId = res?.data?.order_id;
-      window.Toast?.show?.({
-        title: "Order created",
-        message: orderId
-          ? `Order #${orderId} created successfully.`
-          : "Order created successfully.",
-        variant: "success",
-      });
-      await this.loadCart();
-    } catch (e) {
-      window.Toast?.show?.({
-        title: "Error",
-        message: e.response?.data?.message || "Failed to create order",
-        variant: "error",
-      });
-    }
-  }
-
-  renderGuestCheckoutModal() {
-    const orderTypes = this.allowedOrderTypes.length
-      ? this.allowedOrderTypes
-      : ["delivery", "service"];
-    const paymentModes = this.allowedPaymentModes.length
-      ? this.allowedPaymentModes
-      : ["pay_on_delivery", "pay_before_delivery", "in_person"];
-    return `
-      <ui-dialog id="guest-checkout-dialog" ${this.guestCheckoutOpen ? "open" : ""} title="Guest checkout" position="center" no-footer>
-        <div slot="content" class="space-y-4">
-          <p class="text-xs text-slate-500">Enter your details to receive a receipt and delivery updates.</p>
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">Full name</label>
-            <ui-input value="${this.guestForm.name}" placeholder="Jane Doe" oninput="this.closest('app-public-cart-page').handleGuestInputChange('name', this.value)"></ui-input>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">Email</label>
-            <ui-input type="email" value="${this.guestForm.email}" placeholder="you@email.com" oninput="this.closest('app-public-cart-page').handleGuestInputChange('email', this.value)"></ui-input>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">Phone</label>
-            <ui-input value="${this.guestForm.phone}" placeholder="+1 555 000 000" oninput="this.closest('app-public-cart-page').handleGuestInputChange('phone', this.value)"></ui-input>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">Delivery address</label>
-            <ui-textarea rows="3" value="${this.guestForm.address}" placeholder="Street, City, State" oninput="this.closest('app-public-cart-page').handleGuestInputChange('address', this.value)"></ui-textarea>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1">Order type</label>
-              <ui-dropdown id="guest-order-type" value="${orderTypes[0]}">
-                ${orderTypes.map((t) => `<ui-option value="${t}">${t}</ui-option>`).join("")}
-              </ui-dropdown>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1">Payment mode</label>
-              <ui-dropdown id="guest-payment-mode" value="${paymentModes[0]}">
-                ${paymentModes.map((m) => `<ui-option value="${m}">${m}</ui-option>`).join("")}
-              </ui-dropdown>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">Notes (optional)</label>
-            <ui-textarea rows="2" value="${this.guestForm.note}" placeholder="Add delivery instructions" oninput="this.closest('app-public-cart-page').handleGuestInputChange('note', this.value)"></ui-textarea>
-          </div>
-        </div>
-        <div slot="footer" class="flex items-center justify-end gap-3">
-          <button class="secondary" data-guest-checkout-cancel>Cancel</button>
-          <button class="primary" data-guest-checkout-submit ${this.guestCheckoutSubmitting ? "disabled" : ""}>
-            ${this.guestCheckoutSubmitting ? "Placing..." : "Place order"}
-          </button>
-        </div>
-      </ui-dialog>
-    `;
+    window.location.href = "/public/order";
   }
 
   render() {
@@ -569,7 +391,7 @@ class PublicCartPage extends App {
                     })
                     .join("")}
                 </div>
-                <div class="bg-white border border-slate-100 rounded-3xl p-6 h-fit">
+                <div class="bg-white border border-slate-100 rounded-3xl p-6 h-fit lg:sticky lg:top-28">
                   <h3 class="text-lg font-black text-slate-900 mb-4">Order summary</h3>
                   <div class="flex items-center justify-between text-sm text-slate-600 mb-3">
                     <span>Subtotal</span>
@@ -589,7 +411,6 @@ class PublicCartPage extends App {
             `
         }
       </section>
-      ${this.renderGuestCheckoutModal()}
     `;
   }
 

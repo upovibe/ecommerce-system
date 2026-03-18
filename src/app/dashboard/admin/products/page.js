@@ -87,19 +87,23 @@ class ProductsPage extends App {
   syncProductModals() {
     const createModal = this.querySelector("product-create-modal");
     if (createModal && createModal.setOptions) {
-      createModal.setOptions({
-        categories: this.categories,
-        brands: this.brands,
-        materials: this.materials,
-      });
+      if (!createModal.hasAttribute("open")) {
+        createModal.setOptions({
+          categories: this.categories,
+          brands: this.brands,
+          materials: this.materials,
+        });
+      }
     }
     const updateModal = this.querySelector("product-update-modal");
     if (updateModal && updateModal.setOptions) {
-      updateModal.setOptions({
-        categories: this.categories,
-        brands: this.brands,
-        materials: this.materials,
-      });
+      if (!updateModal.hasAttribute("open")) {
+        updateModal.setOptions({
+          categories: this.categories,
+          brands: this.brands,
+          materials: this.materials,
+        });
+      }
     }
   }
 
@@ -328,6 +332,28 @@ class ProductsPage extends App {
       this.toggleAttributeSection("create");
       this.toggleBrandSection("create");
       this.toggleMaterialSection("create");
+      if (!m._debugBound) {
+        m.addEventListener("modal-close", () => {
+          console.log("[ProductCreateModal] closed");
+          if (this._modalGuard) {
+            clearInterval(this._modalGuard);
+            this._modalGuard = null;
+          }
+        });
+        m._debugBound = true;
+      }
+      const uiModal = m.querySelector("ui-modal");
+      if (uiModal) {
+        uiModal.dataset.lockOpen = "1";
+        if (!this._modalGuard) {
+          this._modalGuard = setInterval(() => {
+            const current = document.getElementById("product-create-modal");
+            if (current && current.dataset.lockOpen === "1" && !current.hasAttribute("open")) {
+              current.open();
+            }
+          }, 150);
+        }
+      }
       m.open();
     }
   }
@@ -368,7 +394,7 @@ class ProductsPage extends App {
     if (!name) { Toast.show({ title: "Required", message: "Product name is required", variant: "error" }); return; }
     if (!category_id) { Toast.show({ title: "Required", message: "Category is required", variant: "error" }); return; }
 
-    console.debug("[ProductCreate] submit", { targetStatus });
+    console.log("[ProductCreate] submit", { targetStatus });
     const oldBtnText = saveBtn?.textContent;
     if (saveBtn) saveBtn.textContent = "Saving...";
     try {
@@ -393,7 +419,7 @@ class ProductsPage extends App {
         attributes,
       };
 
-      console.debug("[ProductCreate] payload", payload);
+      console.log("[ProductCreate] payload", payload);
       const res = await api.post("/products", payload);
       const newId = res.data?.data?.id;
 
@@ -471,6 +497,14 @@ class ProductsPage extends App {
     `;
     list.appendChild(row);
 
+    const variantDropdown = row.querySelector('[data-field="type"]');
+    if (variantDropdown && !variantDropdown.dataset.boundAdd) {
+      variantDropdown.addEventListener("option-add", (e) => {
+        this.createVariantTypeFromDropdown(e);
+      });
+      variantDropdown.dataset.boundAdd = "1";
+    }
+
     if (data && typeof data === "object" && !data.nodeType) {
       const typeDrop = row.querySelector('[data-field="type"]');
       const customTypeEl = row.querySelector('[data-field="custom_type"]');
@@ -529,6 +563,14 @@ class ProductsPage extends App {
       </div>
     `;
     list.appendChild(row);
+
+    const attributeDropdown = row.querySelector('[data-field="type"]');
+    if (attributeDropdown && !attributeDropdown.dataset.boundAdd) {
+      attributeDropdown.addEventListener("option-add", (e) => {
+        this.createAttributeTypeFromDropdown(e);
+      });
+      attributeDropdown.dataset.boundAdd = "1";
+    }
 
     if (data && typeof data === "object" && !data.nodeType) {
       const typeDrop = row.querySelector('[data-field="type"]');
@@ -874,6 +916,28 @@ class ProductsPage extends App {
       this.toggleAttributeSection("edit");
       this.toggleBrandSection("edit");
       this.toggleMaterialSection("edit");
+      if (!m._debugBound) {
+        m.addEventListener("modal-close", () => {
+          console.log("[ProductEditModal] closed");
+          if (this._modalGuard) {
+            clearInterval(this._modalGuard);
+            this._modalGuard = null;
+          }
+        });
+        m._debugBound = true;
+      }
+      const uiModal = m.querySelector("ui-modal");
+      if (uiModal) {
+        uiModal.dataset.lockOpen = "1";
+        if (!this._modalGuard) {
+          this._modalGuard = setInterval(() => {
+            const current = document.getElementById("product-edit-modal");
+            if (current && current.dataset.lockOpen === "1" && !current.hasAttribute("open")) {
+              current.open();
+            }
+          }, 150);
+        }
+      }
 
       const editDesc = m.querySelector("#edit-description");
       if (editDesc?.setValue) {
@@ -955,7 +1019,7 @@ class ProductsPage extends App {
     const hasMaterial    = hasMaterialEl ? !!hasMaterialEl.checked : true;
 
     if (!name) { Toast.show({ title: "Required", message: "Name is required", variant: "error" }); return; }
-    console.debug("[ProductEdit] submit", { targetStatus, id: this.selectedProduct?.id });
+    console.log("[ProductEdit] submit", { targetStatus, id: this.selectedProduct?.id });
     const oldBtnText = saveBtn?.textContent;
     if (saveBtn) saveBtn.textContent = "Saving...";
 
@@ -1013,7 +1077,7 @@ class ProductsPage extends App {
         payload.attributes = this.collectAttributes(m.querySelector("#attribute-list"));
       }
 
-      console.debug("[ProductEdit] payload", payload);
+      console.log("[ProductEdit] payload", payload);
       await api.put(`/products/${this.selectedProduct.id}`, payload);
       Toast.show({ title: "Updated", message: "Product updated successfully", variant: "success" });
       this.closeEditModal();
@@ -1101,8 +1165,11 @@ class ProductsPage extends App {
 
   async createBrandFromDropdown(e, dropdown) {
     const name = e?.detail?.value?.trim();
+    console.log("[BrandAdd] start", { name });
     if (!name) return;
+    const modal = dropdown?.closest("ui-modal");
     try {
+      if (modal) modal.dataset.preventClose = "1";
       if (dropdown?.setAddLoading) dropdown.setAddLoading(true);
       const res = await api.post("/brands", { name });
       const created = res?.data?.data;
@@ -1117,19 +1184,33 @@ class ProductsPage extends App {
       dropdown.querySelectorAll("ui-option").forEach((o) => {
         if (o.getAttribute("value") === name) o.remove();
       });
-      await this.fetchData(true);
+      this.brands = Array.isArray(this.brands) ? [...this.brands, created] : [created];
+      this.syncProductModals();
       Toast.show({ title: "Brand added", message: created.name || name, variant: "success" });
+      console.log("[BrandAdd] success", { id, name: created?.name || name });
+      if (modal && !modal.hasAttribute("open") && typeof modal.open === "function") {
+        modal.open();
+      }
     } catch (err) {
+      console.error("[BrandAdd] error", err);
       Toast.show({ title: "Error", message: err.response?.data?.message || "Failed to add brand", variant: "error" });
     } finally {
       if (dropdown?.setAddLoading) dropdown.setAddLoading(false);
+      if (modal) {
+        setTimeout(() => {
+          delete modal.dataset.preventClose;
+        }, 500);
+      }
     }
   }
 
   async createMaterialFromDropdown(e, dropdown) {
     const name = e?.detail?.value?.trim();
+    console.log("[MaterialAdd] start", { name });
     if (!name) return;
+    const modal = dropdown?.closest("ui-modal");
     try {
+      if (modal) modal.dataset.preventClose = "1";
       if (dropdown?.setAddLoading) dropdown.setAddLoading(true);
       const res = await api.post("/materials", { name });
       const created = res?.data?.data;
@@ -1143,12 +1224,51 @@ class ProductsPage extends App {
       dropdown.querySelectorAll("ui-option").forEach((o) => {
         if (o.getAttribute("value") === name) o.remove();
       });
-      await this.fetchData(true);
+      this.materials = Array.isArray(this.materials) ? [...this.materials, created] : [created];
+      this.syncProductModals();
       Toast.show({ title: "Material added", message: created.name || name, variant: "success" });
+      console.log("[MaterialAdd] success", { id, name: created?.name || name });
+      if (modal && !modal.hasAttribute("open") && typeof modal.open === "function") {
+        modal.open();
+      }
     } catch (err) {
+      console.error("[MaterialAdd] error", err);
       Toast.show({ title: "Error", message: err.response?.data?.message || "Failed to add material", variant: "error" });
     } finally {
       if (dropdown?.setAddLoading) dropdown.setAddLoading(false);
+      if (modal) {
+        setTimeout(() => {
+          delete modal.dataset.preventClose;
+        }, 500);
+      }
+    }
+  }
+
+  async createVariantTypeFromDropdown(e) {
+    const name = e?.detail?.value?.trim();
+    if (!name) return;
+    try {
+      await api.post("/attributes", { name });
+      this.productAttributes = Array.isArray(this.productAttributes)
+        ? [...this.productAttributes, { name }]
+        : [{ name }];
+      Toast.show({ title: "Variant type added", message: name, variant: "success" });
+    } catch (err) {
+      Toast.show({ title: "Error", message: err.response?.data?.message || "Failed to add variant type", variant: "error" });
+    }
+  }
+
+  async createAttributeTypeFromDropdown(e) {
+    const name = e?.detail?.value?.trim();
+    if (!name) return;
+    try {
+      await api.post("/product-attribute-types", { name });
+      this.attributeTypes = Array.isArray(this.attributeTypes)
+        ? [...this.attributeTypes, { name }]
+        : [{ name }];
+      Toast.show({ title: "Attribute type added", message: name, variant: "success" });
+    } catch (err) {
+      Toast.show({ title: "Error", message: err.response?.data?.message || "Failed to add attribute type", variant: "error" });
     }
   }
 
