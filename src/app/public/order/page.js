@@ -48,6 +48,9 @@ class PublicOrderPage extends App {
     this.showPickupForm = false;
     this.orderType = "";
     this.paymentMode = "";
+    this.whatsappNumber = "";
+    this.orderRef = "";
+    this.confirmOpen = false;
     this._lastRendered = "";
   }
 
@@ -135,11 +138,12 @@ class PublicOrderPage extends App {
 
   async loadSettings() {
     try {
-      const [currencyRes, typesRes, modesRes, loginRes] = await Promise.all([
+      const [currencyRes, typesRes, modesRes, loginRes, whatsappRes] = await Promise.all([
         api.get("/settings/key/currency").catch(() => null),
         api.get("/settings/key/allowed_order_types").catch(() => null),
         api.get("/settings/key/allowed_payment_modes").catch(() => null),
         api.get("/settings/key/enable_user_login").catch(() => null),
+        api.get("/settings/key/admin_whatsapp").catch(() => null),
       ]);
       const currencyVal = currencyRes?.data?.data?.setting_value;
       if (currencyVal) this.currencyCode = String(currencyVal).toUpperCase();
@@ -154,6 +158,9 @@ class PublicOrderPage extends App {
       );
       const raw = String(loginRes?.data?.data?.setting_value ?? "1").toLowerCase();
       this.userLoginEnabled = !(raw === "0" || raw === "false" || raw === "no");
+      if (whatsappRes?.data?.success) {
+        this.whatsappNumber = String(whatsappRes.data.data.setting_value || "").trim();
+      }
       this.settingsLoaded = true;
       this.syncOrderType();
       if (!this.paymentMode) this.paymentMode = this.allowedPaymentModes[0] || "pay_on_delivery";
@@ -349,6 +356,56 @@ class PublicOrderPage extends App {
     }
   }
 
+  buildOrderRef() {
+    const rand = Math.floor(100000 + Math.random() * 900000);
+    return `REF-${rand}`;
+  }
+
+  formatWhatsAppMessage({ items, customer, pickup, total, ref }) {
+    const lines = [];
+    lines.push("Hi, I'd like to buy these items:");
+    lines.push("");
+    items.forEach((item) => {
+      const name = item.product_name || "Item";
+      const variant = item.variant_label ? ` (${item.variant_label})` : "";
+      const qty = item.quantity || 1;
+      const price = this.fmt(Number(item.unit_price || 0) * Number(qty));
+      lines.push(`📦 ${name}${variant} - ${qty}x - ${price}`);
+    });
+    lines.push("");
+    lines.push(`🙍🏽‍♂️ Customer: ${customer.name}`);
+    if (this.orderType === "pickup") {
+      lines.push("");
+      lines.push("*PICKUP INFO:*");
+      lines.push(`Name: ${pickup.name || customer.name}`);
+      if (customer.phone) lines.push(`Phone: ${customer.phone}`);
+      if (pickup.name || pickup.phone) {
+        lines.push(
+          `Pickup Person: ${pickup.name || customer.name} (${pickup.phone || customer.phone || ""})`,
+        );
+      }
+    }
+    if (this.orderType === "delivery") {
+      lines.push("");
+      lines.push("*DELIVERY INFO:*");
+      if (customer.address) lines.push(`Address: ${customer.address}`);
+      if (customer.phone) lines.push(`Phone: ${customer.phone}`);
+    }
+    lines.push("");
+    lines.push(`💰 Total Price: *${total}*`);
+    lines.push("");
+    lines.push(`🗒 Order Ref: *${ref}*`);
+    return lines.join("\n");
+  }
+
+  openWhatsApp(message) {
+    if (!this.whatsappNumber) return;
+    const number = this.whatsappNumber.replace(/\D+/g, "");
+    if (!number) return;
+    const url = `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
+  }
+
   async placeOrder() {
     if (this.submitting) return;
     if (!this.items.length) {
@@ -417,6 +474,10 @@ class PublicOrderPage extends App {
         }
       }
 
+      const ref = this.buildOrderRef();
+      this.itemsSnapshot = [...this.items];
+      this.totalSnapshot = this.total;
+      this.orderRef = ref;
       if (isLoggedIn) {
         const res = await api.post("/orders", {
           order_type: this.orderType || this.allowedOrderTypes[0] || "delivery",
@@ -427,14 +488,7 @@ class PublicOrderPage extends App {
               email,
               phone,
               address: requiresAddress
-                ? {
-                    line1,
-                    line2,
-                    city,
-                    state,
-                    country,
-                    postal,
-                  }
+                ? [line1, line2, city, state, country, postal].filter(Boolean).join(", ")
                 : "",
               note: this.customer.note || "",
             },
@@ -448,6 +502,7 @@ class PublicOrderPage extends App {
                   }
                 : null,
             source: "customer",
+            reference: ref,
           },
         });
         const orderId = res?.data?.order_id;
@@ -465,14 +520,7 @@ class PublicOrderPage extends App {
             email,
             phone,
             address: requiresAddress
-              ? {
-                  line1,
-                  line2,
-                  city,
-                  state,
-                  country,
-                  postal,
-                }
+              ? [line1, line2, city, state, country, postal].filter(Boolean).join(", ")
               : "",
             note: this.customer.note || "",
             pickup_contact:
@@ -500,10 +548,21 @@ class PublicOrderPage extends App {
         });
       }
 
+      const message = this.formatWhatsAppMessage({
+        items: this.itemsSnapshot || [],
+        customer: { name, phone, address: requiresAddress ? [line1, line2, city, state, country, postal].filter(Boolean).join(", ") : "" },
+        pickup: { name: pickerName, phone: pickerPhone },
+        total: this.fmt(this.totalSnapshot || 0),
+        ref,
+      });
+      this.openWhatsApp(message);
+      this.confirmOpen = true;
+
       localStorage.removeItem("guest_cart");
       localStorage.setItem("cart_count", "0");
       this.items = [];
       this.total = 0;
+      this.updateView();
       this.updateView();
     } catch (e) {
       window.Toast?.show?.({
@@ -872,12 +931,39 @@ class PublicOrderPage extends App {
               <span>Total</span>
               <span class="font-semibold text-slate-900">${this.fmt(this.total)}</span>
             </div>
+            ${
+              this.paymentMode === "pay_before_delivery"
+                ? `<button class="w-full mt-4 px-4 py-3 rounded-2xl border border-emerald-200 text-emerald-700 text-sm font-semibold hover:bg-emerald-50 transition">
+                    Pay with Paystack
+                  </button>`
+                : ""
+            }
             <button data-place-order class="w-full mt-6 px-4 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition ${this.submitting || !hasSelection ? "opacity-60 cursor-not-allowed" : ""}" ${this.submitting || !hasSelection ? "disabled" : ""}>
               ${this.submitting ? "Placing order..." : "Place order"}
             </button>
           </div>
         </div>
       </section>
+      ${this.confirmOpen ? `
+        <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+          <div class="bg-white rounded-3xl p-8 max-w-lg w-full mx-6">
+            <h2 class="text-xl font-black text-slate-900 mb-2">Order Confirmed!</h2>
+            <p class="text-slate-600 text-sm mb-4">Successfully sent to WhatsApp</p>
+            <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm text-slate-600 mb-4">
+              We've sent your order details to WhatsApp. Please check your messages to complete payment.
+            </div>
+            <div class="text-sm font-semibold text-slate-700 mb-2">Your Order Reference:</div>
+            <div class="text-lg font-black text-slate-900 mb-6">${this.orderRef}</div>
+            <div class="text-sm font-semibold text-slate-700 mb-2">What's next?</div>
+            <ul class="text-sm text-slate-600 space-y-1 mb-6">
+              <li>Check your WhatsApp messages</li>
+              <li>Confirm your order details</li>
+              <li>Complete payment as instructed</li>
+            </ul>
+            <button class="w-full px-4 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition" onclick="this.closest('app-public-order-page').confirmOpen=false; this.closest('app-public-order-page').updateView();">Close</button>
+          </div>
+        </div>
+      ` : ""}
     `;
   }
 }

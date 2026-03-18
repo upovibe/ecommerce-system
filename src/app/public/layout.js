@@ -11,6 +11,8 @@ class PublicLayout extends App {
     this.accentColor = "#4f46e5";
     this.allowLogin = true;
     this.settingsLoaded = false;
+    this.whatsappNumber = "";
+    this.showWhatsappFloat = true;
     this._loaded = false;
     this._pageContent = "";
   }
@@ -41,13 +43,16 @@ class PublicLayout extends App {
     const existingContent =
       this.querySelector("#page-content")?.innerHTML || this._pageContent || "";
     try {
-      const [nameRes, logoRes, primaryRes, accentRes, loginRes, iconRes] = await Promise.all([
+      const [nameRes, logoRes, primaryRes, accentRes, loginRes, iconRes, whatsappRes, floatRes, phoneRes] = await Promise.all([
         api.get("/settings/key/site_name").catch(() => null),
         api.get("/settings/key/site_logo").catch(() => null),
         api.get("/settings/key/primary_color").catch(() => null),
         api.get("/settings/key/accent_color").catch(() => null),
         api.get("/settings/key/enable_user_login").catch(() => null),
         api.get("/settings/key/application_favicon").catch(() => null),
+        api.get("/settings/key/admin_whatsapp").catch(() => null),
+        api.get("/settings/key/whatsapp_float").catch(() => null),
+        api.get("/settings/key/phone_number").catch(() => null),
       ]);
 
       if (nameRes?.data?.success) {
@@ -63,6 +68,16 @@ class PublicLayout extends App {
       if (loginRes?.data?.success) {
         const raw = String(loginRes.data.data.setting_value || "1").toLowerCase();
         this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
+      }
+      if (whatsappRes?.data?.success) {
+        this.whatsappNumber = String(whatsappRes.data.data.setting_value || "").trim();
+      }
+      if (!this.whatsappNumber && phoneRes?.data?.success) {
+        this.whatsappNumber = String(phoneRes.data.data.setting_value || "").trim();
+      }
+      if (floatRes?.data?.success) {
+        const raw = String(floatRes.data.data.setting_value || "1").toLowerCase();
+        this.showWhatsappFloat = !(raw === "0" || raw === "false" || raw === "no");
       }
       this.settingsLoaded = true;
       const latestContent =
@@ -277,6 +292,14 @@ class PublicLayout extends App {
 
         <!-- Main Content -->
         <main id="page-content" class="flex-grow"></main>
+
+        ${
+          this.showWhatsappFloat && this.whatsappNumber
+            ? `<a href="https://wa.me/${this.whatsappNumber.replace(/\\D+/g, "")}" target="_blank" rel="noopener" class="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg hover:shadow-xl transition z-[9999]">
+                <i class="fab fa-whatsapp text-2xl"></i>
+              </a>`
+            : ""
+        }
 
         <!-- Global Footer -->
         <footer class="bg-slate-900 py-20 px-10 text-white">

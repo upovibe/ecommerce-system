@@ -24,6 +24,7 @@ class SettingsSeeder
             ['allowed_order_types', '["delivery","pickup","service"]', 'array', 'commerce', 'Allowed order fulfillment types for checkout'],
             ['allowed_payment_modes', '["pay_on_delivery","pay_before_delivery"]', 'array', 'commerce', 'Allowed payment modes for checkout'],
             ['admin_whatsapp', '', 'text', 'commerce', 'Admin WhatsApp number for order alerts'],
+            ['whatsapp_float', '1', 'boolean', 'commerce', 'Show WhatsApp floating button on public pages'],
             ['contact_email', 'info@vastcommerce.com', 'text', 'contact', 'Primary support email'],
             ['phone_number', '+234 800 VAST', 'text', 'contact', 'Customer service line'],
             ['social_facebook', 'https://facebook.com/vastcommerce', 'text', 'social', 'Official Facebook link'],
