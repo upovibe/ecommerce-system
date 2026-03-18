@@ -109,9 +109,11 @@ class PublicLayout extends App {
     const cartLink = this.querySelector("[data-cart-link]");
     if (cartLink && !cartLink._bound) {
       cartLink.addEventListener("click", (e) => {
+        e.preventDefault();
         if (window.router && typeof window.router.navigate === "function") {
-          e.preventDefault();
           window.router.navigate("/public/cart");
+        } else {
+          window.location.href = "/public/cart";
         }
       });
       cartLink._bound = true;
@@ -176,7 +178,7 @@ class PublicLayout extends App {
               ${
                 this.settingsLoaded
                   ? `
-                <a data-cart-link href="/public/cart" onclick="if(window.router){event.preventDefault(); window.router.navigate('/public/cart');}" class="w-11 h-11 flex items-center justify-center text-slate-600 hover:text-[var(--primary)] hover:bg-indigo-50 rounded-xl transition-all relative">
+                <a data-cart-link href="/public/cart" class="w-11 h-11 flex items-center justify-center text-slate-600 hover:text-[var(--primary)] hover:bg-indigo-50 rounded-xl transition-all relative">
                   <i class="fas fa-shopping-cart text-lg"></i>
                   <span data-cart-count class="absolute top-2 right-2 w-4 h-4 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white" style="background:${primary}">${this.getCartCount()}</span>
                 </a>

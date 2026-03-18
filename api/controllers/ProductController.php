@@ -886,6 +886,13 @@ class ProductController
         } else {
             $p['stock_status'] = 'unknown'; // Will be refined in show() for single product
         }
+
+        // Services/digital items are not stock-limited
+        if (isset($p['type']) && in_array($p['type'], ['service', 'digital'], true)) {
+            $p['stock_status'] = 'in_stock';
+            $p['total_stock'] = null;
+            $p['variant_count'] = null;
+        }
         
         // Promotion processing
         $p['is_on_promotion'] = !empty($p['promotion_id']);

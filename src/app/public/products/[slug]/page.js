@@ -5,6 +5,7 @@ import "@/components/ui/Modal.js";
 import "@/components/ui/Input.js";
 import "@/components/ui/Dropdown.js";
 import "@/components/ui/Textarea.js";
+import "@/components/ui/Checkbox.js";
 import "@/components/ui/Toast.js";
 
 class PublicProductDetailsPage extends App {
@@ -34,6 +35,8 @@ class PublicProductDetailsPage extends App {
       address: "",
       note: "",
     };
+    this.selectedVariantId = null;
+    this.selectedVariantLabel = "";
     this._lastRendered = "";
     this._routeRetries = 0;
     this.routeParams = {};
@@ -166,6 +169,7 @@ class PublicProductDetailsPage extends App {
       this.loading = false;
       this.gallery = this.buildGallery(this.product);
       this.activeImageIndex = 0;
+      this.initializeVariantSelection();
       this.startAutoSlide();
       this.updateView();
     }
@@ -232,6 +236,15 @@ class PublicProductDetailsPage extends App {
     if (buyBtn) buyBtn.addEventListener("click", () => this.handleBuyNow());
     if (wishBtn) wishBtn.addEventListener("click", () => this.handleWishlist());
 
+    const variantBoxes = this.querySelectorAll("[data-variant-checkbox]");
+    variantBoxes.forEach((box) => {
+      box.addEventListener("change", (e) => {
+        const checked = e?.detail?.checked;
+        const id = Number(box.dataset.variantId || 0);
+        this.handleVariantSelect(id, checked);
+      });
+    });
+
     const guestCancel = this.querySelector("[data-guest-checkout-cancel]");
     const guestSubmit = this.querySelector("[data-guest-checkout-submit]");
     if (guestCancel)
@@ -293,11 +306,66 @@ class PublicProductDetailsPage extends App {
     localStorage.setItem("post_login_redirect", current);
   }
 
+  initializeVariantSelection() {
+    this.selectedVariantId = null;
+    this.selectedVariantLabel = "";
+    if (!this.product || this.product.has_variants === false) return;
+    const variants = Array.isArray(this.product.variants)
+      ? this.product.variants
+      : [];
+    if (variants.length === 1) {
+      this.selectedVariantId = variants[0].id;
+      this.selectedVariantLabel = this.buildVariantLabel(variants[0]);
+    }
+  }
+
+  buildVariantLabel(variant) {
+    const type = variant?.type_name || variant?.variant_options?.type || "Variant";
+    const value = variant?.value || variant?.variant_options?.value || "N/A";
+    return `${type}: ${value}`;
+  }
+
+  handleVariantSelect(variantId, checked) {
+    if (!variantId) return;
+    if (checked) {
+      const all = this.querySelectorAll("[data-variant-checkbox]");
+      all.forEach((el) => {
+        const id = Number(el.dataset.variantId || 0);
+        if (id !== variantId) {
+          el.removeAttribute("checked");
+        }
+      });
+      this.selectedVariantId = variantId;
+      const match = (this.product?.variants || []).find((v) => Number(v.id) === variantId);
+      this.selectedVariantLabel = this.buildVariantLabel(match);
+    } else if (this.selectedVariantId === variantId) {
+      this.selectedVariantId = null;
+      this.selectedVariantLabel = "";
+    }
+  }
+
+  requireVariantSelection() {
+    if (!this.product || this.product.has_variants === false) return false;
+    const variants = Array.isArray(this.product.variants) ? this.product.variants : [];
+    return variants.length > 0;
+  }
+
+  ensureVariantSelected() {
+    if (!this.requireVariantSelection()) return true;
+    if (this.selectedVariantId) return true;
+    window.Toast?.show?.({
+      title: "Select a variant",
+      message: "Please choose a variant before continuing.",
+      variant: "warning",
+    });
+    return false;
+  }
+
   handleGuestInputChange(field, value) {
     this.guestForm[field] = value;
   }
 
-  addToGuestWishlist(product) {
+  addToGuestWishlist(product, variantId = null, variantLabel = "") {
     if (!product) return;
     let list = [];
     try {
@@ -306,7 +374,13 @@ class PublicProductDetailsPage extends App {
       list = [];
     }
     if (!Array.isArray(list)) list = [];
-    if (list.some((item) => Number(item.product_id) === Number(product.id))) {
+    if (
+      list.some(
+        (item) =>
+          Number(item.product_id) === Number(product.id) &&
+          Number(item.variant_id || 0) === Number(variantId || 0),
+      )
+    ) {
       return;
     }
     list.push({
@@ -314,6 +388,8 @@ class PublicProductDetailsPage extends App {
       product_name: product.name,
       main_image: product.main_image,
       base_price: product.base_price,
+      variant_id: variantId,
+      variant_label: variantLabel,
     });
     localStorage.setItem("guest_wishlist", JSON.stringify(list));
   }
@@ -403,7 +479,7 @@ class PublicProductDetailsPage extends App {
     }
   }
 
-  addToGuestCart(product, quantity = 1) {
+  addToGuestCart(product, quantity = 1, variantId = null, variantLabel = "") {
     if (!product) return;
     const raw = localStorage.getItem("guest_cart");
     let items = [];
@@ -415,7 +491,9 @@ class PublicProductDetailsPage extends App {
     if (!Array.isArray(items)) items = [];
 
     const existing = items.find(
-      (i) => Number(i.product_id) === Number(product.id),
+      (i) =>
+        Number(i.product_id) === Number(product.id) &&
+        Number(i.variant_id || 0) === Number(variantId || 0),
     );
     if (existing) {
       existing.quantity = Number(existing.quantity || 0) + Number(quantity || 1);
@@ -428,6 +506,8 @@ class PublicProductDetailsPage extends App {
         category_name: product.category_name,
         unit_price: product.discounted_price ?? product.base_price,
         quantity: Number(quantity || 1),
+        variant_id: variantId,
+        variant_label: variantLabel,
       });
     }
 
@@ -451,9 +531,14 @@ class PublicProductDetailsPage extends App {
     if (!this.product) return;
     if (this._checkoutLoading) return;
     this._checkoutLoading = true;
+    if (!this.ensureVariantSelected()) {
+      this._checkoutLoading = false;
+      return;
+    }
+    const variantId = this.selectedVariantId || null;
     const token = localStorage.getItem("token");
     if (!token) {
-      this.addToGuestCart(this.product, 1);
+      this.addToGuestCart(this.product, 1, variantId, this.selectedVariantLabel);
       window.Toast?.show?.({
         title: "Added",
         message: "Item added to cart.",
@@ -466,6 +551,7 @@ class PublicProductDetailsPage extends App {
       await api.post("/cart/items", {
         product_id: this.product.id,
         quantity: 1,
+        variant_id: variantId,
       });
       localStorage.setItem(
         "cart_count",
@@ -492,6 +578,10 @@ class PublicProductDetailsPage extends App {
     if (!this.product) return;
     if (this._checkoutLoading) return;
     this._checkoutLoading = true;
+    if (!this.ensureVariantSelected()) {
+      this._checkoutLoading = false;
+      return;
+    }
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -511,7 +601,7 @@ class PublicProductDetailsPage extends App {
               {
                 product_id: this.product.id,
                 quantity: 1,
-                variant_id: null,
+                variant_id: this.selectedVariantId || null,
               },
             ],
             "single",
@@ -523,6 +613,7 @@ class PublicProductDetailsPage extends App {
       await api.post("/cart/items", {
         product_id: this.product.id,
         quantity: 1,
+        variant_id: this.selectedVariantId || null,
       });
 
       const orderType =
@@ -556,6 +647,7 @@ class PublicProductDetailsPage extends App {
 
   async handleWishlist() {
     if (!this.product) return;
+    if (!this.ensureVariantSelected()) return;
     if (this.allowLogin) {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -571,7 +663,10 @@ class PublicProductDetailsPage extends App {
         return;
       }
       try {
-        await api.post("/wishlist/items", { product_id: this.product.id });
+        await api.post("/wishlist/items", {
+          product_id: this.product.id,
+          variant_id: this.selectedVariantId || null,
+        });
         window.Toast?.show?.({
           title: "Saved",
           message: "Added to wishlist.",
@@ -587,7 +682,11 @@ class PublicProductDetailsPage extends App {
       return;
     }
 
-    this.addToGuestWishlist(this.product);
+    this.addToGuestWishlist(
+      this.product,
+      this.selectedVariantId || null,
+      this.selectedVariantLabel,
+    );
     window.Toast?.show?.({
       title: "Saved",
       message: "Added to wishlist.",
@@ -596,6 +695,7 @@ class PublicProductDetailsPage extends App {
   }
 
   renderVariants() {
+    if (this.product?.has_variants === false) return "";
     const variants = Array.isArray(this.product?.variants)
       ? this.product.variants
       : [];
@@ -617,9 +717,21 @@ class PublicProductDetailsPage extends App {
             const label = item.value || item.variant_options?.value || "N/A";
             const qty =
               item.quantity !== null && item.quantity !== undefined
-                ? ` • ${item.quantity} in stock`
+                ? ` (${item.quantity} in stock)`
                 : "";
-            return `<span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">${label}${qty}</span>`;
+            const disabled = item.quantity !== null && item.quantity <= 0;
+            const checked =
+              this.selectedVariantId &&
+              Number(this.selectedVariantId) === Number(item.id);
+            return `
+              <ui-checkbox
+                data-variant-checkbox
+                data-variant-id="${item.id}"
+                label="${label}${qty}"
+                ${checked ? "checked" : ""}
+                ${disabled ? "disabled" : ""}
+              ></ui-checkbox>
+            `;
           })
           .join("");
         return `
@@ -630,6 +742,28 @@ class PublicProductDetailsPage extends App {
         `;
       })
       .join("");
+  }
+
+  renderAttributes() {
+    if (this.product?.has_attributes === false) return "";
+    const attrs = Array.isArray(this.product?.attributes)
+      ? this.product.attributes
+      : [];
+    if (!attrs.length) return "";
+    return `
+      <div class="space-y-3">
+        ${attrs
+          .map(
+            (a) => `
+            <div class="flex items-start justify-between gap-6 border-b border-slate-100 pb-3">
+              <span class="text-xs font-semibold text-slate-500">${a.type || "Attribute"}</span>
+              <span class="text-sm font-semibold text-slate-800 text-right break-words">${a.value ?? ""}</span>
+            </div>
+          `,
+          )
+          .join("")}
+      </div>
+    `;
   }
 
   renderDetails() {
@@ -824,6 +958,7 @@ class PublicProductDetailsPage extends App {
     const price = this.formatCurrency(product.discounted_price ?? product.base_price);
     const basePrice = this.formatCurrency(product.base_price);
     const showPromo = product.is_on_promotion && product.promotion_details;
+    const isPhysical = product.type !== "service" && product.type !== "digital";
     const status =
       product.stock_status === "in_stock"
         ? "In stock"
@@ -837,6 +972,7 @@ class PublicProductDetailsPage extends App {
         ? "bg-amber-100 text-amber-700"
         : "bg-rose-100 text-rose-700";
     const showVariants = product.has_variants !== false;
+    const showAttributes = product.has_attributes !== false;
 
     const description = product.description || "";
     const descriptionAttr = description.replace(/"/g, "&quot;");
@@ -876,6 +1012,9 @@ class PublicProductDetailsPage extends App {
               }
             </div>
 
+            ${
+              isPhysical
+                ? `
             <div class="flex flex-wrap items-center gap-3">
               <span class="px-3 py-1.5 rounded-full text-xs font-semibold ${statusClass}">${status}</span>
               ${
@@ -884,6 +1023,9 @@ class PublicProductDetailsPage extends App {
                   : ""
               }
             </div>
+            `
+                : ""
+            }
 
             <div class="grid grid-cols-2 gap-4 text-xs text-slate-600">
               <div class="p-3 rounded-2xl bg-white border border-slate-100">
@@ -896,16 +1038,34 @@ class PublicProductDetailsPage extends App {
               </div>
             </div>
 
+            ${
+              product.brand_name || product.material_name
+                ? `
             <div class="grid grid-cols-2 gap-4 text-sm">
+              ${
+                product.brand_name
+                  ? `
               <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <p class="text-xs font-semibold text-slate-500 mb-1">Brand</p>
-                <p class="font-semibold text-slate-900">${product.brand_name || "—"}</p>
+                <p class="font-semibold text-slate-900">${product.brand_name}</p>
               </div>
+              `
+                  : ""
+              }
+              ${
+                product.material_name
+                  ? `
               <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <p class="text-xs font-semibold text-slate-500 mb-1">Material</p>
-                <p class="font-semibold text-slate-900">${product.material_name || "—"}</p>
+                <p class="font-semibold text-slate-900">${product.material_name}</p>
               </div>
+              `
+                  : ""
+              }
             </div>
+            `
+                : ""
+            }
 
             ${
               showVariants
@@ -920,7 +1080,12 @@ class PublicProductDetailsPage extends App {
 
             <div class="flex flex-wrap items-center gap-3">
               <button data-add-to-cart class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Add to cart</button>
-              <button data-save-wishlist class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition">Save to wishlist</button>
+              <button data-buy-now class="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Buy now</button>
+              ${
+                this.allowLogin
+                  ? `<button data-save-wishlist class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition">Save to wishlist</button>`
+                  : ""
+              }
             </div>
           </div>
         </div>
@@ -935,6 +1100,17 @@ class PublicProductDetailsPage extends App {
                   : `<p class="text-sm text-slate-500">No description has been provided for this product.</p>`
               }
             </div>
+
+            ${
+              showAttributes && this.product?.attributes?.length
+                ? `
+              <div>
+                <h3 class="text-lg font-black text-slate-900 mb-3">Attributes</h3>
+                ${this.renderAttributes()}
+              </div>
+            `
+                : ""
+            }
 
             ${
               this.product?.details
