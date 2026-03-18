@@ -106,18 +106,46 @@ class ProductCreateModal extends HTMLElement {
                 </ui-dropdown>
               </div>
 
-              <!-- 6. Brand & Material -->
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
-                <ui-dropdown id="create-brand" placeholder="Select brand..." searchable class="w-full">
-                  ${brandOptions}
-                </ui-dropdown>
+              <!-- 6. Brand -->
+              <div class="sm:col-span-2">
+                <div class="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                  <div class="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <label class="block text-sm font-medium text-slate-700">Brand</label>
+                      <p class="text-[11px] text-slate-400 mt-1">Optional merchandising data for the product.</p>
+                    </div>
+                    <ui-switch id="create-has-brand" checked onchange="this.closest('app-products-page').toggleBrandSection('create')">
+                      <span slot="label">Enable</span>
+                    </ui-switch>
+                  </div>
+                  <div id="create-brand-field" class="transition-all duration-300" style="max-height: 1000px; opacity: 1; overflow: visible;">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
+                    <ui-dropdown id="create-brand" placeholder="Select brand..." searchable class="w-full relative z-50">
+                      ${brandOptions}
+                    </ui-dropdown>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
-                <ui-dropdown id="create-material" placeholder="Select material..." searchable class="w-full">
-                  ${materialOptions}
-                </ui-dropdown>
+
+              <!-- 6b. Material -->
+              <div class="sm:col-span-2">
+                <div class="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                  <div class="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <label class="block text-sm font-medium text-slate-700">Material</label>
+                      <p class="text-[11px] text-slate-400 mt-1">Optional merchandising data for the product.</p>
+                    </div>
+                    <ui-switch id="create-has-material" checked onchange="this.closest('app-products-page').toggleMaterialSection('create')">
+                      <span slot="label">Enable</span>
+                    </ui-switch>
+                  </div>
+                  <div id="create-material-field" class="transition-all duration-300" style="max-height: 1000px; opacity: 1; overflow: visible;">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
+                    <ui-dropdown id="create-material" placeholder="Select material..." searchable class="w-full relative z-50">
+                      ${materialOptions}
+                    </ui-dropdown>
+                  </div>
+                </div>
               </div>
             </div>
 

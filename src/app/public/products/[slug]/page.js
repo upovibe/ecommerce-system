@@ -22,6 +22,7 @@ class PublicProductDetailsPage extends App {
     this.allowedPaymentModes = [];
     this._checkoutLoading = false;
     this.allowLogin = true;
+    this.loginSettingLoaded = false;
     this.guestCheckoutOpen = false;
     this.guestCheckoutSubmitting = false;
     this.guestOrderItems = [];
@@ -115,8 +116,10 @@ class PublicProductDetailsPage extends App {
       const res = await api.get("/settings/key/enable_user_login");
       const raw = String(res?.data?.data?.setting_value ?? "1").toLowerCase();
       this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
+      this.loginSettingLoaded = true;
     } catch (_) {
       this.allowLogin = true;
+      this.loginSettingLoaded = true;
     }
   }
 
@@ -342,6 +345,7 @@ class PublicProductDetailsPage extends App {
       this.selectedVariantId = null;
       this.selectedVariantLabel = "";
     }
+    this.updateView();
   }
 
   requireVariantSelection() {
@@ -359,6 +363,14 @@ class PublicProductDetailsPage extends App {
       variant: "warning",
     });
     return false;
+  }
+
+  isVariantRequired() {
+    return this.requireVariantSelection();
+  }
+
+  isVariantSelected() {
+    return !!this.selectedVariantId;
   }
 
   handleGuestInputChange(field, value) {
@@ -958,7 +970,8 @@ class PublicProductDetailsPage extends App {
     const price = this.formatCurrency(product.discounted_price ?? product.base_price);
     const basePrice = this.formatCurrency(product.base_price);
     const showPromo = product.is_on_promotion && product.promotion_details;
-    const isPhysical = product.type !== "service" && product.type !== "digital";
+    const isService = product.type === "service";
+    const isPhysical = !isService && product.type !== "digital";
     const status =
       product.stock_status === "in_stock"
         ? "In stock"
@@ -1039,11 +1052,12 @@ class PublicProductDetailsPage extends App {
             </div>
 
             ${
-              product.brand_name || product.material_name
+              (product.has_brand !== false && product.brand_name) ||
+              (product.has_material !== false && product.material_name)
                 ? `
             <div class="grid grid-cols-2 gap-4 text-sm">
               ${
-                product.brand_name
+                product.has_brand !== false && product.brand_name
                   ? `
               <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <p class="text-xs font-semibold text-slate-500 mb-1">Brand</p>
@@ -1053,7 +1067,7 @@ class PublicProductDetailsPage extends App {
                   : ""
               }
               ${
-                product.material_name
+                product.has_material !== false && product.material_name
                   ? `
               <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <p class="text-xs font-semibold text-slate-500 mb-1">Material</p>
@@ -1079,12 +1093,20 @@ class PublicProductDetailsPage extends App {
             }
 
             <div class="flex flex-wrap items-center gap-3">
-              <button data-add-to-cart class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Add to cart</button>
-              <button data-buy-now class="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Buy now</button>
               ${
-                this.allowLogin
-                  ? `<button data-save-wishlist class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition">Save to wishlist</button>`
-                  : ""
+                isService
+                  ? ""
+                  : `<button data-add-to-cart ${this.isVariantRequired() && !this.isVariantSelected() ? "disabled" : ""} class="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed">Add to cart</button>`
+              }
+              <button data-buy-now ${this.isVariantRequired() && !this.isVariantSelected() ? "disabled" : ""} class="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                ${isService ? "Book now" : "Buy now"}
+              </button>
+              ${
+                this.loginSettingLoaded
+                  ? this.allowLogin
+                    ? `<button data-save-wishlist ${this.isVariantRequired() && !this.isVariantSelected() ? "disabled" : ""} class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition disabled:opacity-50 disabled:cursor-not-allowed">Save to wishlist</button>`
+                    : ""
+                  : `<div class="h-11 w-40 rounded-2xl bg-slate-100 animate-pulse"></div>`
               }
             </div>
           </div>

@@ -312,9 +312,22 @@ class ProductsPage extends App {
         hasAttributes.checked = true;
         hasAttributes.setAttribute("checked", "");
       }
+      const hasBrand = m.querySelector("#create-has-brand");
+      if (hasBrand) {
+        hasBrand.checked = true;
+        hasBrand.setAttribute("checked", "");
+      }
+      const hasMaterial = m.querySelector("#create-has-material");
+      if (hasMaterial) {
+        hasMaterial.checked = true;
+        hasMaterial.setAttribute("checked", "");
+      }
       this.bindToggleHandlers(m, "create");
+      this.bindBrandMaterialHandlers(m, "create");
       this.toggleVariantSection("create");
       this.toggleAttributeSection("create");
+      this.toggleBrandSection("create");
+      this.toggleMaterialSection("create");
       m.open();
     }
   }
@@ -343,8 +356,12 @@ class ProductsPage extends App {
     const is_active      = form.querySelector("#create-active")?.checked ? 1 : 0;
     const hasVariantsEl  = form.querySelector("#create-has-variants");
     const hasAttributesEl = form.querySelector("#create-has-attributes");
+    const hasBrandEl     = form.querySelector("#create-has-brand");
+    const hasMaterialEl  = form.querySelector("#create-has-material");
     const hasVariants    = hasVariantsEl ? !!hasVariantsEl.checked : true;
     const hasAttributes  = hasAttributesEl ? !!hasAttributesEl.checked : true;
+    const hasBrand       = hasBrandEl ? !!hasBrandEl.checked : true;
+    const hasMaterial    = hasMaterialEl ? !!hasMaterialEl.checked : true;
     const variants       = this.collectVariants(form.querySelector("#variant-list"));
     const attributes     = this.collectAttributes(form.querySelector("#attribute-list"));
 
@@ -364,11 +381,13 @@ class ProductsPage extends App {
         base_price,
         description,
         details: details ? { note: details } : null,
-        brand_id,
-        material_id,
+        brand_id: hasBrand ? brand_id : null,
+        material_id: hasMaterial ? material_id : null,
         is_active,
         has_variants: hasVariants ? 1 : 0,
         has_attributes: hasAttributes ? 1 : 0,
+        has_brand: hasBrand ? 1 : 0,
+        has_material: hasMaterial ? 1 : 0,
         variants,
         attributes,
       };
@@ -469,6 +488,11 @@ class ProductsPage extends App {
       row.querySelector('[data-field="quantity"]').value = data.quantity ?? data.stock ?? 0;
     } else {
     }
+    {
+      const modal = list.closest("ui-modal");
+      const prefix = modal?.id === "product-edit-modal" ? "edit" : "create";
+      this.toggleVariantSection(prefix);
+    }
     this.updateTotalStock();
   }
 
@@ -520,6 +544,11 @@ class ProductsPage extends App {
       }
 
       row.querySelector('[data-field="value"]').value = data.value || "";
+    }
+    {
+      const modal = list.closest("ui-modal");
+      const prefix = modal?.id === "product-edit-modal" ? "edit" : "create";
+      this.toggleAttributeSection(prefix);
     }
   }
 
@@ -837,9 +866,24 @@ class ProductsPage extends App {
         if (hasAttributes.checked) hasAttributes.setAttribute("checked", "");
         else hasAttributes.removeAttribute("checked");
       }
+      const hasBrand = m.querySelector("#edit-has-brand");
+      if (hasBrand) {
+        hasBrand.checked = p.has_brand !== false;
+        if (hasBrand.checked) hasBrand.setAttribute("checked", "");
+        else hasBrand.removeAttribute("checked");
+      }
+      const hasMaterial = m.querySelector("#edit-has-material");
+      if (hasMaterial) {
+        hasMaterial.checked = p.has_material !== false;
+        if (hasMaterial.checked) hasMaterial.setAttribute("checked", "");
+        else hasMaterial.removeAttribute("checked");
+      }
       this.bindToggleHandlers(m, "edit");
+      this.bindBrandMaterialHandlers(m, "edit");
       this.toggleVariantSection("edit");
       this.toggleAttributeSection("edit");
+      this.toggleBrandSection("edit");
+      this.toggleMaterialSection("edit");
 
       const editDesc = m.querySelector("#edit-description");
       if (editDesc?.setValue) {
@@ -915,6 +959,10 @@ class ProductsPage extends App {
     const hasAttributesEl = m.querySelector("#edit-has-attributes");
     const hasVariants    = hasVariantsEl ? !!hasVariantsEl.checked : true;
     const hasAttributes  = hasAttributesEl ? !!hasAttributesEl.checked : true;
+    const hasBrandEl     = m.querySelector("#edit-has-brand");
+    const hasMaterialEl  = m.querySelector("#edit-has-material");
+    const hasBrand       = hasBrandEl ? !!hasBrandEl.checked : true;
+    const hasMaterial    = hasMaterialEl ? !!hasMaterialEl.checked : true;
 
     if (!name) { Toast.show({ title: "Required", message: "Name is required", variant: "error" }); return; }
     const oldBtnText = saveBtn?.textContent;
@@ -958,11 +1006,13 @@ class ProductsPage extends App {
         base_price,
         description,
         details: details ? { note: details } : null,
-        brand_id,
-        material_id,
+        brand_id: hasBrand ? brand_id : null,
+        material_id: hasMaterial ? material_id : null,
         is_active,
         has_variants: hasVariants ? 1 : 0,
         has_attributes: hasAttributes ? 1 : 0,
+        has_brand: hasBrand ? 1 : 0,
+        has_material: hasMaterial ? 1 : 0,
       };
 
       if (hasVariants) {
@@ -1021,6 +1071,66 @@ class ProductsPage extends App {
         this.toggleAttributeSection(prefix);
       });
       attributeToggle.dataset.bound = "1";
+    }
+  }
+
+  bindBrandMaterialHandlers(modal, prefix) {
+    if (!modal) return;
+    const brandToggle = modal.querySelector(`#${prefix}-has-brand`);
+    const materialToggle = modal.querySelector(`#${prefix}-has-material`);
+    if (brandToggle && !brandToggle.dataset.bound) {
+      brandToggle.addEventListener("switch-change", () => {
+        this.toggleBrandSection(prefix);
+      });
+      brandToggle.dataset.bound = "1";
+    }
+    if (materialToggle && !materialToggle.dataset.bound) {
+      materialToggle.addEventListener("switch-change", () => {
+        this.toggleMaterialSection(prefix);
+      });
+      materialToggle.dataset.bound = "1";
+    }
+  }
+
+  toggleBrandSection(prefix = "create") {
+    const modal =
+      prefix === "edit"
+        ? this.querySelector("#product-edit-modal")
+        : this.querySelector("#product-create-modal");
+    if (!modal) return;
+    const toggle = modal.querySelector(`#${prefix}-has-brand`);
+    const field = modal.querySelector(`#${prefix}-brand-field`);
+    if (!toggle || !field) return;
+    const enabled = toggle.checked ?? toggle.hasAttribute("checked");
+    field.style.maxHeight = enabled ? `${field.scrollHeight}px` : "0px";
+    field.style.opacity = enabled ? "1" : "0";
+    field.style.pointerEvents = enabled ? "auto" : "none";
+    field.style.overflow = enabled ? "visible" : "hidden";
+    const dropdown = field.querySelector("ui-dropdown");
+    if (dropdown) {
+      if (enabled) dropdown.removeAttribute("disabled");
+      else dropdown.setAttribute("disabled", "");
+    }
+  }
+
+  toggleMaterialSection(prefix = "create") {
+    const modal =
+      prefix === "edit"
+        ? this.querySelector("#product-edit-modal")
+        : this.querySelector("#product-create-modal");
+    if (!modal) return;
+    const toggle = modal.querySelector(`#${prefix}-has-material`);
+    const field = modal.querySelector(`#${prefix}-material-field`);
+    if (!toggle || !field) return;
+    const enabled = toggle.checked ?? toggle.hasAttribute("checked");
+    field.style.maxHeight = enabled ? `${field.scrollHeight}px` : "0px";
+    field.style.opacity = enabled ? "1" : "0";
+    field.style.pointerEvents = enabled ? "auto" : "none";
+    field.style.overflow = enabled ? "visible" : "hidden";
+    const dropdown = field.querySelector("ui-dropdown");
+    if (dropdown) {
+      if (enabled) dropdown.removeAttribute("disabled");
+      else dropdown.setAttribute("disabled", "");
     }
   }
 

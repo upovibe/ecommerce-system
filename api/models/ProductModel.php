@@ -27,6 +27,8 @@ class ProductModel extends BaseModel
         'is_active',
         'has_variants',
         'has_attributes',
+        'has_brand',
+        'has_material',
     ];
 
     protected static $casts = [
@@ -36,6 +38,8 @@ class ProductModel extends BaseModel
         'is_active'   => 'boolean',
         'has_variants' => 'boolean',
         'has_attributes' => 'boolean',
+        'has_brand' => 'boolean',
+        'has_material' => 'boolean',
         'brand_id'    => 'integer',
         'material_id' => 'integer',
         'category_id' => 'integer',

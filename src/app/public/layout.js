@@ -20,6 +20,19 @@ class PublicLayout extends App {
     if (this._loaded) return;
     this._loaded = true;
     window.addEventListener("cart:updated", () => this.updateCartBadge());
+    if (!this._globalNavBound) {
+      this._globalNavBound = true;
+      document.addEventListener("click", (e) => {
+        const link = e.target?.closest?.("[data-cart-link]");
+        if (!link) return;
+        e.preventDefault();
+        if (window.router && typeof window.router.navigate === "function") {
+          window.router.navigate("/public/cart");
+        } else {
+          window.location.href = "/public/cart";
+        }
+      }, true);
+    }
     this.bindNav();
     await this.loadSettings();
   }

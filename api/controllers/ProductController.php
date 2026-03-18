@@ -45,6 +45,8 @@ class ProductController
                     p.is_active,
                     p.has_variants,
                     p.has_attributes,
+                    p.has_brand,
+                    p.has_material,
                     p.created_at,
                     p.updated_at,
                     p.category_id,
@@ -116,6 +118,8 @@ class ProductController
                     p.is_active,
                     p.has_variants,
                     p.has_attributes,
+                    p.has_brand,
+                    p.has_material,
                     p.created_at,
                     p.updated_at,
                     p.category_id,
@@ -461,6 +465,8 @@ class ProductController
                 'is_active'    => isset($data['is_active']) ? (int)(bool)$data['is_active'] : 1,
                 'has_variants' => isset($data['has_variants']) ? (int)(bool)$data['has_variants'] : 1,
                 'has_attributes' => isset($data['has_attributes']) ? (int)(bool)$data['has_attributes'] : 1,
+                'has_brand' => isset($data['has_brand']) ? (int)(bool)$data['has_brand'] : 1,
+                'has_material' => isset($data['has_material']) ? (int)(bool)$data['has_material'] : 1,
             ]);
 
             if (!$id) {
@@ -559,6 +565,8 @@ class ProductController
             if (isset($data['is_active']))   $updateData['is_active']   = (int)(bool)$data['is_active'];
             if (isset($data['has_variants']))   $updateData['has_variants']   = (int)(bool)$data['has_variants'];
             if (isset($data['has_attributes'])) $updateData['has_attributes'] = (int)(bool)$data['has_attributes'];
+            if (isset($data['has_brand']))      $updateData['has_brand']      = (int)(bool)$data['has_brand'];
+            if (isset($data['has_material']))   $updateData['has_material']   = (int)(bool)$data['has_material'];
 
             // Regenerate slug only if name changed
             if (!empty($data['name'])) {
@@ -869,6 +877,12 @@ class ProductController
         }
         if (array_key_exists('has_attributes', $p)) {
             $p['has_attributes'] = (bool) $p['has_attributes'];
+        }
+        if (array_key_exists('has_brand', $p)) {
+            $p['has_brand'] = (bool) $p['has_brand'];
+        }
+        if (array_key_exists('has_material', $p)) {
+            $p['has_material'] = (bool) $p['has_material'];
         }
 
         // Stock status processing
