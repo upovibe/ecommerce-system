@@ -86,10 +86,6 @@ class ProductCreateModal extends HTMLElement {
                   <ui-option value="service">Service</ui-option>
                 </ui-dropdown>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Total Stock (Calculated)</label>
-                <ui-input id="create-stock-total" readonly placeholder="Sum of variants" class="w-full bg-slate-50"></ui-input>
-              </div>
 
               <!-- 5. Category & Subcategory -->
               <div>
@@ -107,7 +103,7 @@ class ProductCreateModal extends HTMLElement {
               </div>
 
               <!-- 6. Brand -->
-              <div class="sm:col-span-2">
+              <div>
                 <div class="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
                   <div class="flex items-start justify-between gap-4 mb-4">
                     <div>
@@ -120,7 +116,7 @@ class ProductCreateModal extends HTMLElement {
                   </div>
                   <div id="create-brand-field" class="transition-all duration-300" style="max-height: 1000px; opacity: 1; overflow: visible;">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Brand</label>
-                    <ui-dropdown id="create-brand" placeholder="Select brand..." searchable class="w-full relative z-50">
+                    <ui-dropdown id="create-brand" placeholder="Select brand..." search-placeholder="Select brand..." searchable allow-add class="w-full relative z-50">
                       ${brandOptions}
                     </ui-dropdown>
                   </div>
@@ -128,7 +124,7 @@ class ProductCreateModal extends HTMLElement {
               </div>
 
               <!-- 6b. Material -->
-              <div class="sm:col-span-2">
+              <div>
                 <div class="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
                   <div class="flex items-start justify-between gap-4 mb-4">
                     <div>
@@ -141,7 +137,7 @@ class ProductCreateModal extends HTMLElement {
                   </div>
                   <div id="create-material-field" class="transition-all duration-300" style="max-height: 1000px; opacity: 1; overflow: visible;">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
-                    <ui-dropdown id="create-material" placeholder="Select material..." searchable class="w-full relative z-50">
+                    <ui-dropdown id="create-material" placeholder="Select material..." search-placeholder="Select material..." searchable allow-add class="w-full relative z-50">
                       ${materialOptions}
                     </ui-dropdown>
                   </div>
@@ -161,9 +157,13 @@ class ProductCreateModal extends HTMLElement {
                     <span slot="label">Enable</span>
                   </ui-switch>
                 </div>
-                <div id="create-variant-body" class="space-y-3 overflow-hidden transition-all duration-300" style="max-height: 1000px; opacity: 1;">
-                  <div id="variant-list" class="space-y-3"></div>
+              <div id="create-variant-body" class="space-y-3 overflow-hidden transition-all duration-300" style="max-height: 1000px; opacity: 1;">
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs font-semibold">
+                  <span class="text-slate-500">Total stock</span>
+                  <span id="create-stock-total" class="text-slate-900">0</span>
                 </div>
+                <div id="variant-list" class="space-y-3"></div>
+              </div>
                 <div id="create-variant-actions" class="flex justify-end mt-3 transition-opacity duration-200">
                   <button type="button" onclick="this.closest('app-products-page').addVariantRow(null, this.closest('ui-modal').querySelector('#variant-list'))" class="px-4 py-2 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                     <i class="fas fa-plus text-[10px]"></i> Add variant

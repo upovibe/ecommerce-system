@@ -63,12 +63,25 @@ class Dropdown extends HTMLElement {
         this.searchContainer = document.createElement('div');
         this.searchContainer.className = 'upo-dropdown-search';
         this.searchContainer.style.display = 'none';
-        
+
+        // Create search row container
+        this.searchRow = document.createElement('div');
+        this.searchRow.className = 'upo-dropdown-search-row';
+
         // Create the search input
         this.searchInput = document.createElement('input');
         this.searchInput.type = 'text';
         this.searchInput.className = 'upo-dropdown-search-input';
-        this.searchInput.placeholder = 'Search...';
+        this.searchInput.placeholder = this.getAttribute('search-placeholder') || 'Search...';
+
+        // Create add button (optional)
+        this.addButton = document.createElement('button');
+        this.addButton.type = 'button';
+        this.addButton.className = 'upo-dropdown-add-btn';
+        this.addButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>';
+        this.addButton.title = 'Add option';
+        this.addButton.style.display = 'none';
+        this.addButton.dataset.loading = 'false';
         
         // Create the options container
         this.optionsContainer = document.createElement('div');
@@ -77,7 +90,9 @@ class Dropdown extends HTMLElement {
         // Assemble the structure
         this.trigger.appendChild(this.selection);
         this.trigger.appendChild(this.arrow);
-        this.searchContainer.appendChild(this.searchInput);
+        this.searchRow.appendChild(this.searchInput);
+        this.searchRow.appendChild(this.addButton);
+        this.searchContainer.appendChild(this.searchRow);
         this.menu.appendChild(this.searchContainer);
         this.menu.appendChild(this.optionsContainer);
         this.container.appendChild(this.trigger);
@@ -228,6 +243,12 @@ class Dropdown extends HTMLElement {
                     padding: 0.5rem;
                     border-bottom: 1px solid #e5e7eb;
                 }
+
+                .upo-dropdown-search-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
                 
                 .upo-dropdown-search-input {
                     width: 100%;
@@ -237,11 +258,47 @@ class Dropdown extends HTMLElement {
                     font-size: 0.875rem;
                     outline: none;
                     transition: border-color 0.15s ease-in-out;
+                    flex: 1;
                 }
                 
                 .upo-dropdown-search-input:focus {
                     border-color: #3b82f6;
                     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                }
+
+                .upo-dropdown-add-btn {
+                    width: 2rem;
+                    height: 2rem;
+                    border-radius: 0.375rem;
+                    border: 1px solid #d1d5db;
+                    background: #ffffff;
+                    color: #16a34a;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: all 0.15s ease-in-out;
+                }
+
+                .upo-dropdown-add-btn:hover {
+                    border-color: #16a34a;
+                    background: #ecfdf3;
+                }
+
+                .upo-dropdown-add-btn.loading {
+                    color: #64748b;
+                    border-color: #cbd5f5;
+                    background: #f8fafc;
+                    cursor: wait;
+                }
+
+                .upo-dropdown-add-btn.loading svg {
+                    animation: upo-spin 1s linear infinite;
+                }
+
+                @keyframes upo-spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
                 }
                 
                 .upo-dropdown-options {
@@ -360,7 +417,7 @@ class Dropdown extends HTMLElement {
     }
     
     static get observedAttributes() {
-        return ['value', 'placeholder', 'disabled', 'multiple', 'searchable'];
+        return ['value', 'placeholder', 'disabled', 'multiple', 'searchable', 'search-placeholder'];
     }
 
     attributeChangedCallback(name, oldValue, newValue) {
@@ -383,6 +440,9 @@ class Dropdown extends HTMLElement {
                 if (this.selectedValues.size === 0) {
                     this.updateSelection();
                 }
+                break;
+            case 'search-placeholder':
+                this.searchInput.placeholder = newValue || 'Search...';
                 break;
             case 'disabled':
                 if (this.hasAttribute('disabled')) {
@@ -524,6 +584,13 @@ class Dropdown extends HTMLElement {
             }
         });
 
+        // Add option button
+        this.addButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handleAddOption();
+        });
+
         // Keyboard navigation for options
         this.optionsContainer.addEventListener('keydown', (e) => {
             switch (e.key) {
@@ -630,7 +697,7 @@ class Dropdown extends HTMLElement {
     }
     }
     
-        updateOptions() {
+    updateOptions() {
         // Use internal options array
         const options = this._options || [];
         this.filteredOptions = options.filter(option => {
@@ -640,6 +707,8 @@ class Dropdown extends HTMLElement {
             }
             return true;
         });
+        
+        this.updateAddButton();
         
         if (this.filteredOptions.length === 0) {
             this.optionsContainer.innerHTML = `
@@ -737,6 +806,64 @@ class Dropdown extends HTMLElement {
             bubbles: true,
             detail: { value }
         }));
+    }
+
+    updateAddButton() {
+        if (!this.hasAttribute('allow-add') || !this.hasAttribute('searchable')) {
+            this.addButton.style.display = 'none';
+            return;
+        }
+        const term = (this.searchInput.value || '').trim();
+        if (!term) {
+            this.addButton.style.display = 'none';
+            return;
+        }
+        const exists = (this._options || []).some(opt => {
+            const val = (opt.getAttribute('value') || '').toLowerCase();
+            const text = (opt.textContent || '').trim().toLowerCase();
+            return val === term.toLowerCase() || text === term.toLowerCase();
+        });
+        this.addButton.style.display = exists ? 'none' : 'inline-flex';
+        this.addButton.setAttribute('aria-label', `Add ${term}`);
+    }
+
+    handleAddOption() {
+        const term = (this.searchInput.value || '').trim();
+        if (!term) return;
+        if (this.addButton.classList.contains('loading')) return;
+        const exists = (this._options || []).some(opt => {
+            const val = (opt.getAttribute('value') || '').toLowerCase();
+            const text = (opt.textContent || '').trim().toLowerCase();
+            return val === term.toLowerCase() || text === term.toLowerCase();
+        });
+        if (exists) return;
+
+        const option = document.createElement('ui-option');
+        option.setAttribute('value', term);
+        option.textContent = term;
+        this.appendChild(option);
+        this.syncOptions();
+        this.selectedValues.clear();
+        this.selectedValues.add(term);
+        this.updateSelection();
+        this.updateOptions();
+        this.dispatchChangeEvent();
+        this.dispatchEvent(new CustomEvent('option-add', {
+            bubbles: true,
+            detail: { value: term, label: term }
+        }));
+        // Keep dropdown open so caller can complete async creation
+    }
+
+    setAddLoading(isLoading) {
+        if (!this.addButton) return;
+        if (isLoading) {
+            this.addButton.classList.add('loading');
+            this.addButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>';
+        } else {
+            this.addButton.classList.remove('loading');
+            this.addButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>';
+        }
     }
 
     // Public methods

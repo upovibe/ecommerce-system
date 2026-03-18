@@ -368,6 +368,7 @@ class ProductsPage extends App {
     if (!name) { Toast.show({ title: "Required", message: "Product name is required", variant: "error" }); return; }
     if (!category_id) { Toast.show({ title: "Required", message: "Category is required", variant: "error" }); return; }
 
+    console.debug("[ProductCreate] submit", { targetStatus });
     const oldBtnText = saveBtn?.textContent;
     if (saveBtn) saveBtn.textContent = "Saving...";
     try {
@@ -392,6 +393,7 @@ class ProductsPage extends App {
         attributes,
       };
 
+      console.debug("[ProductCreate] payload", payload);
       const res = await api.post("/products", payload);
       const newId = res.data?.data?.id;
 
@@ -427,6 +429,7 @@ class ProductsPage extends App {
       this.closeCreateModal();
       await this.fetchData(true);
     } catch (e) {
+      console.error("[ProductCreate] error", e);
       Toast.show({ title: "Error", message: e.response?.data?.message || "Failed to create product", variant: "error" });
     } finally {
       if (saveBtn) saveBtn.textContent = oldBtnText;
@@ -444,7 +447,7 @@ class ProductsPage extends App {
       <div class="flex flex-col gap-4">
         <div class="space-y-2">
           <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Variation Type</label>
-          <ui-dropdown data-field="type" placeholder="Select type..." class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleVariantTypeChange(event)">
+          <ui-dropdown data-field="type" placeholder="Select type..." search-placeholder="Select type..." searchable allow-add class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleVariantTypeChange(event)">
             ${this.buildTypeOptionsHtml()}
           </ui-dropdown>
           <div class="mt-2 hidden custom-type-container animate-in fade-in slide-in-from-top-1 duration-200">
@@ -507,7 +510,7 @@ class ProductsPage extends App {
       <div class="flex flex-col gap-4">
         <div class="space-y-2">
           <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Attribute Type</label>
-          <ui-dropdown data-field="type" placeholder="Select type..." class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleAttributeTypeChange(event)">
+          <ui-dropdown data-field="type" placeholder="Select type..." search-placeholder="Select type..." searchable allow-add class="w-full bg-white border-slate-200" onchange="this.closest('app-products-page').handleAttributeTypeChange(event)">
             ${this.buildAttributeTypeOptionsHtml()}
           </ui-dropdown>
           <div class="mt-2 hidden custom-attribute-container animate-in fade-in slide-in-from-top-1 duration-200">
@@ -702,19 +705,9 @@ class ProductsPage extends App {
     
     if (!variantsEnabled || rows.length === 0) {
       if (stockField) {
-        stockField.removeAttribute("readonly");
-        stockField.classList.remove("bg-slate-50");
-        stockField.classList.add("bg-white");
-        stockField.placeholder = "Enter direct stock";
+        stockField.textContent = "0";
       }
       return;
-    }
-
-    if (stockField) {
-      stockField.setAttribute("readonly", "");
-      stockField.classList.add("bg-slate-50");
-      stockField.classList.remove("bg-white");
-      stockField.placeholder = "Sum of variants";
     }
 
     const total = rows.reduce((sum, row) => {
@@ -723,7 +716,7 @@ class ProductsPage extends App {
     }, 0);
 
     if (stockField) {
-      stockField.value = total;
+      stockField.textContent = String(total);
     }
   }
 
@@ -742,10 +735,7 @@ class ProductsPage extends App {
     
     // If no variants, check the total stock field and return a default variant
     if (rows.length === 0) {
-      const m = list.closest("ui-modal");
-      const stockField = m?.querySelector("#create-stock-total") || m?.querySelector("#edit-stock-total");
-      const quantity = stockField?.value ? parseInt(stockField.value, 10) : 0;
-      return [{ type: "Default", value: "Default", quantity }];
+      return [];
     }
 
     const variants = rows.map((row) => {
@@ -965,6 +955,7 @@ class ProductsPage extends App {
     const hasMaterial    = hasMaterialEl ? !!hasMaterialEl.checked : true;
 
     if (!name) { Toast.show({ title: "Required", message: "Name is required", variant: "error" }); return; }
+    console.debug("[ProductEdit] submit", { targetStatus, id: this.selectedProduct?.id });
     const oldBtnText = saveBtn?.textContent;
     if (saveBtn) saveBtn.textContent = "Saving...";
 
@@ -1022,11 +1013,13 @@ class ProductsPage extends App {
         payload.attributes = this.collectAttributes(m.querySelector("#attribute-list"));
       }
 
+      console.debug("[ProductEdit] payload", payload);
       await api.put(`/products/${this.selectedProduct.id}`, payload);
       Toast.show({ title: "Updated", message: "Product updated successfully", variant: "success" });
       this.closeEditModal();
       await this.fetchData(true);
     } catch (e) {
+      console.error("[ProductEdit] error", e);
       Toast.show({ title: "Error", message: e.response?.data?.message || "Failed to update product", variant: "error" });
     } finally {
       if (saveBtn) saveBtn.textContent = oldBtnText;
@@ -1078,6 +1071,8 @@ class ProductsPage extends App {
     if (!modal) return;
     const brandToggle = modal.querySelector(`#${prefix}-has-brand`);
     const materialToggle = modal.querySelector(`#${prefix}-has-material`);
+    const brandDropdown = modal.querySelector(`#${prefix}-brand`);
+    const materialDropdown = modal.querySelector(`#${prefix}-material`);
     if (brandToggle && !brandToggle.dataset.bound) {
       brandToggle.addEventListener("switch-change", () => {
         this.toggleBrandSection(prefix);
@@ -1089,6 +1084,71 @@ class ProductsPage extends App {
         this.toggleMaterialSection(prefix);
       });
       materialToggle.dataset.bound = "1";
+    }
+    if (brandDropdown && !brandDropdown.dataset.boundAdd) {
+      brandDropdown.addEventListener("option-add", (e) => {
+        this.createBrandFromDropdown(e, brandDropdown);
+      });
+      brandDropdown.dataset.boundAdd = "1";
+    }
+    if (materialDropdown && !materialDropdown.dataset.boundAdd) {
+      materialDropdown.addEventListener("option-add", (e) => {
+        this.createMaterialFromDropdown(e, materialDropdown);
+      });
+      materialDropdown.dataset.boundAdd = "1";
+    }
+  }
+
+  async createBrandFromDropdown(e, dropdown) {
+    const name = e?.detail?.value?.trim();
+    if (!name) return;
+    try {
+      if (dropdown?.setAddLoading) dropdown.setAddLoading(true);
+      const res = await api.post("/brands", { name });
+      const created = res?.data?.data;
+      const id = created?.id;
+      if (!id) return;
+      const opt = document.createElement("ui-option");
+      opt.setAttribute("value", String(id));
+      opt.textContent = created.name || name;
+      dropdown.appendChild(opt);
+      dropdown.value = String(id);
+      // Remove temporary option with string value
+      dropdown.querySelectorAll("ui-option").forEach((o) => {
+        if (o.getAttribute("value") === name) o.remove();
+      });
+      await this.fetchData(true);
+      Toast.show({ title: "Brand added", message: created.name || name, variant: "success" });
+    } catch (err) {
+      Toast.show({ title: "Error", message: err.response?.data?.message || "Failed to add brand", variant: "error" });
+    } finally {
+      if (dropdown?.setAddLoading) dropdown.setAddLoading(false);
+    }
+  }
+
+  async createMaterialFromDropdown(e, dropdown) {
+    const name = e?.detail?.value?.trim();
+    if (!name) return;
+    try {
+      if (dropdown?.setAddLoading) dropdown.setAddLoading(true);
+      const res = await api.post("/materials", { name });
+      const created = res?.data?.data;
+      const id = created?.id;
+      if (!id) return;
+      const opt = document.createElement("ui-option");
+      opt.setAttribute("value", String(id));
+      opt.textContent = created.name || name;
+      dropdown.appendChild(opt);
+      dropdown.value = String(id);
+      dropdown.querySelectorAll("ui-option").forEach((o) => {
+        if (o.getAttribute("value") === name) o.remove();
+      });
+      await this.fetchData(true);
+      Toast.show({ title: "Material added", message: created.name || name, variant: "success" });
+    } catch (err) {
+      Toast.show({ title: "Error", message: err.response?.data?.message || "Failed to add material", variant: "error" });
+    } finally {
+      if (dropdown?.setAddLoading) dropdown.setAddLoading(false);
     }
   }
 
@@ -1102,10 +1162,10 @@ class ProductsPage extends App {
     const field = modal.querySelector(`#${prefix}-brand-field`);
     if (!toggle || !field) return;
     const enabled = toggle.checked ?? toggle.hasAttribute("checked");
-    field.style.maxHeight = enabled ? `${field.scrollHeight}px` : "0px";
+    field.style.display = enabled ? "block" : "none";
     field.style.opacity = enabled ? "1" : "0";
     field.style.pointerEvents = enabled ? "auto" : "none";
-    field.style.overflow = enabled ? "visible" : "hidden";
+    field.style.overflow = "visible";
     const dropdown = field.querySelector("ui-dropdown");
     if (dropdown) {
       if (enabled) dropdown.removeAttribute("disabled");
@@ -1123,10 +1183,10 @@ class ProductsPage extends App {
     const field = modal.querySelector(`#${prefix}-material-field`);
     if (!toggle || !field) return;
     const enabled = toggle.checked ?? toggle.hasAttribute("checked");
-    field.style.maxHeight = enabled ? `${field.scrollHeight}px` : "0px";
+    field.style.display = enabled ? "block" : "none";
     field.style.opacity = enabled ? "1" : "0";
     field.style.pointerEvents = enabled ? "auto" : "none";
-    field.style.overflow = enabled ? "visible" : "hidden";
+    field.style.overflow = "visible";
     const dropdown = field.querySelector("ui-dropdown");
     if (dropdown) {
       if (enabled) dropdown.removeAttribute("disabled");
