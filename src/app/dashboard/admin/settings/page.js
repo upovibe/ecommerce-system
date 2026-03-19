@@ -155,6 +155,21 @@ class SettingsPage extends App {
     return [];
   }
 
+  getBusinessHoursValue(setting) {
+    if (!setting) return [];
+    const raw = setting.setting_value;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
+
   async saveSetting(id) {
     const setting = this.settings.find((s) => String(s.id) === String(id));
     if (!setting) return;
@@ -186,7 +201,20 @@ class SettingsPage extends App {
         }
       } else if (setting.setting_type === "array") {
         const options = this.getArrayOptions(setting);
-        if (options) {
+        if (setting.setting_key === "business_hours") {
+          const rows = Array.from(card.querySelectorAll("[data-hours-row]"));
+          const payload = rows
+            .map((row) => {
+              const label = row.querySelector('[data-hours-field="label"]')?.value?.trim() || "";
+              const value = row.querySelector('[data-hours-field="value"]')?.value?.trim() || "";
+              return { label, value };
+            })
+            .filter((h) => h.label || h.value);
+          await api.put(`/settings/${id}`, {
+            setting_value: JSON.stringify(payload),
+            is_active,
+          });
+        } else if (options) {
           const selected = Array.from(card.querySelectorAll("ui-checkbox"))
             .filter((el) => el.hasAttribute("checked"))
             .map((el) => el.dataset.value)
@@ -255,6 +283,8 @@ class SettingsPage extends App {
     const isBoolean = setting.setting_type === "boolean";
     const arrayOptions = isArray ? this.getArrayOptions(setting) : null;
     const arrayValue = isArray ? this.getArrayValue(setting) : [];
+    const isBusinessHours = setting.setting_key === "business_hours";
+    const businessHours = isBusinessHours ? this.getBusinessHoursValue(setting) : [];
 
     return `
       <div class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm" data-setting-id="${setting.id}">
@@ -297,6 +327,29 @@ class SettingsPage extends App {
                 `,
                 )
                 .join("")}
+            </div>
+          `
+                : isArray && isBusinessHours
+                  ? `
+            <div class="space-y-3">
+              ${(businessHours.length
+                ? businessHours
+                : [
+                    { label: "Mon - Fri", value: "9am - 6pm" },
+                    { label: "Sat", value: "10am - 4pm" },
+                    { label: "Sun", value: "Closed" },
+                  ]
+              )
+                .map(
+                  (h) => `
+                <div class="grid grid-cols-[1fr_1fr] gap-3" data-hours-row>
+                  <ui-input data-hours-field="label" value="${String(h.label || "").replace(/"/g, "&quot;")}" placeholder="Day(s)" class="w-full"></ui-input>
+                  <ui-input data-hours-field="value" value="${String(h.value || "").replace(/"/g, "&quot;")}" placeholder="Hours" class="w-full"></ui-input>
+                </div>
+              `,
+                )
+                .join("")}
+              <p class="text-[11px] text-slate-500">Use each row for a day range and its opening hours.</p>
             </div>
           `
                   : isArray

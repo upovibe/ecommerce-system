@@ -189,19 +189,6 @@ class PageSeeder
                     'description' => 'Returns policy and refund process.'
                 ],
             ],
-            [
-                'title' => "Faq's",
-                'subtitle' => 'Quick answers to common questions.',
-                'name' => "Faq's",
-                'slug' => 'faqs',
-                'content' => '<h2>FAQs</h2><h3>How do I place an order?</h3><p>Add items to your cart and complete checkout.</p><h3>Can I pay on delivery?</h3><p>Payment modes depend on the store settings and product type.</p><h3>How do I contact support?</h3><p>Email support@vastcommerce.com or use the live chat widget.</p>',
-                'banner' => $splash,
-                'images' => $defaultImages,
-                'meta' => [
-                    'keywords' => 'faqs, questions, help',
-                    'description' => 'Frequently asked questions and quick help.'
-                ],
-            ],
         ];
 
         foreach ($pages as $p) {

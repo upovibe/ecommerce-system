@@ -81,6 +81,13 @@ Router::get('/pages/{id}', 'PageController@show');
 Router::put('/pages/{id}', 'PageController@update');
 Router::delete('/pages/{id}', 'PageController@destroy');
 
+// FAQ Management Routes (admin + public)
+Router::get('/faqs', 'FaqController@index');
+Router::post('/faqs', 'FaqController@store');
+Router::put('/faqs/{id}', 'FaqController@update');
+Router::delete('/faqs/{id}', 'FaqController@destroy');
+Router::get('/faqs/public', 'FaqController@getPublic');
+
 // Inventory Management Routes (admin only)
 
 // Attribute Management Routes (admin only)

@@ -243,7 +243,7 @@ class PublicLayout extends App {
             <div class="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-500">
               <a href="/public/categories" class="transition-colors hover:text-[var(--primary)]">Collections</a>
               <a href="/public/products" class="transition-colors hover:text-[var(--primary)]">All Products</a>
-              <a href="#" class="transition-colors hover:text-[var(--primary)]">Flash Deals</a>
+              <a href="/public/contact" class="transition-colors hover:text-[var(--primary)]">Contact Us</a>
             </div>
           </div>
 
@@ -339,21 +339,31 @@ class PublicLayout extends App {
             </div>
               <div>
                 <h4 class="text-xs font-semibold text-indigo-400 mb-6">Support</h4>
-                <ul class="space-y-4 text-sm font-bold text-slate-400">
+                  <ul class="space-y-4 text-sm font-bold text-slate-400">
                   ${
                     (this.footerPages || [])
                       .filter((p) => {
                         const slug = String(p.slug || "").replace(/^\/+/, "");
-                        return !["home", "category", "product", "public", ""].includes(slug);
+                        return [
+                          "about-us",
+                          "contact",
+                          "faq",
+                          "terms-conditions",
+                          "privacy-policy",
+                          "shipping-returns",
+                          "refund-policy",
+                          "cookie-policy",
+                          "selling-policy",
+                          "returns-policy",
+                        ].includes(slug);
                       })
                       .map((p) => {
                         const slug = String(p.slug || "").replace(/^\/+/, "");
-                        return `<li><a href="/public/pages/${slug}" class="hover:text-white transition-colors">${p.title}</a></li>`;
+                        return `<li><a href="/public/${slug}" class="hover:text-white transition-colors">${p.title}</a></li>`;
                       })
                       .join("")
-                  }
-                  <li><a href="/auth/login" class="hover:text-white transition-colors">Admin Portal</a></li>
-                </ul>
+                    }
+                  </ul>
               </div>
           </div>
           <div class="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-semibold text-slate-500">
@@ -363,12 +373,11 @@ class PublicLayout extends App {
                 (this.footerPages || [])
                   .filter((p) => {
                     const slug = String(p.slug || "").replace(/^\/+/, "");
-                    return !["home", "category", "product", "public", ""].includes(slug);
+                    return ["privacy-policy", "terms-conditions"].includes(slug);
                   })
-                  .slice(0, 2)
                   .map((p) => {
                     const slug = String(p.slug || "").replace(/^\/+/, "");
-                    return `<a href="/public/pages/${slug}" class="hover:text-white transition-colors">${p.title}</a>`;
+                    return `<a href="/public/${slug}" class="hover:text-white transition-colors">${p.title}</a>`;
                   })
                   .join("")
               }

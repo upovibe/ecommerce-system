@@ -52,4 +52,20 @@ class PageModel extends BaseModel
             throw new Exception('Error fetching page by slug: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Get active pages (public)
+     */
+    public function getActivePages()
+    {
+        try {
+            $stmt = $this->pdo->prepare("SELECT * FROM {$this->table} WHERE is_active = 1 ORDER BY id ASC");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $rows ? array_map(fn($row) => $this->applyCasts($row), $rows) : [];
+            return $rows;
+        } catch (PDOException $e) {
+            throw new Exception('Error fetching active pages: ' . $e->getMessage());
+        }
+    }
 }

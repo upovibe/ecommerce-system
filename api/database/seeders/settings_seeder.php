@@ -27,8 +27,11 @@ class SettingsSeeder
             ['whatsapp_float', '1', 'boolean', 'commerce', 'Show WhatsApp floating button on public pages'],
             ['contact_email', 'info@vastcommerce.com', 'text', 'contact', 'Primary support email'],
             ['phone_number', '+234 800 VAST', 'text', 'contact', 'Customer service line'],
+            ['business_hours', '[{\"label\":\"Mon - Fri\",\"value\":\"9am - 6pm\"},{\"label\":\"Sat\",\"value\":\"10am - 4pm\"},{\"label\":\"Sun\",\"value\":\"Closed\"}]', 'array', 'contact', 'Public business hours for contact page'],
+            ['contact_address', '123 Commerce St, Example City', 'text', 'contact', 'Primary store address'],
             ['social_facebook', 'https://facebook.com/vastcommerce', 'text', 'social', 'Official Facebook link'],
             ['site_twitter', 'https://twitter.com/vastcommerce', 'text', 'social', 'Official Twitter link'],
+            ['map_url', 'https://maps.google.com/maps?q=5.6037,0.1870&z=12&output=embed', 'text', 'location', 'Embedded map URL for contact page'],
             // Design Tokens (Colors)
             ['primary_color', '#4f46e5', 'color', 'theme', 'Main brand indigo color'],
             ['secondary_color', '#64748b', 'color', 'theme', 'Secondary slate color for neutral elements'],

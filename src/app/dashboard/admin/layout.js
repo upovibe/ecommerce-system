@@ -235,6 +235,11 @@ class AdminLayout extends App {
             href: "/dashboard/admin/customers",
           },
           {
+            label: "FAQs",
+            icon: "fas fa-question-circle",
+            href: "/dashboard/admin/faqs",
+          },
+          {
             label: "Cloud Pages",
             icon: "fas fa-pager",
             href: "/dashboard/admin/pages",
@@ -279,6 +284,7 @@ class AdminLayout extends App {
       pages: "Cloud Pages",
       settings: "Preferences",
       promotions: "Promotions",
+      faqs: "FAQs",
       profile: "Profile",
     };
     return map[last] || last.charAt(0).toUpperCase() + last.slice(1);
