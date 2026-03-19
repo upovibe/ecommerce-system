@@ -13,6 +13,7 @@ class PublicLayout extends App {
     this.settingsLoaded = false;
     this.whatsappNumber = "";
     this.showWhatsappFloat = true;
+    this.footerPages = [];
     this._loaded = false;
     this._pageContent = "";
   }
@@ -43,7 +44,7 @@ class PublicLayout extends App {
     const existingContent =
       this.querySelector("#page-content")?.innerHTML || this._pageContent || "";
     try {
-      const [nameRes, logoRes, primaryRes, accentRes, loginRes, iconRes, whatsappRes, floatRes, phoneRes] = await Promise.all([
+      const [nameRes, logoRes, primaryRes, accentRes, loginRes, iconRes, whatsappRes, floatRes, phoneRes, pagesRes] = await Promise.all([
         api.get("/settings/key/site_name").catch(() => null),
         api.get("/settings/key/site_logo").catch(() => null),
         api.get("/settings/key/primary_color").catch(() => null),
@@ -53,6 +54,7 @@ class PublicLayout extends App {
         api.get("/settings/key/admin_whatsapp").catch(() => null),
         api.get("/settings/key/whatsapp_float").catch(() => null),
         api.get("/settings/key/phone_number").catch(() => null),
+        api.get("/pages/active").catch(() => null),
       ]);
 
       if (nameRes?.data?.success) {
@@ -74,6 +76,9 @@ class PublicLayout extends App {
       }
       if (!this.whatsappNumber && phoneRes?.data?.success) {
         this.whatsappNumber = String(phoneRes.data.data.setting_value || "").trim();
+      }
+      if (pagesRes?.data?.success) {
+        this.footerPages = Array.isArray(pagesRes.data.data) ? pagesRes.data.data : [];
       }
       if (floatRes?.data?.success) {
         const raw = String(floatRes.data.data.setting_value || "1").toLowerCase();
@@ -332,21 +337,41 @@ class PublicLayout extends App {
                 <li><a href="#" class="hover:text-white transition-colors">Custom Orders</a></li>
               </ul>
             </div>
-            <div>
-              <h4 class="text-xs font-semibold text-indigo-400 mb-6">Support</h4>
-              <ul class="space-y-4 text-sm font-bold text-slate-400">
-                <li><a href="#" class="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" class="hover:text-white transition-colors">Shipping Info</a></li>
-                <li><a href="#" class="hover:text-white transition-colors">Returns</a></li>
-                <li><a href="/auth/login" class="hover:text-white transition-colors">Admin Portal</a></li>
-              </ul>
-            </div>
+              <div>
+                <h4 class="text-xs font-semibold text-indigo-400 mb-6">Support</h4>
+                <ul class="space-y-4 text-sm font-bold text-slate-400">
+                  ${
+                    (this.footerPages || [])
+                      .filter((p) => {
+                        const slug = String(p.slug || "").replace(/^\/+/, "");
+                        return !["home", "category", "product", "public", ""].includes(slug);
+                      })
+                      .map((p) => {
+                        const slug = String(p.slug || "").replace(/^\/+/, "");
+                        return `<li><a href="/public/pages/${slug}" class="hover:text-white transition-colors">${p.title}</a></li>`;
+                      })
+                      .join("")
+                  }
+                  <li><a href="/auth/login" class="hover:text-white transition-colors">Admin Portal</a></li>
+                </ul>
+              </div>
           </div>
           <div class="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-semibold text-slate-500">
             <p>&copy; 2026 VastCommerce Architecture</p>
             <div class="flex gap-8">
-              <a href="#" class="hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" class="hover:text-white transition-colors">Terms of Service</a>
+              ${
+                (this.footerPages || [])
+                  .filter((p) => {
+                    const slug = String(p.slug || "").replace(/^\/+/, "");
+                    return !["home", "category", "product", "public", ""].includes(slug);
+                  })
+                  .slice(0, 2)
+                  .map((p) => {
+                    const slug = String(p.slug || "").replace(/^\/+/, "");
+                    return `<a href="/public/pages/${slug}" class="hover:text-white transition-colors">${p.title}</a>`;
+                  })
+                  .join("")
+              }
             </div>
           </div>
         </footer>
