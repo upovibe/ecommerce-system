@@ -961,6 +961,7 @@ class PublicProductDetailsPage extends App {
         </section>
       `;
     }
+    const isLoggedIn = !!localStorage.getItem("token");
 
     if (this.error || !this.product) {
       return `
@@ -1111,13 +1112,13 @@ class PublicProductDetailsPage extends App {
               <button data-buy-now ${this.isVariantRequired() && !this.isVariantSelected() ? "disabled" : ""} class="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                 ${isService ? "Book now" : "Buy now"}
               </button>
-              ${
-                this.loginSettingLoaded
-                  ? this.allowLogin
-                    ? `<button data-save-wishlist ${this.isVariantRequired() && !this.isVariantSelected() ? "disabled" : ""} class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition disabled:opacity-50 disabled:cursor-not-allowed">Save to wishlist</button>`
-                    : ""
-                  : `<div class="h-11 w-40 rounded-2xl bg-slate-100 animate-pulse"></div>`
-              }
+                ${
+                  this.loginSettingLoaded
+                    ? this.allowLogin && isLoggedIn
+                      ? `<button data-save-wishlist ${this.isVariantRequired() && !this.isVariantSelected() ? "disabled" : ""} class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition disabled:opacity-50 disabled:cursor-not-allowed">Save to wishlist</button>`
+                      : ""
+                    : `<div class="h-11 w-40 rounded-2xl bg-slate-100 animate-pulse"></div>`
+                }
             </div>
           </div>
         </div>

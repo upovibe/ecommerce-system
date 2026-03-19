@@ -170,6 +170,71 @@ class ProductController
         }
     }
 
+    // GET /products/public-filters — variant/attribute filters for public catalog
+    public function publicFilters()
+    {
+        try {
+            $variantOptions = [];
+            $variantMap = [];
+            $stmt = $this->pdo->query("
+                SELECT v.product_id, t.name AS type_name, v.value
+                FROM product_variants v
+                JOIN product_variant_types t ON t.id = v.variant_type_id
+                JOIN products p ON p.id = v.product_id
+                WHERE p.is_active = 1 AND p.status = 'active'
+            ");
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $row) {
+                $pid = (int) $row['product_id'];
+                $type = trim((string) $row['type_name']);
+                $value = trim((string) $row['value']);
+                if ($type === '' || $value === '') continue;
+                if (!isset($variantOptions[$type])) $variantOptions[$type] = [];
+                if (!in_array($value, $variantOptions[$type], true)) $variantOptions[$type][] = $value;
+                if (!isset($variantMap[$pid])) $variantMap[$pid] = [];
+                $variantMap[$pid][] = ['type' => $type, 'value' => $value];
+            }
+
+            $attributeOptions = [];
+            $attributeMap = [];
+            $stmt = $this->pdo->query("
+                SELECT a.product_id, t.name AS type_name, a.value
+                FROM product_attributes a
+                JOIN product_attribute_types t ON t.id = a.attribute_type_id
+                JOIN products p ON p.id = a.product_id
+                WHERE p.is_active = 1 AND p.status = 'active'
+            ");
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $row) {
+                $pid = (int) $row['product_id'];
+                $type = trim((string) $row['type_name']);
+                $value = trim((string) $row['value']);
+                if ($type === '' || $value === '') continue;
+                if (!isset($attributeOptions[$type])) $attributeOptions[$type] = [];
+                if (!in_array($value, $attributeOptions[$type], true)) $attributeOptions[$type][] = $value;
+                if (!isset($attributeMap[$pid])) $attributeMap[$pid] = [];
+                $attributeMap[$pid][] = ['type' => $type, 'value' => $value];
+            }
+
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'variants' => [
+                        'options' => $variantOptions,
+                        'map' => $variantMap
+                    ],
+                    'attributes' => [
+                        'options' => $attributeOptions,
+                        'map' => $attributeMap
+                    ]
+                ]
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // GET /products/{id}
     // ─────────────────────────────────────────────────────────────────────────

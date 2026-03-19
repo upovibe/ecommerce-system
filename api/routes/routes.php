@@ -92,6 +92,7 @@ Router::post('/product-attribute-types', 'ProductAttributeTypeController@store')
 // Product Management Routes (admin only)
 Router::get('/products', 'ProductController@index');
 Router::get('/products/public', 'ProductController@publicIndex');
+Router::get('/products/public-filters', 'ProductController@publicFilters');
 Router::get('/products/public/{slug}', 'ProductController@publicShow');
 Router::post('/products', 'ProductController@store');
 Router::get('/products/{id}', 'ProductController@show');
@@ -126,6 +127,10 @@ Router::get('/orders', 'OrderController@index');
 Router::get('/orders/{id}', 'OrderController@show');
 Router::put('/orders/{id}', 'OrderController@update');
 Router::post('/orders/guest', 'OrderController@createGuestOrder');
+
+// Payments (Paystack)
+Router::post('/payments/initialize', 'PaymentController@initialize');
+Router::get('/payments/verify', 'PaymentController@verify');
 
 // Settings Management Routes (admin only for create/update/delete, public for view)
 Router::get('/settings', 'SettingController@index');

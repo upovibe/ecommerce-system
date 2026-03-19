@@ -12,10 +12,12 @@ class PublicOrderSummaryPage extends App {
     this.allowedPaymentModes = [];
     this.paymentMode = "";
     this.whatsappNumber = "";
-    this.allowGuestCheckout = true;
     this.submitting = false;
     this.orderRef = "";
     this.confirmOpen = false;
+    this.confirmTitle = "Order Confirmed!";
+    this.confirmSubtitle = "Successfully sent to WhatsApp";
+    this.confirmBody = "We've sent your order details to WhatsApp. Please check your messages to complete payment.";
     this.draft = null;
     this.customer = { name: "", email: "", phone: "", note: "" };
     this.deliveryAddress = { line1: "", line2: "", city: "", state: "", country: "", postal: "" };
@@ -32,6 +34,7 @@ class PublicOrderSummaryPage extends App {
     if (!this.draft) return;
     await this.loadSettings();
     await this.loadCart();
+    await this.handlePaystackVerify();
   }
 
   loadDraft() {
@@ -93,11 +96,10 @@ class PublicOrderSummaryPage extends App {
 
   async loadSettings() {
     try {
-      const [currencyRes, modesRes, whatsappRes, guestRes] = await Promise.all([
+      const [currencyRes, modesRes, whatsappRes] = await Promise.all([
         api.get("/settings/key/currency").catch(() => null),
         api.get("/settings/key/allowed_payment_modes").catch(() => null),
         api.get("/settings/key/admin_whatsapp").catch(() => null),
-        api.get("/settings/key/allow_guest_checkout").catch(() => null),
       ]);
       const currencyVal = currencyRes?.data?.data?.setting_value;
       if (currencyVal) this.currencyCode = String(currencyVal).toUpperCase();
@@ -105,13 +107,43 @@ class PublicOrderSummaryPage extends App {
       if (whatsappRes?.data?.success) {
         this.whatsappNumber = String(whatsappRes.data.data.setting_value || "").trim();
       }
-      if (guestRes?.data?.success) {
-        const raw = String(guestRes.data.data.setting_value || "1").toLowerCase();
-        this.allowGuestCheckout = !(raw === "0" || raw === "false" || raw === "no");
-      }
       if (!this.paymentMode) this.paymentMode = this.allowedPaymentModes[0] || "whatsapp";
     } catch (_) {
       this.allowedPaymentModes = [];
+    }
+  }
+
+  async handlePaystackVerify() {
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference") || params.get("trxref");
+    if (!reference) return;
+
+    try {
+      const res = await api.get(`/payments/verify?reference=${encodeURIComponent(reference)}`).catch(() => null);
+      if (res?.data?.success) {
+        this.confirmTitle = "Payment Successful!";
+        this.confirmSubtitle = "Your payment has been confirmed";
+        this.confirmBody = "We have received your payment and your order is now being processed.";
+        this.confirmOpen = true;
+        localStorage.removeItem("guest_cart");
+        localStorage.setItem("cart_count", "0");
+        localStorage.removeItem("order_draft");
+        this.items = [];
+        this.total = 0;
+        this.updateView();
+      } else {
+        window.Toast?.show?.({
+          title: "Payment verification failed",
+          message: res?.data?.message || "Unable to verify payment.",
+          variant: "error",
+        });
+      }
+    } catch (_) {
+      window.Toast?.show?.({
+        title: "Payment verification failed",
+        message: "Unable to verify payment.",
+        variant: "error",
+      });
     }
   }
 
@@ -221,21 +253,21 @@ class PublicOrderSummaryPage extends App {
 
   async placeOrder() {
     if (this.submitting) return;
-    if (!this.allowGuestCheckout && !this.isCustomerLoggedIn()) {
-      window.Toast?.show?.({
-        title: "Sign in required",
-        message: "Please sign in to continue checkout.",
-        variant: "warning",
-      });
-      window.location.href = "/auth/customer-login";
-      return;
-    }
     if (!this.items.length) {
       window.Toast?.show?.({
         title: "Cart empty",
         message: "Please add items to your cart before placing an order.",
         variant: "warning",
       });
+      return;
+    }
+    if (!this.isCustomerLoggedIn() && this.paymentMode !== "whatsapp") {
+      window.Toast?.show?.({
+        title: "Sign in required",
+        message: "Please sign in to use card or mobile money payments.",
+        variant: "warning",
+      });
+      window.location.href = "/auth/customer-login";
       return;
     }
 
@@ -282,8 +314,9 @@ class PublicOrderSummaryPage extends App {
             }
           : null;
 
+      let orderId = null;
       if (this.isCustomerLoggedIn()) {
-        await api.post("/orders", {
+        const res = await api.post("/orders", {
           order_type: this.orderType || "delivery",
           payment_mode: this.paymentMode || this.allowedPaymentModes[0] || "whatsapp",
           metadata: {
@@ -293,8 +326,9 @@ class PublicOrderSummaryPage extends App {
             reference: ref,
           },
         });
+        orderId = res?.data?.order_id || null;
       } else {
-        await api.post("/orders/guest", {
+        const res = await api.post("/orders/guest", {
           customer: {
             ...payloadCustomer,
             pickup_contact: pickupPayload,
@@ -307,17 +341,40 @@ class PublicOrderSummaryPage extends App {
           order_type: this.orderType || "delivery",
           payment_mode: this.paymentMode || this.allowedPaymentModes[0] || "whatsapp",
         });
+        orderId = res?.data?.order_id || null;
       }
 
-      const message = this.formatWhatsAppMessage({
-        items: this.items,
-        customer: { ...payloadCustomer, address: addr },
-        pickup: pickupPayload,
-        total: this.fmt(this.total),
-        ref,
-      });
-      this.openWhatsApp(message);
-      this.confirmOpen = true;
+      if (this.paymentMode === "whatsapp") {
+        const message = this.formatWhatsAppMessage({
+          items: this.items,
+          customer: { ...payloadCustomer, address: addr },
+          pickup: pickupPayload,
+          total: this.fmt(this.total),
+          ref,
+        });
+        this.openWhatsApp(message);
+        this.confirmTitle = "Order Confirmed!";
+        this.confirmSubtitle = "Successfully sent to WhatsApp";
+        this.confirmBody = "We've sent your order details to WhatsApp. Please check your messages to complete payment.";
+        this.confirmOpen = true;
+      } else {
+        const init = await api.post("/payments/initialize", {
+          order_id: orderId,
+          email: payloadCustomer.email,
+          payment_mode: this.paymentMode,
+          reference: ref,
+        });
+        const url = init?.data?.data?.authorization_url;
+        if (url) {
+          window.location.href = url;
+          return;
+        }
+        window.Toast?.show?.({
+          title: "Payment failed",
+          message: "Unable to initialize payment.",
+          variant: "error",
+        });
+      }
 
       localStorage.removeItem("guest_cart");
       localStorage.setItem("cart_count", "0");
@@ -360,9 +417,15 @@ class PublicOrderSummaryPage extends App {
       `;
     }
 
-    const paymentModes = this.allowedPaymentModes.length
+    const isLoggedIn = this.isCustomerLoggedIn();
+    const paymentModes = (this.allowedPaymentModes.length
       ? this.allowedPaymentModes
-      : ["whatsapp", "card", "mobile_money"];
+      : ["whatsapp", "card", "mobile_money"]).filter((mode) =>
+      isLoggedIn ? true : mode === "whatsapp",
+    );
+    if (!paymentModes.includes(this.paymentMode)) {
+      this.paymentMode = paymentModes[0] || "whatsapp";
+    }
     const isDelivery = this.orderType === "delivery";
     const isPickup = this.orderType === "pickup";
     const addressSummary = [
@@ -471,8 +534,8 @@ class PublicOrderSummaryPage extends App {
                           : "Mobile Money";
                     const subText =
                       mode === "whatsapp"
-                        ? "More options coming soon"
-                        : "Coming Soon";
+                        ? "Chat and confirm your order"
+                        : "Secure Paystack checkout";
                     return `
                       <button type="button" class="w-full text-left border ${active ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-100"} rounded-2xl px-4 py-3 flex items-start gap-3 hover:border-slate-300 transition" onclick="this.closest('app-public-order-summary-page').paymentMode='${mode}'; this.closest('app-public-order-summary-page').updateView();">
                         <div class="w-4 h-4 rounded-full border ${active ? "border-slate-900" : "border-slate-300"} flex items-center justify-center mt-1">
@@ -507,8 +570,8 @@ class PublicOrderSummaryPage extends App {
                             <i class="fas fa-check-circle text-emerald-600 text-2xl"></i>
                           </div>
                           <div>
-                            <h3 class="text-2xl font-black text-slate-900">Order Confirmed!</h3>
-                            <p class="text-sm text-emerald-600 mt-1">Successfully sent to WhatsApp</p>
+                            <h3 class="text-2xl font-black text-slate-900">${this.confirmTitle}</h3>
+                            <p class="text-sm text-emerald-600 mt-1">${this.confirmSubtitle}</p>
                           </div>
                         </div>
                         <button type="button" class="text-slate-400 hover:text-slate-600" onclick="this.closest('app-public-order-summary-page').confirmOpen=false; this.closest('app-public-order-summary-page').updateView();">
@@ -523,7 +586,7 @@ class PublicOrderSummaryPage extends App {
                           <i class="fas fa-check text-emerald-600 text-3xl"></i>
                         </div>
                         <p class="text-lg text-slate-700">
-                          We've sent your order details to WhatsApp. Please check your messages to complete payment.
+                          ${this.confirmBody}
                         </p>
                       </div>
 

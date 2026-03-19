@@ -104,7 +104,7 @@ class OrderController
         $phone = $payload['phone'] ?? '';
         $total = $payload['total'] ?? 0;
         $orderType = $payload['order_type'] ?? 'delivery';
-        $paymentMode = $payload['payment_mode'] ?? 'pay_on_delivery';
+        $paymentMode = $payload['payment_mode'] ?? 'whatsapp';
 
         $message = "New order #{$orderId}\nName: {$name}\nEmail: {$email}\nPhone: {$phone}\nTotal: {$total}\nType: {$orderType}\nPayment: {$paymentMode}";
         $url = "https://wa.me/{$digits}?text=" . urlencode($message);
@@ -124,10 +124,10 @@ class OrderController
             $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
             $orderType = $data['order_type'] ?? 'delivery';
-            $paymentMode = $data['payment_mode'] ?? 'pay_on_delivery';
+            $paymentMode = $data['payment_mode'] ?? 'whatsapp';
 
             $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'pickup', 'service']);
-            $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery']);
+            $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['whatsapp', 'card', 'mobile_money']);
 
             if (!in_array($orderType, $allowedOrderTypes, true)) {
                 http_response_code(400);
@@ -367,7 +367,7 @@ class OrderController
             }
 
             if (isset($data['payment_mode'])) {
-                $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery']);
+                $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['whatsapp', 'card', 'mobile_money']);
                 if (!in_array($data['payment_mode'], $allowedPaymentModes, true)) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'message' => 'Invalid payment mode']);
@@ -437,9 +437,9 @@ class OrderController
             }
 
             $orderType = $data['order_type'] ?? 'delivery';
-            $paymentMode = $data['payment_mode'] ?? 'pay_on_delivery';
+            $paymentMode = $data['payment_mode'] ?? 'whatsapp';
             $allowedOrderTypes = $this->getAllowedList('allowed_order_types', ['delivery', 'pickup', 'service']);
-            $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['pay_on_delivery', 'pay_before_delivery']);
+            $allowedPaymentModes = $this->getAllowedList('allowed_payment_modes', ['whatsapp', 'card', 'mobile_money']);
             if (!in_array($orderType, $allowedOrderTypes, true)) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'message' => 'Invalid order type']);

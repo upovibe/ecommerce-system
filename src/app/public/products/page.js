@@ -4,6 +4,8 @@ import "@/components/ui/ContentDisplay.js";
 import "@/components/ui/Input.js";
 import "@/components/ui/Dropdown.js";
 import "@/components/ui/Switch.js";
+import "@/components/ui/Accordion.js";
+import "@/components/ui/Checkbox.js";
 import api from "@/services/api.js";
 
 class ProductsPage extends App {
@@ -33,6 +35,12 @@ class ProductsPage extends App {
     this.inStockOnly = false;
     this.selectedBrands = new Set();
     this.selectedMaterials = new Set();
+    this.variantFilterOptions = {};
+    this.attributeFilterOptions = {};
+    this.variantFilterMap = {};
+    this.attributeFilterMap = {};
+    this.selectedVariantFilters = {};
+    this.selectedAttributeFilters = {};
     this._lastRendered = "";
     this._isInitialized = false;
   }
@@ -55,6 +63,7 @@ class ProductsPage extends App {
       this.loadCurrency(),
       this.loadPage(),
       this.loadLoginSetting(),
+      this.loadFilters(),
     ]);
   }
 
@@ -119,6 +128,40 @@ class ProductsPage extends App {
       this.allowLogin = !(raw === "0" || raw === "false" || raw === "no");
     } catch (_) {
       this.allowLogin = true;
+    }
+  }
+
+  getCategoryScopedProducts() {
+    if (!this.products.length) return [];
+    let list = [...this.products];
+    if (this.activeSubcategoryId) {
+      list = list.filter(
+        (p) => Number(p.category_id) === Number(this.activeSubcategoryId),
+      );
+    } else if (this.activeParentCategoryId) {
+      const children = this.categoriesMeta
+        .filter((c) => Number(c.parent_id) === Number(this.activeParentCategoryId))
+        .map((c) => c.id);
+      if (children.length) {
+        list = list.filter((p) => children.includes(Number(p.category_id)));
+      }
+    }
+    return list;
+  }
+
+  async loadFilters() {
+    try {
+      const res = await api.get("/products/public-filters");
+      const data = res?.data?.data || {};
+      this.variantFilterOptions = data?.variants?.options || {};
+      this.variantFilterMap = data?.variants?.map || {};
+      this.attributeFilterOptions = data?.attributes?.options || {};
+      this.attributeFilterMap = data?.attributes?.map || {};
+    } catch (_) {
+      this.variantFilterOptions = {};
+      this.variantFilterMap = {};
+      this.attributeFilterOptions = {};
+      this.attributeFilterMap = {};
     }
   }
 
@@ -330,31 +373,78 @@ class ProductsPage extends App {
       });
     }
 
-    const clear = this.querySelector("#clear-filters");
-    if (clear) {
-      clear.addEventListener("click", () => {
-        this.searchTerm = "";
-        this.sortBy = "newest";
-        this.priceMin = "";
-        this.priceMax = "";
-        this.inStockOnly = false;
-        this.selectedBrands.clear();
-        this.selectedMaterials.clear();
-        this.activeSubcategoryId = null;
-        const brandSelectEl = this.querySelector("#brand-filter");
-        if (brandSelectEl) brandSelectEl.value = [];
-        const materialSelectEl = this.querySelector("#material-filter");
-        if (materialSelectEl) materialSelectEl.value = [];
-        const searchEl = this.querySelector("#product-search");
-        if (searchEl) searchEl.setAttribute("value", "");
-        const minEl = this.querySelector("#price-min");
-        if (minEl) minEl.setAttribute("value", "");
-        const maxEl = this.querySelector("#price-max");
-        if (maxEl) maxEl.setAttribute("value", "");
-        this.updateView();
+      const clear = this.querySelector("#clear-filters");
+      if (clear) {
+        clear.addEventListener("click", () => {
+          this.searchTerm = "";
+          this.sortBy = "newest";
+          this.priceMin = "";
+          this.priceMax = "";
+          this.inStockOnly = false;
+          this.selectedBrands.clear();
+          this.selectedMaterials.clear();
+          this.selectedVariantFilters = {};
+          this.selectedAttributeFilters = {};
+          this.activeSubcategoryId = null;
+          const brandSelectEl = this.querySelector("#brand-filter");
+          if (brandSelectEl) brandSelectEl.value = [];
+          const materialSelectEl = this.querySelector("#material-filter");
+          if (materialSelectEl) materialSelectEl.value = [];
+          const searchEl = this.querySelector("#product-search");
+          if (searchEl) searchEl.setAttribute("value", "");
+          const minEl = this.querySelector("#price-min");
+          if (minEl) minEl.setAttribute("value", "");
+          const maxEl = this.querySelector("#price-max");
+          if (maxEl) maxEl.setAttribute("value", "");
+          const rangeMin = this.querySelector("#price-range-min");
+          if (rangeMin) rangeMin.value = "";
+          const rangeMax = this.querySelector("#price-range-max");
+          if (rangeMax) rangeMax.value = "";
+          this.updateView();
+        });
+      }
+
+      const rangeMin = this.querySelector("#price-range-min");
+      if (rangeMin) {
+        rangeMin.addEventListener("input", (e) => {
+          this.priceMin = e.target?.value ?? "";
+          this.updateView();
+        });
+      }
+      const rangeMax = this.querySelector("#price-range-max");
+      if (rangeMax) {
+        rangeMax.addEventListener("input", (e) => {
+          this.priceMax = e.target?.value ?? "";
+          this.updateView();
+        });
+      }
+
+      this.querySelectorAll("[data-variant-filter]").forEach((el) => {
+        el.addEventListener("change", (e) => {
+          const type = el.dataset.type;
+          const value = el.dataset.value;
+          const checked = e.detail?.checked ?? e.target?.checked;
+          if (!type || !value) return;
+          if (!this.selectedVariantFilters[type]) this.selectedVariantFilters[type] = new Set();
+          if (checked) this.selectedVariantFilters[type].add(value);
+          else this.selectedVariantFilters[type].delete(value);
+          this.updateView();
+        });
+      });
+
+      this.querySelectorAll("[data-attribute-filter]").forEach((el) => {
+        el.addEventListener("change", (e) => {
+          const type = el.dataset.type;
+          const value = el.dataset.value;
+          const checked = e.detail?.checked ?? e.target?.checked;
+          if (!type || !value) return;
+          if (!this.selectedAttributeFilters[type]) this.selectedAttributeFilters[type] = new Set();
+          if (checked) this.selectedAttributeFilters[type].add(value);
+          else this.selectedAttributeFilters[type].delete(value);
+          this.updateView();
+        });
       });
     }
-  }
 
   async addToWishlist(productId) {
     const token = localStorage.getItem("token");
@@ -525,9 +615,35 @@ class ProductsPage extends App {
       list = list.filter((p) => this.selectedBrands.has(p.brand_name || ""));
     }
 
-    if (this.selectedMaterials.size) {
-      list = list.filter((p) => this.selectedMaterials.has(p.material_name || ""));
-    }
+      if (this.selectedMaterials.size) {
+        list = list.filter((p) => this.selectedMaterials.has(p.material_name || ""));
+      }
+
+      const hasVariantFilters = Object.values(this.selectedVariantFilters || {}).some(
+        (s) => s && s.size,
+      );
+      if (hasVariantFilters) {
+        list = list.filter((p) => {
+          const variants = this.variantFilterMap?.[p.id] || [];
+          return Object.entries(this.selectedVariantFilters).every(([type, values]) => {
+            if (!values || !values.size) return true;
+            return variants.some((v) => v.type === type && values.has(v.value));
+          });
+        });
+      }
+
+      const hasAttributeFilters = Object.values(this.selectedAttributeFilters || {}).some(
+        (s) => s && s.size,
+      );
+      if (hasAttributeFilters) {
+        list = list.filter((p) => {
+          const attrs = this.attributeFilterMap?.[p.id] || [];
+          return Object.entries(this.selectedAttributeFilters).every(([type, values]) => {
+            if (!values || !values.size) return true;
+            return attrs.some((a) => a.type === type && values.has(a.value));
+          });
+        });
+      }
 
     switch (this.sortBy) {
       case "price_asc":
@@ -693,6 +809,32 @@ class ProductsPage extends App {
       `;
     }
     const filtered = this.getFilteredProducts();
+    const scopedProducts = this.getCategoryScopedProducts();
+    const scopedIds = new Set(scopedProducts.map((p) => p.id));
+    const scopedVariantOptions = {};
+    Object.keys(this.variantFilterOptions || {}).forEach((type) => {
+      const values = this.variantFilterOptions[type] || [];
+      const scoped = new Set();
+      scopedProducts.forEach((p) => {
+        const list = this.variantFilterMap?.[p.id] || [];
+        list.forEach((v) => {
+          if (v.type === type && values.includes(v.value)) scoped.add(v.value);
+        });
+      });
+      if (scoped.size) scopedVariantOptions[type] = Array.from(scoped);
+    });
+    const scopedAttributeOptions = {};
+    Object.keys(this.attributeFilterOptions || {}).forEach((type) => {
+      const values = this.attributeFilterOptions[type] || [];
+      const scoped = new Set();
+      scopedProducts.forEach((p) => {
+        const list = this.attributeFilterMap?.[p.id] || [];
+        list.forEach((a) => {
+          if (a.type === type && values.includes(a.value)) scoped.add(a.value);
+        });
+      });
+      if (scoped.size) scopedAttributeOptions[type] = Array.from(scoped);
+    });
     const pageContent = this.pageData?.content || "";
     const pageContentAttr = pageContent.replace(/"/g, "&quot;");
     const title = this.pageLoading ? "" : this.pageData?.title || "Premium Collection";
@@ -784,13 +926,21 @@ class ProductsPage extends App {
                 </ui-dropdown>
               </div>
 
-              <div>
-                <label class="text-[11px] font-semibold text-slate-500">Price range</label>
-                <div class="mt-2 grid grid-cols-2 gap-3">
-                  <ui-input id="price-min" type="number" label="Min price" placeholder="${priceBounds.min}" value="${this.priceMin}"></ui-input>
-                  <ui-input id="price-max" type="number" label="Max price" placeholder="${priceBounds.max}" value="${this.priceMax}"></ui-input>
+                <div>
+                  <label class="text-[11px] font-semibold text-slate-500">Price range</label>
+                  <div class="mt-2 grid grid-cols-2 gap-3">
+                    <ui-input id="price-min" type="number" label="Min price" placeholder="${priceBounds.min}" value="${this.priceMin}"></ui-input>
+                    <ui-input id="price-max" type="number" label="Max price" placeholder="${priceBounds.max}" value="${this.priceMax}"></ui-input>
+                  </div>
+                  <div class="mt-3">
+                    <input id="price-range-min" type="range" min="${priceBounds.min}" max="${priceBounds.max}" value="${this.priceMin || priceBounds.min}" class="w-full accent-slate-900">
+                    <input id="price-range-max" type="range" min="${priceBounds.min}" max="${priceBounds.max}" value="${this.priceMax || priceBounds.max}" class="w-full accent-slate-900 mt-2">
+                    <div class="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                      <span>${this.priceMin || priceBounds.min}</span>
+                      <span>${this.priceMax || priceBounds.max}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
               <div>
                 <label class="text-[11px] font-semibold text-slate-500">Stock</label>
@@ -799,23 +949,61 @@ class ProductsPage extends App {
                 </div>
               </div>
 
-              <div>
-                <label class="text-[11px] font-semibold text-slate-500">Brands</label>
-                <ui-dropdown id="brand-filter" multiple searchable placeholder="Select brands">
-                  ${filterOptions.brands
-                    .map((b) => `<ui-option value="${b}">${b}</ui-option>`)
-                    .join("")}
-                </ui-dropdown>
-              </div>
+                <div>
+                  <label class="text-[11px] font-semibold text-slate-500">Brands</label>
+                  <ui-dropdown id="brand-filter" multiple searchable placeholder="Select brands">
+                    ${filterOptions.brands
+                      .map((b) => `<ui-option value="${b}">${b}</ui-option>`)
+                      .join("")}
+                  </ui-dropdown>
+                </div>
 
-              <div>
-                <label class="text-[11px] font-semibold text-slate-500">Materials</label>
-                <ui-dropdown id="material-filter" multiple searchable placeholder="Select materials">
-                  ${filterOptions.materials
-                    .map((m) => `<ui-option value="${m}">${m}</ui-option>`)
-                    .join("")}
-                </ui-dropdown>
-              </div>
+                <div>
+                  <label class="text-[11px] font-semibold text-slate-500">Materials</label>
+                  <ui-dropdown id="material-filter" multiple searchable placeholder="Select materials">
+                    ${filterOptions.materials
+                      .map((m) => `<ui-option value="${m}">${m}</ui-option>`)
+                      .join("")}
+                  </ui-dropdown>
+                </div>
+
+                ${
+                  Object.keys(scopedVariantOptions || {}).length
+                    ? `
+                  <ui-accordion class="mt-2">
+                    ${Object.entries(scopedVariantOptions)
+                      .map(([type, values]) => `
+                        <ui-accordion-item title="${type}">
+                          <div class="grid grid-cols-2 gap-2">
+                            ${(values || []).map((val) => `
+                              <ui-checkbox data-variant-filter data-type="${type}" data-value="${val}" label="${val}" ${this.selectedVariantFilters?.[type]?.has(val) ? "checked" : ""}></ui-checkbox>
+                            `).join("")}
+                          </div>
+                        </ui-accordion-item>
+                      `).join("")}
+                  </ui-accordion>
+                `
+                    : ""
+                }
+
+                ${
+                  Object.keys(scopedAttributeOptions || {}).length
+                    ? `
+                  <ui-accordion class="mt-2">
+                    ${Object.entries(scopedAttributeOptions)
+                      .map(([type, values]) => `
+                        <ui-accordion-item title="${type}">
+                          <div class="grid grid-cols-2 gap-2">
+                            ${(values || []).map((val) => `
+                              <ui-checkbox data-attribute-filter data-type="${type}" data-value="${val}" label="${val}" ${this.selectedAttributeFilters?.[type]?.has(val) ? "checked" : ""}></ui-checkbox>
+                            `).join("")}
+                          </div>
+                        </ui-accordion-item>
+                      `).join("")}
+                  </ui-accordion>
+                `
+                    : ""
+                }
             </div>
           </aside>
 

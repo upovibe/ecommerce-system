@@ -25,6 +25,12 @@ class CustomerSignupPage extends App {
     super.connectedCallback();
     document.title = "Customer Sign Up";
     await this.loadLoginSetting();
+    const pending = localStorage.getItem("pending_signup_email");
+    if (pending) {
+      this.step = "verify";
+      this.verify.email = pending;
+      this.innerHTML = this.render();
+    }
   }
 
   async loadLoginSetting() {
@@ -83,9 +89,10 @@ class CustomerSignupPage extends App {
         date_of_birth,
         password,
       });
-      this.step = "verify";
-      this.verify.email = email;
-      this.render();
+        localStorage.setItem("pending_signup_email", email);
+        this.step = "verify";
+        this.verify.email = email;
+        this.innerHTML = this.render();
       window.Toast.show({
         title: "Verification sent",
         message: "A verification code has been sent to your email.",
@@ -109,20 +116,27 @@ class CustomerSignupPage extends App {
       });
       return;
     }
-    try {
-      await api.post("/auth/verify-registration", {
-        email: this.verify.email,
-        code: this.verify.code,
-      });
-      window.Toast.show({
-        title: "Verified",
-        message: "Your email has been verified. Please sign in.",
-        variant: "success",
-      });
-      setTimeout(() => {
-        window.location.href = "/auth/customer-login";
-      }, 700);
-    } catch (error) {
+      try {
+        const res = await api.post("/auth/verify-registration", {
+          email: this.verify.email,
+          code: this.verify.code,
+        });
+        const user = res?.data?.user || null;
+        const token = res?.data?.token || user?.token;
+          if (user && token) {
+            localStorage.setItem("userData", JSON.stringify(user));
+            localStorage.setItem("token", token);
+          }
+          localStorage.removeItem("pending_signup_email");
+          window.Toast.show({
+            title: "Verified",
+            message: "Your email has been verified. Welcome!",
+            variant: "success",
+          });
+          setTimeout(() => {
+          window.location.href = "/profile";
+          }, 700);
+      } catch (error) {
       window.Toast.show({
         title: "Verification failed",
         message: error.response?.data?.error || "Invalid or expired code.",
