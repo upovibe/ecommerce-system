@@ -163,7 +163,7 @@ class PublicOrderPage extends App {
       }
       this.settingsLoaded = true;
       this.syncOrderType();
-      if (!this.paymentMode) this.paymentMode = this.allowedPaymentModes[0] || "pay_on_delivery";
+      if (!this.paymentMode) this.paymentMode = this.allowedPaymentModes[0] || "whatsapp";
       this.updateView();
     } catch (_) {
       this.settingsLoaded = true;
@@ -406,6 +406,58 @@ class PublicOrderPage extends App {
     window.open(url, "_blank");
   }
 
+  continueToSummary() {
+    if (!this.items.length) {
+      window.Toast?.show?.({
+        title: "Cart empty",
+        message: "Please add items to your cart before continuing.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    const { name, email, phone } = this.customer;
+    const { line1, city } = this.deliveryAddress;
+    const requiresAddress = this.orderType === "delivery";
+    const pickerName = this.pickupContact.name;
+    const pickerPhone = this.pickupContact.phone;
+
+    if (!name || !email || !phone || (requiresAddress && (!line1 || !city))) {
+      window.Toast?.show?.({
+        title: "Missing details",
+        message: requiresAddress
+          ? "Please complete the required customer fields and delivery address."
+          : "Please complete the required customer fields.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    if (this.orderType === "pickup" && this.pickupMode === "someone" && (!pickerName || !pickerPhone)) {
+      window.Toast?.show?.({
+        title: "Pickup details",
+        message: "Please enter the pickup person's name and phone.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    const draft = {
+      orderType: this.orderType,
+      customer: { ...this.customer },
+      deliveryAddress: { ...this.deliveryAddress },
+      selectedAddressId: this.selectedAddressId,
+      pickupMode: this.pickupMode,
+      pickupContact: { ...this.pickupContact },
+      selectedPickupId: this.selectedPickupId,
+      saveAddress: this.saveAddress,
+      savePickup: this.savePickup,
+    };
+
+    localStorage.setItem("order_draft", JSON.stringify(draft));
+    window.location.href = "/public/order/summary";
+  }
+
   async placeOrder() {
     if (this.submitting) return;
     if (!this.items.length) {
@@ -481,7 +533,7 @@ class PublicOrderPage extends App {
       if (isLoggedIn) {
         const res = await api.post("/orders", {
           order_type: this.orderType || this.allowedOrderTypes[0] || "delivery",
-          payment_mode: this.paymentMode || this.allowedPaymentModes[0] || "pay_on_delivery",
+          payment_mode: this.paymentMode || this.allowedPaymentModes[0] || "whatsapp",
           metadata: {
             customer: {
               name,
@@ -539,7 +591,7 @@ class PublicOrderPage extends App {
             variant_id: item.variant_id || null,
           })),
           order_type: this.orderType || this.allowedOrderTypes[0] || "delivery",
-          payment_mode: this.paymentMode || this.allowedPaymentModes[0] || "pay_on_delivery",
+          payment_mode: this.paymentMode || this.allowedPaymentModes[0] || "whatsapp",
         });
         window.Toast?.show?.({
           title: "Order placed",
@@ -589,8 +641,8 @@ class PublicOrderPage extends App {
         this.paymentMode = e.detail?.value || "";
       });
     }
-    const place = this.querySelector("[data-place-order]");
-    if (place) place.addEventListener("click", () => this.placeOrder());
+    const next = this.querySelector("[data-continue-summary]");
+    if (next) next.addEventListener("click", () => this.continueToSummary());
   }
 
   render() {
@@ -620,7 +672,7 @@ class PublicOrderPage extends App {
     const orderTypes = this.getOrderTypeOptions();
     const paymentModes = this.allowedPaymentModes.length
       ? this.allowedPaymentModes
-      : ["pay_on_delivery", "pay_before_delivery"];
+      : ["whatsapp", "card", "mobile_money"];
     const isService = this.hasServiceItems();
     const hasSelection = !!this.orderType;
     const isDelivery = this.orderType === "delivery";
@@ -636,8 +688,8 @@ class PublicOrderPage extends App {
           <a href="/public/cart" class="text-sm font-semibold text-slate-500 hover:text-slate-900">Back to cart</a>
         </div>
 
-        <div class="grid lg:grid-cols-[1.5fr_1fr] gap-8">
-          <div class="space-y-6">
+          <div class="grid lg:grid-cols-[1.5fr_1fr] gap-8">
+            <div class="space-y-6">
             <div class="bg-white border border-slate-100 rounded-3xl p-6 space-y-4">
               <h2 class="text-lg font-black text-slate-900">Delivery type</h2>
               <div class="grid sm:grid-cols-2 gap-4">
@@ -876,72 +928,39 @@ class PublicOrderPage extends App {
                   Select a delivery type to continue checkout.
                 </div>
               `
-            }
-          </div>
-
-          <div class="bg-white border border-slate-100 rounded-3xl p-6 h-fit lg:sticky lg:top-28">
-            <h3 class="text-lg font-black text-slate-900 mb-4">Order summary</h3>
-            <div class="space-y-4">
-              ${this.items
-                .map((item) => {
-                  const image = this.getImageUrl(item.main_image);
-                  return `
-                    <div class="flex items-center gap-4">
-                      <div class="size-14 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 flex items-center justify-center">
-                        ${image ? `<img src="${image}" class="w-full h-full object-cover">` : `<i class="fas fa-image text-slate-300"></i>`}
-                      </div>
-                      <div class="flex-1 min-w-0">
-                        <p class="text-sm font-semibold text-slate-900 truncate">${item.product_name || "Product"}</p>
-                        <p class="text-xs text-slate-500">Qty ${item.quantity || 1}</p>
-                      </div>
-                      <p class="text-sm font-semibold text-slate-900">${this.fmt(Number(item.unit_price || 0) * Number(item.quantity || 0))}</p>
-                    </div>
-                  `;
-                })
-                .join("")}
+              }
             </div>
-            <div class="mt-6">
-              <h4 class="text-sm font-bold text-slate-900 mb-3">Payment type</h4>
-              <div class="space-y-3">
-                ${paymentModes
-                  .map((mode) => {
-                    const active = this.paymentMode === mode;
-                    const isPickupMode = this.orderType === "pickup";
-                    const label =
-                      mode === "pay_before_delivery"
-                        ? isPickupMode
-                          ? "Pay before pickup"
-                          : "Pay before delivery"
-                        : isPickupMode
-                          ? "Pay on pickup"
-                          : "Pay on delivery";
+
+            <div class="bg-white border border-slate-100 rounded-3xl p-6 h-fit lg:sticky lg:top-28">
+              <h3 class="text-lg font-black text-slate-900 mb-4">Order summary</h3>
+              <div class="space-y-4">
+                ${this.items
+                  .map((item) => {
+                    const image = this.getImageUrl(item.main_image);
                     return `
-                      <button type="button" class="w-full text-left border ${active ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-100"} rounded-2xl px-4 py-3 flex items-center gap-3 hover:border-slate-300 transition" onclick="this.closest('app-public-order-page').paymentMode='${mode}'; this.closest('app-public-order-page').updateView();">
-                        <div class="w-4 h-4 rounded-full border ${active ? "border-slate-900" : "border-slate-300"} flex items-center justify-center">
-                          ${active ? `<span class="w-2 h-2 bg-slate-900 rounded-full"></span>` : ""}
+                      <div class="flex items-center gap-4">
+                        <div class="size-14 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 flex items-center justify-center">
+                          ${image ? `<img src="${image}" class="w-full h-full object-cover">` : `<i class="fas fa-image text-slate-300"></i>`}
                         </div>
-                        <span class="text-sm font-semibold text-slate-900">${label}</span>
-                      </button>
+                        <div class="flex-1 min-w-0">
+                          <p class="text-sm font-semibold text-slate-900 truncate">${item.product_name || "Product"}</p>
+                          <p class="text-xs text-slate-500">Qty ${item.quantity || 1}</p>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-900">${this.fmt(Number(item.unit_price || 0) * Number(item.quantity || 0))}</p>
+                      </div>
                     `;
                   })
                   .join("")}
               </div>
+              <div class="border-t border-slate-100 mt-6 pt-4 flex items-center justify-between text-sm text-slate-600">
+                <span>Total</span>
+                <span class="font-semibold text-slate-900">${this.fmt(this.total)}</span>
+              </div>
+              <button data-continue-summary class="w-full mt-6 px-4 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition ${!hasSelection ? "opacity-60 cursor-not-allowed" : ""}" ${!hasSelection ? "disabled" : ""}>
+                Place order
+              </button>
+              <p class="text-xs text-slate-500 mt-3">You'll review your details and choose a checkout method next.</p>
             </div>
-            <div class="border-t border-slate-100 mt-6 pt-4 flex items-center justify-between text-sm text-slate-600">
-              <span>Total</span>
-              <span class="font-semibold text-slate-900">${this.fmt(this.total)}</span>
-            </div>
-            ${
-              this.paymentMode === "pay_before_delivery"
-                ? `<button class="w-full mt-4 px-4 py-3 rounded-2xl border border-emerald-200 text-emerald-700 text-sm font-semibold hover:bg-emerald-50 transition">
-                    Pay with Paystack
-                  </button>`
-                : ""
-            }
-            <button data-place-order class="w-full mt-6 px-4 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition ${this.submitting || !hasSelection ? "opacity-60 cursor-not-allowed" : ""}" ${this.submitting || !hasSelection ? "disabled" : ""}>
-              ${this.submitting ? "Placing order..." : "Place order"}
-            </button>
-          </div>
         </div>
       </section>
       ${this.confirmOpen ? `

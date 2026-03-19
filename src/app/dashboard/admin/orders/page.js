@@ -267,7 +267,7 @@ class OrdersPage extends App {
     const orderTypeOptions = (this.allowedOrderTypes.length ? this.allowedOrderTypes : ["delivery", "service"])
       .map((t) => `<ui-option value="${t}">${t}</ui-option>`)
       .join("");
-    const paymentModeOptions = (this.allowedPaymentModes.length ? this.allowedPaymentModes : ["pay_on_delivery", "pay_before_delivery", "in_person"])
+    const paymentModeOptions = (this.allowedPaymentModes.length ? this.allowedPaymentModes : ["whatsapp", "card", "mobile_money"])
       .map((t) => `<ui-option value="${t}">${t}</ui-option>`)
       .join("");
 

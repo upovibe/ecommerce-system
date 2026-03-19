@@ -27,7 +27,7 @@ class OrderUpdateModal extends HTMLElement {
     const orderTypes = (this.allowedOrderTypes.length ? this.allowedOrderTypes : ["delivery", "service"])
       .map((t) => `<ui-option value="${t}">${t}</ui-option>`)
       .join("");
-    const paymentModes = (this.allowedPaymentModes.length ? this.allowedPaymentModes : ["pay_on_delivery", "pay_before_delivery", "in_person"])
+    const paymentModes = (this.allowedPaymentModes.length ? this.allowedPaymentModes : ["whatsapp", "card", "mobile_money"])
       .map((t) => `<ui-option value="${t}">${t}</ui-option>`)
       .join("");
     const statuses = this.statusOptions
@@ -58,7 +58,7 @@ class OrderUpdateModal extends HTMLElement {
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-500 mb-1">Payment Mode</label>
-            <ui-dropdown id="order-payment-mode" value="${this.order.payment_mode || this.order.payment_method || "pay_on_delivery"}" class="w-full">
+            <ui-dropdown id="order-payment-mode" value="${this.order.payment_mode || this.order.payment_method || "whatsapp"}" class="w-full">
               ${paymentModes}
             </ui-dropdown>
           </div>

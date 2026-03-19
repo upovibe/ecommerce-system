@@ -412,7 +412,7 @@ class PublicProductDetailsPage extends App {
     this.guestOrderType =
       this.allowedOrderTypes[0] ||
       (this.product?.type === "service" ? "service" : "delivery");
-    this.guestPaymentMode = this.allowedPaymentModes[0] || "pay_on_delivery";
+    this.guestPaymentMode = this.allowedPaymentModes[0] || "whatsapp";
     this.guestCheckoutOpen = true;
     this.updateView();
   }
@@ -465,7 +465,7 @@ class PublicProductDetailsPage extends App {
         payment_mode:
           this.guestPaymentMode ||
           this.allowedPaymentModes[0] ||
-          "pay_on_delivery",
+            "whatsapp",
       });
 
       if (this.guestCheckoutSource === "cart") {
@@ -889,7 +889,12 @@ class PublicProductDetailsPage extends App {
       : ["delivery", "service"];
     const paymentModes = this.allowedPaymentModes.length
       ? this.allowedPaymentModes
-      : ["pay_on_delivery", "pay_before_delivery", "in_person"];
+      : ["whatsapp", "card", "mobile_money"];
+    const paymentLabels = {
+      whatsapp: "Checkout via WhatsApp",
+      card: "Pay with Card",
+      mobile_money: "Mobile Money",
+    };
     return `
       <ui-modal id="guest-checkout-modal" ${this.guestCheckoutOpen ? "open" : ""} position="right" size="md">
         <div slot="title">Guest checkout</div>
@@ -921,7 +926,9 @@ class PublicProductDetailsPage extends App {
             <div>
               <label class="block text-xs font-semibold text-slate-500 mb-1">Payment mode</label>
               <ui-dropdown value="${this.guestPaymentMode || paymentModes[0]}" onchange="this.closest('app-public-product-details-page').guestPaymentMode = event.detail.value">
-                ${paymentModes.map((m) => `<ui-option value="${m}">${m}</ui-option>`).join("")}
+                ${paymentModes
+                  .map((m) => `<ui-option value="${m}">${paymentLabels[m] || m}</ui-option>`)
+                  .join("")}
               </ui-dropdown>
             </div>
           </div>

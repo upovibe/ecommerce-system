@@ -293,13 +293,23 @@ class PublicLayout extends App {
         <!-- Main Content -->
         <main id="page-content" class="flex-grow"></main>
 
-        ${
-          this.showWhatsappFloat && this.whatsappNumber
-            ? `<a href="https://wa.me/${this.whatsappNumber.replace(/\\D+/g, "")}" target="_blank" rel="noopener" class="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg hover:shadow-xl transition z-[9999]">
-                <i class="fab fa-whatsapp text-2xl"></i>
-              </a>`
-            : ""
-        }
+          ${
+            this.showWhatsappFloat && this.whatsappNumber
+              ? (() => {
+                  const whatsappPhone = String(this.whatsappNumber).replace(/\\s+/g, "");
+                  return `<div class="fixed bottom-6 right-6 z-[9999]">
+                   <a href="https://api.whatsapp.com/send?phone=${encodeURIComponent(
+                     whatsappPhone
+                   )}&text=${encodeURIComponent(
+                     `Hello! 👋 I have a quick question about your store's hours and shipping policies. 📦🚚 Could you please share more details?`
+                   )}" target="_blank" rel="noopener" aria-label="Chat on WhatsApp" class="relative flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 shadow-lg transition-all duration-300 hover:scale-110">
+                     <i class="fab fa-whatsapp text-2xl"></i>
+                     <span class="absolute top-0 right-0 block h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white animate-ping"></span>
+                   </a>
+                 </div>`;
+                })()
+              : ""
+          }
 
         <!-- Global Footer -->
         <footer class="bg-slate-900 py-20 px-10 text-white">

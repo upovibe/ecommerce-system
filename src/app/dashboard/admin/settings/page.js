@@ -132,9 +132,9 @@ class SettingsPage extends App {
     }
     if (key === "allowed_payment_modes") {
       return [
-        { value: "pay_on_delivery", label: "Pay on delivery" },
-        { value: "pay_before_delivery", label: "Pay before delivery" },
-        { value: "in_person", label: "Pay in person" },
+        { value: "whatsapp", label: "Checkout via WhatsApp" },
+        { value: "card", label: "Pay with card" },
+        { value: "mobile_money", label: "Mobile money" },
       ];
     }
     return null;
