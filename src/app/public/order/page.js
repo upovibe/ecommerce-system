@@ -16,6 +16,7 @@ class PublicOrderPage extends App {
     this.allowedOrderTypes = [];
     this.allowedPaymentModes = [];
     this.userLoginEnabled = true;
+    this.allowGuestCheckout = true;
     this.settingsLoaded = false;
     this.submitting = false;
     this.customer = {
@@ -137,14 +138,15 @@ class PublicOrderPage extends App {
   }
 
   async loadSettings() {
-    try {
-      const [currencyRes, typesRes, modesRes, loginRes, whatsappRes] = await Promise.all([
-        api.get("/settings/key/currency").catch(() => null),
-        api.get("/settings/key/allowed_order_types").catch(() => null),
-        api.get("/settings/key/allowed_payment_modes").catch(() => null),
-        api.get("/settings/key/enable_user_login").catch(() => null),
-        api.get("/settings/key/admin_whatsapp").catch(() => null),
-      ]);
+      try {
+        const [currencyRes, typesRes, modesRes, loginRes, whatsappRes, guestRes] = await Promise.all([
+          api.get("/settings/key/currency").catch(() => null),
+          api.get("/settings/key/allowed_order_types").catch(() => null),
+          api.get("/settings/key/allowed_payment_modes").catch(() => null),
+          api.get("/settings/key/enable_user_login").catch(() => null),
+          api.get("/settings/key/admin_whatsapp").catch(() => null),
+          api.get("/settings/key/allow_guest_checkout").catch(() => null),
+        ]);
       const currencyVal = currencyRes?.data?.data?.setting_value;
       if (currencyVal) this.currencyCode = String(currencyVal).toUpperCase();
       this.allowedOrderTypes = this.parseSettingList(
@@ -158,9 +160,13 @@ class PublicOrderPage extends App {
       );
       const raw = String(loginRes?.data?.data?.setting_value ?? "1").toLowerCase();
       this.userLoginEnabled = !(raw === "0" || raw === "false" || raw === "no");
-      if (whatsappRes?.data?.success) {
-        this.whatsappNumber = String(whatsappRes.data.data.setting_value || "").trim();
-      }
+        if (whatsappRes?.data?.success) {
+          this.whatsappNumber = String(whatsappRes.data.data.setting_value || "").trim();
+        }
+        if (guestRes?.data?.success) {
+          const rawGuest = String(guestRes.data.data.setting_value || "1").toLowerCase();
+          this.allowGuestCheckout = !(rawGuest === "0" || rawGuest === "false" || rawGuest === "no");
+        }
       this.settingsLoaded = true;
       this.syncOrderType();
       if (!this.paymentMode) this.paymentMode = this.allowedPaymentModes[0] || "whatsapp";
@@ -415,6 +421,15 @@ class PublicOrderPage extends App {
       });
       return;
     }
+    if (!this.allowGuestCheckout && !this.isCustomerLoggedIn()) {
+      window.Toast?.show?.({
+        title: "Sign in required",
+        message: "Please sign in to continue checkout.",
+        variant: "warning",
+      });
+      window.location.href = "/auth/customer-login";
+      return;
+    }
 
     const { name, email, phone } = this.customer;
     const { line1, city } = this.deliveryAddress;
@@ -452,6 +467,8 @@ class PublicOrderPage extends App {
       selectedPickupId: this.selectedPickupId,
       saveAddress: this.saveAddress,
       savePickup: this.savePickup,
+      items: this.items,
+      total: this.total,
     };
 
     localStorage.setItem("order_draft", JSON.stringify(draft));

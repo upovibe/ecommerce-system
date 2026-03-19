@@ -12,6 +12,7 @@ class PublicOrderSummaryPage extends App {
     this.allowedPaymentModes = [];
     this.paymentMode = "";
     this.whatsappNumber = "";
+    this.allowGuestCheckout = true;
     this.submitting = false;
     this.orderRef = "";
     this.confirmOpen = false;
@@ -49,6 +50,10 @@ class PublicOrderSummaryPage extends App {
       this.pickupMode = draft.pickupMode || "self";
       this.selectedAddressId = draft.selectedAddressId || "";
       this.selectedPickupId = draft.selectedPickupId || "";
+      if (Array.isArray(draft.items) && draft.items.length) {
+        this.items = draft.items;
+        this.total = Number(draft.total || 0) || this.total;
+      }
     } catch (_) {
       window.location.href = "/public/order";
     }
@@ -88,16 +93,21 @@ class PublicOrderSummaryPage extends App {
 
   async loadSettings() {
     try {
-      const [currencyRes, modesRes, whatsappRes] = await Promise.all([
+      const [currencyRes, modesRes, whatsappRes, guestRes] = await Promise.all([
         api.get("/settings/key/currency").catch(() => null),
         api.get("/settings/key/allowed_payment_modes").catch(() => null),
         api.get("/settings/key/admin_whatsapp").catch(() => null),
+        api.get("/settings/key/allow_guest_checkout").catch(() => null),
       ]);
       const currencyVal = currencyRes?.data?.data?.setting_value;
       if (currencyVal) this.currencyCode = String(currencyVal).toUpperCase();
       this.allowedPaymentModes = this.parseSettingList(modesRes?.data?.data?.setting_value);
       if (whatsappRes?.data?.success) {
         this.whatsappNumber = String(whatsappRes.data.data.setting_value || "").trim();
+      }
+      if (guestRes?.data?.success) {
+        const raw = String(guestRes.data.data.setting_value || "1").toLowerCase();
+        this.allowGuestCheckout = !(raw === "0" || raw === "false" || raw === "no");
       }
       if (!this.paymentMode) this.paymentMode = this.allowedPaymentModes[0] || "whatsapp";
     } catch (_) {
@@ -119,6 +129,10 @@ class PublicOrderSummaryPage extends App {
         }
       } else {
         this.loadGuestCart();
+      }
+      if (!this.items.length && Array.isArray(this.draft?.items) && this.draft.items.length) {
+        this.items = this.draft.items;
+        this.total = Number(this.draft.total || 0) || this.total;
       }
     } catch (_) {
       this.items = [];
@@ -207,6 +221,15 @@ class PublicOrderSummaryPage extends App {
 
   async placeOrder() {
     if (this.submitting) return;
+    if (!this.allowGuestCheckout && !this.isCustomerLoggedIn()) {
+      window.Toast?.show?.({
+        title: "Sign in required",
+        message: "Please sign in to continue checkout.",
+        variant: "warning",
+      });
+      window.location.href = "/auth/customer-login";
+      return;
+    }
     if (!this.items.length) {
       window.Toast?.show?.({
         title: "Cart empty",
@@ -473,24 +496,70 @@ class PublicOrderSummaryPage extends App {
 
         ${
           this.confirmOpen
-            ? `<div class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[9999]">
-              <div class="bg-white rounded-3xl shadow-xl w-full max-w-md p-6">
-                <h3 class="text-xl font-black text-slate-900 mb-2">Order Confirmed!</h3>
-                <p class="text-sm text-slate-600 mb-4">Successfully sent to WhatsApp</p>
-                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm text-slate-600 mb-4">
-                  We've sent your order details to WhatsApp. Please check your messages to complete payment.
+            ? `<div class="fixed inset-0 z-[9999] overflow-y-auto">
+                <div class="fixed inset-0 bg-slate-900/75 backdrop-blur-sm" onclick="this.closest('app-public-order-summary-page').confirmOpen=false; this.closest('app-public-order-summary-page').updateView();"></div>
+                <div class="flex items-center justify-center min-h-screen px-4 py-10">
+                  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+                    <div class="px-8 py-6 bg-gradient-to-r from-emerald-50 to-sky-50 border-b border-slate-100">
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                          <div class="p-2 rounded-full bg-emerald-100">
+                            <i class="fas fa-check-circle text-emerald-600 text-2xl"></i>
+                          </div>
+                          <div>
+                            <h3 class="text-2xl font-black text-slate-900">Order Confirmed!</h3>
+                            <p class="text-sm text-emerald-600 mt-1">Successfully sent to WhatsApp</p>
+                          </div>
+                        </div>
+                        <button type="button" class="text-slate-400 hover:text-slate-600" onclick="this.closest('app-public-order-summary-page').confirmOpen=false; this.closest('app-public-order-summary-page').updateView();">
+                          <i class="fas fa-times"></i>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="px-8 py-6 space-y-6">
+                      <div class="text-center">
+                        <div class="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-emerald-100 mb-4">
+                          <i class="fas fa-check text-emerald-600 text-3xl"></i>
+                        </div>
+                        <p class="text-lg text-slate-700">
+                          We've sent your order details to WhatsApp. Please check your messages to complete payment.
+                        </p>
+                      </div>
+
+                      <div class="p-5 bg-gradient-to-r from-sky-50 to-emerald-50 rounded-xl border border-sky-100">
+                        <div class="flex items-center gap-3">
+                          <i class="fas fa-hashtag text-sky-500"></i>
+                          <div>
+                            <p class="text-sm font-medium text-slate-600">Your Order Reference:</p>
+                            <p class="text-xl font-black text-slate-900 tracking-wide">${this.orderRef}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="bg-sky-50/60 p-4 rounded-lg border border-sky-100">
+                        <div class="flex gap-3">
+                          <i class="fas fa-info-circle text-sky-500 mt-0.5"></i>
+                          <div>
+                            <h4 class="text-sm font-semibold text-sky-800">What's next?</h4>
+                            <div class="mt-2 text-sm text-sky-700 space-y-1">
+                              <div>Check your WhatsApp messages</div>
+                              <div>Confirm your order details</div>
+                              <div>Complete payment as instructed</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="px-8 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                        <button class="inline-flex items-center px-5 py-2.5 border border-slate-200 shadow-sm text-sm font-semibold rounded-lg text-slate-700 bg-white hover:bg-slate-50 transition" onclick="this.closest('app-public-order-summary-page').confirmOpen=false; this.closest('app-public-order-summary-page').updateView(); window.location.href='/public/products';">
+                          Close
+                        </button>
+                    </div>
+                  </div>
                 </div>
-                <div class="text-sm font-semibold text-slate-700 mb-2">Your Order Reference:</div>
-                <div class="text-lg font-black text-slate-900 mb-6">${this.orderRef}</div>
-                <div class="text-sm font-semibold text-slate-700 mb-2">What's next?</div>
-                <ul class="text-sm text-slate-600 space-y-1 mb-6">
-                  <li>Check your WhatsApp messages</li>
-                  <li>Confirm your order details</li>
-                  <li>Complete payment as instructed</li>
-                </ul>
-                <button class="w-full px-4 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition" onclick="this.closest('app-public-order-summary-page').confirmOpen=false; this.closest('app-public-order-summary-page').updateView();">Close</button>
-              </div>
-            </div>`
+              </div>`
             : ""
         }
       </section>
