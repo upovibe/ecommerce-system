@@ -3,9 +3,11 @@
 return [
     'db' => [
         'host' => 'localhost', // Change to your DB host
-        'name' => 'vastcommerce', // Change to your DB name
+        'name' => '4555497_ecommerce', // Change to your DB name
         'user' => 'root',      // Change to your DB user
-        'pass' => '',          // Change to your DB password
+        'pass' => '',
+        // 'user' => '4555497_ecommerce',      // Change to your DB user
+        // 'pass' => '',        // Change to your DB password
     ],
     'mail' => [
         'host' => 'mboxhosting.com',
