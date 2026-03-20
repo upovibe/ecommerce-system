@@ -130,6 +130,8 @@ Router::delete('/pickup-contacts/{id}', 'PickupContactController@destroy');
 
 // Orders (user)
 Router::post('/orders', 'OrderController@createFromCart');
+Router::get('/orders/my-orders', 'OrderController@myOrders');
+Router::get('/orders/my-orders/{id}', 'OrderController@showMyOrder');
 Router::get('/orders', 'OrderController@index');
 Router::get('/orders/{id}', 'OrderController@show');
 Router::put('/orders/{id}', 'OrderController@update');

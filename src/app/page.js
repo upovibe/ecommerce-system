@@ -39,11 +39,20 @@ export default class RootPage extends App {
       this.loadProducts(),
       this.loadCategories(),
       this.loadCurrency(),
+      this.loadWishlistIds(),
     ]);
   }
 
   attachEvents() {
     this.initCarousel("landing-categories");
+    this.querySelectorAll("[data-wishlist-id]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.dataset.wishlistId;
+        if (id) this.addToWishlist(id);
+      });
+    });
   }
 
   initCarousel(key) {
@@ -106,6 +115,53 @@ export default class RootPage extends App {
     if (this.heroTimer) {
       clearInterval(this.heroTimer);
       this.heroTimer = null;
+    }
+  }
+
+  async loadWishlistIds() {
+    this.wishlistIds = new Set();
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await api.get("/wishlist");
+      const items = res?.data?.data || [];
+      this.wishlistIds = new Set(items.map((item) => Number(item.product_id)));
+      this.updateView();
+    } catch (_) {
+      this.wishlistIds = new Set();
+    }
+  }
+
+  async addToWishlist(productId) {
+    const token = localStorage.getItem("token");
+    const id = Number(productId);
+    if (!token) {
+      localStorage.setItem("post_login_redirect", "/");
+      window.Toast?.show?.({
+        title: "Sign in required",
+        message: "Please sign in to save items.",
+        variant: "warning",
+      });
+      setTimeout(() => {
+        window.location.href = "/auth/customer-login";
+      }, 600);
+      return;
+    }
+    try {
+      await api.post("/wishlist/items", { product_id: id });
+      this.wishlistIds.add(id);
+      this.updateView();
+      window.Toast?.show?.({
+        title: "Saved",
+        message: "Added to wishlist.",
+        variant: "success",
+      });
+    } catch (e) {
+      window.Toast?.show?.({
+        title: "Error",
+        message: e.response?.data?.message || "Failed to update wishlist.",
+        variant: "error",
+      });
     }
   }
 
@@ -446,23 +502,34 @@ export default class RootPage extends App {
     const price = this.formatCurrency(p.base_price);
     const slug = p.slug || p.id;
     const url = `/public/products/${slug}`;
+    const isLiked = this.wishlistIds && this.wishlistIds.has(Number(p.id));
 
     return `
-      <div class="group cursor-pointer">
-        <div class="relative aspect-[4/5] bg-slate-50 rounded-[2.25rem] overflow-hidden mb-5 border border-slate-100 group-hover:shadow-2xl group-hover:shadow-indigo-100 transition-all duration-500">
-          ${
-            image
-              ? `<img src="${image}" alt="${p.name || "Product"}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
-              : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i class="fas fa-image"></i></div>`
-          }
-          <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-6">
-            <a href="${url}" class="w-full py-3 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-colors text-center">View Details</a>
+      <div class="group relative">
+        <a href="${url}" class="block">
+          <div class="relative aspect-[4/5] bg-slate-50 rounded-[2.25rem] overflow-hidden mb-5 border border-slate-100 group-hover:shadow-2xl group-hover:shadow-indigo-100 transition-all duration-500">
+            ${
+              image
+                ? `<img src="${image}" alt="${p.name || "Product"}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
+                : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i class="fas fa-image"></i></div>`
+            }
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-6">
+              <span class="w-full py-3 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-colors text-center">View Details</span>
+            </div>
           </div>
-        </div>
-        <div class="px-1">
-          <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-1">${category}</p>
-          <h3 class="text-base font-black text-slate-900 mb-1 leading-tight">${p.name || "Untitled Product"}</h3>
-          <p class="text-lg font-black text-slate-900">${price}</p>
+          <div class="px-1">
+            <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-1">${category}</p>
+            <h3 class="text-base font-black text-slate-900 mb-1 leading-tight">${p.name || "Untitled Product"}</h3>
+            <p class="text-lg font-black text-slate-900">${price}</p>
+          </div>
+        </a>
+        <div class="absolute top-5 right-5 z-20">
+          <button 
+            data-wishlist-id="${p.id}" 
+            class="w-10 h-10 bg-white/95 backdrop-blur-md rounded-xl flex items-center justify-center ${isLiked ? "text-rose-500 shadow-rose-100" : "text-slate-400"} hover:text-rose-500 transition-all shadow-xl hover:scale-110"
+          >
+            <i class="${isLiked ? "fas" : "far"} fa-heart"></i>
+          </button>
         </div>
       </div>
     `;

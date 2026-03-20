@@ -462,6 +462,17 @@ class UserController
         try {
             ob_clean();
 
+            // Require authentication
+            $currentUser = AuthMiddleware::requireAuth($this->pdo);
+
+            // Ensure user can only update their own profile OR is an admin
+            // Role ID 1 is assumed to be Admin
+            if ($currentUser['id'] != $id && ($currentUser['role_id'] ?? 0) != 1) {
+                http_response_code(403);
+                echo json_encode(['error' => 'You do not have permission to update this profile'], JSON_PRETTY_PRINT);
+                return;
+            }
+
             $data = json_decode(file_get_contents('php://input'), true);
             $model = $this->resolveModel($id);
 
@@ -476,6 +487,7 @@ class UserController
             // Remove sensitive fields that shouldn't be updated via profile
             unset($data['role_id']);
             unset($data['status']);
+            unset($data['is_super_admin']);
 
             $oldEmail = $existingUser['email'];
             $newEmail = $data['email'] ?? $oldEmail;
@@ -483,14 +495,8 @@ class UserController
 
             // Check email uniqueness if email is being updated
             if ($emailChanged) {
-                // Check if user has permission to change email (only Admin/Super Admin)
-                if ($existingUser['role_id'] != 1) {
-                    http_response_code(403);
-                    echo json_encode(['error' => 'You do not have permission to change your email address'], JSON_PRETTY_PRINT);
-                    return;
-                }
-
-                $emailExists = $model->findByEmail($data['email']);
+                // If not admin, we might want additional verification, but for now we allow self-update if unique
+                $emailExists = $model->findByEmailExcept($newEmail, $id);
                 if ($emailExists) {
                     http_response_code(400);
                     echo json_encode(['error' => 'Email already exists'], JSON_PRETTY_PRINT);
@@ -499,8 +505,15 @@ class UserController
             }
 
             // Hash password if provided
-            if (isset($data['password'])) {
+            if (isset($data['password']) && !empty($data['password'])) {
+                if (strlen($data['password']) < 8) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Password must be at least 8 characters long'], JSON_PRETTY_PRINT);
+                    return;
+                }
                 $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            } else {
+                unset($data['password']);
             }
 
             $result = $model->update($id, $data);

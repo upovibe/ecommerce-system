@@ -57,6 +57,7 @@ class ProductsPage extends App {
     super.connectedCallback();
     if (this._isInitialized) return;
     this._isInitialized = true;
+    this.wishlistIds = new Set();
     await Promise.all([
       this.loadProducts(),
       this.loadCategoriesMeta(),
@@ -64,6 +65,7 @@ class ProductsPage extends App {
       this.loadPage(),
       this.loadLoginSetting(),
       this.loadFilters(),
+      this.loadWishlistIds(),
     ]);
   }
 
@@ -71,6 +73,19 @@ class ProductsPage extends App {
     if (this.bannerTimer) {
       clearInterval(this.bannerTimer);
       this.bannerTimer = null;
+    }
+  }
+
+  async loadWishlistIds() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await api.get("/wishlist");
+      const items = res?.data?.data || [];
+      this.wishlistIds = new Set(items.map((item) => Number(item.product_id)));
+      this.updateView();
+    } catch (_) {
+      this.wishlistIds = new Set();
     }
   }
 
@@ -448,6 +463,7 @@ class ProductsPage extends App {
 
   async addToWishlist(productId) {
     const token = localStorage.getItem("token");
+    const id = Number(productId);
     if (this.allowLogin) {
       if (!token) {
         const current = `${window.location.pathname}${window.location.search || ""}`;
@@ -463,7 +479,9 @@ class ProductsPage extends App {
         return;
       }
       try {
-        await api.post("/wishlist/items", { product_id: Number(productId) });
+        await api.post("/wishlist/items", { product_id: id });
+        this.wishlistIds.add(id);
+        this.updateView();
         window.Toast?.show?.({
           title: "Saved",
           message: "Added to wishlist.",
@@ -472,7 +490,7 @@ class ProductsPage extends App {
       } catch (e) {
         window.Toast?.show?.({
           title: "Error",
-          message: e.response?.data?.message || "Failed to add to wishlist.",
+          message: e.response?.data?.message || "Failed to update wishlist.",
           variant: "error",
         });
       }
@@ -486,9 +504,11 @@ class ProductsPage extends App {
       list = [];
     }
     if (!Array.isArray(list)) list = [];
-    if (!list.some((item) => Number(item.product_id) === Number(productId))) {
-      list.push({ product_id: Number(productId) });
+    if (!list.some((item) => Number(item.product_id) === id)) {
+      list.push({ product_id: id });
       localStorage.setItem("guest_wishlist", JSON.stringify(list));
+      this.wishlistIds.add(id);
+      this.updateView();
     }
     window.Toast?.show?.({
       title: "Saved",
@@ -1061,29 +1081,36 @@ class ProductsPage extends App {
     const image = this.getImageUrl(product.main_image);
     const slug = product.slug || product.id;
     const url = `/public/products/${slug}`;
+    const isLiked = this.wishlistIds && this.wishlistIds.has(Number(product.id));
+
     return `
-      <a href="${url}" class="group block">
-        <div class="relative aspect-[4/5] bg-slate-50 rounded-[1.75rem] overflow-hidden mb-5 group-hover:shadow-2xl group-hover:shadow-indigo-100 transition-all duration-500">
-          ${
-            image
-              ? `<img src="${image}" alt="${name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
-              : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i class="fas fa-image"></i></div>`
-          }
-          <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
-            <button class="w-full py-3 bg-white text-slate-900 rounded-xl font-semibold text-xs hover:bg-indigo-600 hover:text-white transition-colors">Quick View</button>
+      <div class="group block relative">
+        <a href="${url}" class="block">
+          <div class="relative aspect-[4/5] bg-slate-50 rounded-[1.75rem] overflow-hidden mb-5 group-hover:shadow-2xl group-hover:shadow-indigo-100 transition-all duration-500 border border-slate-100">
+            ${
+              image
+                ? `<img src="${image}" alt="${name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">`
+                : `<div class="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i class="fas fa-image"></i></div>`
+            }
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
+              <span class="w-full py-3 bg-white text-slate-900 rounded-xl font-semibold text-xs hover:bg-indigo-600 hover:text-white transition-colors text-center">Quick View</span>
+            </div>
           </div>
-          <div class="absolute top-6 right-6">
-            <button data-wishlist-id="${product.id}" class="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm">
-              <i class="far fa-heart"></i>
-            </button>
+          <div class="px-2 min-w-0">
+            <p class="text-xs font-semibold text-indigo-600 mb-1">${category}</p>
+            <h3 class="text-lg font-black text-slate-900 mb-2 leading-tight">${name}</h3>
+            <p class="text-base font-black text-slate-900 break-words leading-tight">${price}</p>
           </div>
+        </a>
+        <div class="absolute top-6 right-6 z-20">
+          <button 
+            data-wishlist-id="${product.id}" 
+            class="w-10 h-10 bg-white/95 backdrop-blur-md rounded-xl flex items-center justify-center ${isLiked ? "text-rose-500 shadow-rose-100" : "text-slate-400"} hover:text-rose-500 transition-all shadow-xl hover:scale-110"
+          >
+            <i class="${isLiked ? "fas" : "far"} fa-heart"></i>
+          </button>
         </div>
-        <div class="px-2 min-w-0">
-          <p class="text-xs font-semibold text-indigo-600 mb-1">${category}</p>
-          <h3 class="text-lg font-black text-slate-900 mb-2 leading-tight">${name}</h3>
-          <p class="text-base font-black text-slate-900 break-words leading-tight">${price}</p>
-        </div>
-      </a>
+      </div>
     `;
   }
 }

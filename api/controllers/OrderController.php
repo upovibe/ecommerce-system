@@ -554,6 +554,109 @@ class OrderController
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /orders/my-orders — user orders
+    // ─────────────────────────────────────────────────────────
+    public function myOrders()
+    {
+        try {
+            $user = $this->getUser();
+            $stmt = $this->pdo->prepare("
+                SELECT
+                    o.*,
+                    COUNT(oi.id) AS items_count
+                FROM orders o
+                LEFT JOIN order_items oi ON oi.order_id = o.id
+                WHERE o.user_id = ?
+                GROUP BY o.id
+                ORDER BY o.created_at DESC
+            ");
+            $stmt->execute([$user['id']]);
+            $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($orders as &$o) {
+                $o['items_count'] = (int) ($o['items_count'] ?? 0);
+                $o['total_amount'] = (float) ($o['total_amount'] ?? 0);
+                if (isset($o['metadata']) && is_string($o['metadata'])) {
+                    $decoded = json_decode($o['metadata'], true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $o['metadata'] = $decoded;
+                    }
+                }
+            }
+
+            echo json_encode(['success' => true, 'data' => $orders]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /orders/my-orders/{id} — user order details
+    // ─────────────────────────────────────────────────────────
+    public function showMyOrder($id)
+    {
+        try {
+            $user = $this->getUser();
+            $stmt = $this->pdo->prepare("
+                SELECT
+                    o.*
+                FROM orders o
+                WHERE o.id = ? AND o.user_id = ?
+            ");
+            $stmt->execute([$id, $user['id']]);
+            $order = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$order) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Order not found']);
+                return;
+            }
+
+            if (isset($order['metadata']) && is_string($order['metadata'])) {
+                $decoded = json_decode($order['metadata'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $order['metadata'] = $decoded;
+                }
+            }
+
+            $itemsStmt = $this->pdo->prepare("
+                SELECT
+                    oi.*,
+                    p.name AS product_name,
+                    p.slug AS product_slug,
+                    p.main_image,
+                    v.value AS variant_value,
+                    t.name AS variant_type
+                FROM order_items oi
+                JOIN products p ON p.id = oi.product_id
+                LEFT JOIN product_variants v ON v.id = oi.variant_id
+                LEFT JOIN product_variant_types t ON t.id = v.variant_type_id
+                WHERE oi.order_id = ?
+                ORDER BY oi.id
+            ");
+            $itemsStmt->execute([$id]);
+            $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $total = 0;
+            foreach ($items as &$item) {
+                $item['quantity'] = (int) $item['quantity'];
+                $item['price_at_purchase'] = (float) $item['price_at_purchase'];
+                $item['line_total'] = $item['price_at_purchase'] * $item['quantity'];
+                $total += $item['line_total'];
+            }
+
+            $order['items'] = $items;
+            $order['items_total'] = $total;
+            $order['total_amount'] = (float) ($order['total_amount'] ?? 0);
+
+            echo json_encode(['success' => true, 'data' => $order]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
 }
 ?>
 

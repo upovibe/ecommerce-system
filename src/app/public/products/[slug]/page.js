@@ -66,6 +66,8 @@ class PublicProductDetailsPage extends App {
     await this.loadCurrency();
     await this.loadCheckoutSettings();
     await this.loadLoginSetting();
+    this.wishlistIds = new Set();
+    await this.loadWishlistIds();
     if (this.dataset.route) {
       try {
         this.routeParams = JSON.parse(decodeURIComponent(this.dataset.route));
@@ -80,6 +82,19 @@ class PublicProductDetailsPage extends App {
     if (this.autoSlideTimer) {
       clearInterval(this.autoSlideTimer);
       this.autoSlideTimer = null;
+    }
+  }
+
+  async loadWishlistIds() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await api.get("/wishlist");
+      const items = res?.data?.data || [];
+      this.wishlistIds = new Set(items.map((item) => Number(item.product_id)));
+      this.updateView();
+    } catch (_) {
+      this.wishlistIds = new Set();
     }
   }
 
@@ -682,6 +697,8 @@ class PublicProductDetailsPage extends App {
           product_id: this.product.id,
           variant_id: this.selectedVariantId || null,
         });
+        this.wishlistIds.add(Number(this.product.id));
+        this.updateView();
         window.Toast?.show?.({
           title: "Saved",
           message: "Added to wishlist.",
@@ -690,7 +707,7 @@ class PublicProductDetailsPage extends App {
       } catch (e) {
         window.Toast?.show?.({
           title: "Error",
-          message: e.response?.data?.message || "Failed to add to wishlist.",
+          message: e.response?.data?.message || "Failed to update wishlist.",
           variant: "error",
         });
       }
@@ -1115,7 +1132,13 @@ class PublicProductDetailsPage extends App {
                 ${
                   this.loginSettingLoaded
                     ? this.allowLogin && isLoggedIn
-                      ? `<button data-save-wishlist ${this.isVariantRequired() && !this.isVariantSelected() ? "disabled" : ""} class="px-5 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-500 transition disabled:opacity-50 disabled:cursor-not-allowed">Save to wishlist</button>`
+                      ? (() => {
+                          const isLiked = this.wishlistIds && this.wishlistIds.has(Number(product.id));
+                          return `<button data-save-wishlist ${this.isVariantRequired() && !this.isVariantSelected() ? "disabled" : ""} class="px-5 py-3 rounded-2xl border ${isLiked ? "border-rose-500 text-rose-500" : "border-slate-200 text-slate-700"} text-sm font-semibold hover:border-rose-300 hover:text-rose-500 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="${isLiked ? "fas" : "far"} fa-heart mr-2"></i>
+                            ${isLiked ? "Saved to wishlist" : "Save to wishlist"}
+                          </button>`;
+                        })()
                       : ""
                     : `<div class="h-11 w-40 rounded-2xl bg-slate-100 animate-pulse"></div>`
                 }
