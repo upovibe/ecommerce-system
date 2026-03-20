@@ -23,9 +23,9 @@ return [
         'public_key' => 'pk_test_241d946866cc647b13f3263c8ee149ea844aa995',
         'api_url' => 'https://api.paystack.co',
     ],
-    'client_url' => 'http://localhost:8002',
-    'api_url' => 'http://localhost:8002/api',
-    'app_url' => 'http://localhost:8002',
+    'client_url' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . ($_SERVER['HTTP_HOST'] ?? 'localhost:8002'),
+    'api_url' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . ($_SERVER['HTTP_HOST'] ?? 'localhost:8002') . "/api",
+    'app_url' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . ($_SERVER['HTTP_HOST'] ?? 'localhost:8002'),
 
 ]; 
 
